@@ -14,9 +14,14 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::get('/', function () {
-    return view('welcome');
-});
+// Route::get('/', function () {
+//     return view('welcome');
+// });
+Route::redirect('/', '/check-in');
+Route::redirect('/checkin', '/check-in');
+Route::get('/check-in', function () {
+    return view('checkin');
+})->name('checkin');
 
 Route::get('/dashboard', function () {
     return view('dashboard');
