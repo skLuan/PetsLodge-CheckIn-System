@@ -9,18 +9,16 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-    public function up(): void
+    public function up()
     {
         Schema::create('kind_of_pets', function (Blueprint $table) {
             $table->id();
+            $table->string('name')->unique(); // e.g., 'dog', 'cat', 'bird'
             $table->timestamps();
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
+    public function down()
     {
         Schema::dropIfExists('kind_of_pets');
     }

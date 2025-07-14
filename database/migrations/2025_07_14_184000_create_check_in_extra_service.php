@@ -11,13 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('foods', function (Blueprint $table) {
+        Schema::create('check_in_extra_service', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
-            $table->text('description')->nullable();
-            $table->foreignId('pet_id')->constrained()->onDelete('cascade');
-            $table->foreignId('moment_of_day_id')->constrained()->onDelete('restrict');
             $table->foreignId('check_in_id')->constrained()->onDelete('cascade');
+            $table->foreignId('extra_service_id')->constrained()->onDelete('cascade');
             $table->timestamps();
         });
     }
@@ -27,6 +24,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('food');
+        Schema::dropIfExists('check_in_extra_service');
     }
 };

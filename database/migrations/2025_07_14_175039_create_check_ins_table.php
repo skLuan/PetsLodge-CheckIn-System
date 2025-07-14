@@ -13,6 +13,10 @@ return new class extends Migration
     {
         Schema::create('check_ins', function (Blueprint $table) {
             $table->id();
+            $table->dateTime('check_in');
+            $table->dateTime('check_out')->nullable();
+            $table->foreignId('pet_id')->constrained()->onDelete('cascade');
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->timestamps();
         });
     }
