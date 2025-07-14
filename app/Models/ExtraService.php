@@ -8,4 +8,11 @@ use Illuminate\Database\Eloquent\Model;
 class ExtraService extends Model
 {
     use HasFactory;
+
+    protected $fillable = ['name'];
+
+    public function checkIns()
+    {
+        return $this->belongsToMany(CheckIn::class, 'check_in_extra_service');
+    }
 }

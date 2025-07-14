@@ -8,4 +8,11 @@ use Illuminate\Database\Eloquent\Model;
 class Castrated extends Model
 {
     use HasFactory;
+    
+    protected $fillable = ['status'];
+
+    public function pets()
+    {
+        return $this->hasMany(Pet::class);
+    }
 }

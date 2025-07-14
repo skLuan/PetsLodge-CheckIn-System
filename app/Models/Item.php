@@ -8,4 +8,10 @@ use Illuminate\Database\Eloquent\Model;
 class Item extends Model
 {
     use HasFactory;
+    protected $fillable = ['name', 'description', 'check_in_id'];
+
+    public function checkIn()
+    {
+        return $this->belongsTo(CheckIn::class);
+    }
 }
