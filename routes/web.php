@@ -20,8 +20,8 @@ use Illuminate\Support\Facades\Route;
 Route::redirect('/', '/check-in');
 Route::redirect('/checkin', '/check-in');
 Route::get('/check-in', function () {
-    return view('checkin');
-})->name('checkin');
+    return view('CheckIn');
+})->name('CheckIn');
 
 Route::get('/dashboard', function () {
     return view('dashboard');
@@ -33,4 +33,10 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
+use App\Http\Controllers\CheckInController;
+
+Route::post('/check-user', [CheckInController::class, 'checkUser'])->name('check-user');
+Route::get('/new-form', [CheckInController::class, 'newForm'])->name('new-form');
+Route::get('/new-form-pre-filled', [CheckInController::class, 'newFormPreFilled'])->name('new-form-pre-filled');
+Route::get('/view-check-in', [CheckInController::class, 'viewCheckIn'])->name('view-check-in');
 require __DIR__.'/auth.php';
