@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\CheckInController;
+use App\Http\Controllers\DropInController;
 
 /*
 |--------------------------------------------------------------------------
@@ -33,8 +35,11 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-use App\Http\Controllers\CheckInController;
+Route::get('/drop-in', [DropInController::class, 'show'])->name('drop-in.show');
+Route::redirect('/dropin', '/drop-in');
+Route::post('/readyToPrint', [DropInController::class, 'readyToPrint']);
 
+// Check-in routes
 Route::post('/check-user', [CheckInController::class, 'checkUser'])->name('check-user');
 Route::get('/new-form', [CheckInController::class, 'newForm'])->name('new-form');
 Route::get('/new-form-pre-filled', [CheckInController::class, 'newFormPreFilled'])->name('new-form-pre-filled');
