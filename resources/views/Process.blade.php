@@ -11,12 +11,13 @@
         <div id="stepContainer" class="py-4">
             <div id="step1" class="step active">
                 <form id="processForm">
+                    <label class="" for="phone">Phone Number</label>
+                    <input class="" type="tel" id="phone" name="phone" placeholder="Your Phone Number" value="{{ $user->phone ?? request()->get('phone') }}" pattern="[0-9]{10}" required>
+                    
                     <label class="" for="name">Name</label>
                     <input type="text" id="name" name="name" placeholder="Your Name" value="{{ old('name') }}" required>
                     <label class="" for="email">Email</label>
                     <input type="email" id="email" name="email" placeholder="Your Email" value="{{ old('email') }}" required>
-                    <label class="" for="phone">Phone Number</label>
-                    <input type="tel" id="phone" name="phone" placeholder="Your Phone Number" value="{{ $user->phone ?? request()->get('phone') }}" pattern="[0-9]{10}" required>
                     <label class="" for="address">Address</label>
                     <input type="text" id="address" name="address" placeholder="Your Address" value="{{ old('address') }}" required>
                     <button type="button" id="nextStep">Next</button>
@@ -35,7 +36,10 @@
             // Load saved data into form
             $('#name').val(formData.name || '');
             $('#email').val(formData.email || '');
-            $('#phone').val(formData.phone || '');
+            
+            const urlParams = new URLSearchParams(window.location.search);
+            $('#phone').val(urlParams.get('phone') || formData.phone || '');
+            
             $('#address').val(formData.address || '');
 
             $('#nextStep').on('click', function() {
