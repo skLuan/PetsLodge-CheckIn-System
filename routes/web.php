@@ -36,6 +36,7 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::get('/drop-in', [DropInController::class, 'show'])->name('drop-in.show');
+Route::get('/drop-in', [DropInController::class, 'show'])->name('drop-in.show');
 Route::redirect('/dropin', '/drop-in');
 Route::post('/readyToPrint', [DropInController::class, 'readyToPrint']);
 
@@ -45,3 +46,6 @@ Route::get('/new-form', [CheckInController::class, 'newForm'])->name('new-form')
 Route::get('/new-form-pre-filled', [CheckInController::class, 'newFormPreFilled'])->name('new-form-pre-filled');
 Route::get('/view-check-in', [CheckInController::class, 'viewCheckIn'])->name('view-check-in');
 require __DIR__.'/auth.php';
+
+Route::get('/drop-in/check', [DropInController::class, 'checkInfo'])->name('drop-in.check');
+Route::post('/drop-in/check-user', [DropInController::class, 'checkUser'])->name('drop-in.check-user');

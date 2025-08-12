@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use Illuminate\Http\Request;
 use App\Services\PdfService;
 use App\Services\PrintNodeService;
@@ -15,6 +16,50 @@ class DropInController extends Controller
         // Carga datos prellenados (e.g., de sesión o BD)
         $data = $request->user()->dropInData ?? [];  // Asumiendo modelo User con datos
         return view('drop-in', compact('data'));
+    }
+    public function checkInfo(Request $request)
+    {
+        return view('Drop-in.check');
+    }
+    public function checkUser(Request $request)
+    {
+        $checkInController = new CheckInController();
+        $userExists = $checkInController->checkUser($request)->getData()->userExists;
+        if ($userExists === true) {
+
+            // Preparar datos para el frontend/modal
+            $data = [
+                'client_name' => $dropIn->client_name ?? 'N/A',
+                'dog_name' => $dropIn->dog_name ?? 'N/A',
+                'breed' => $dropIn->breed ?? 'N/A',
+            ];
+
+            return response()->json([
+                'status' => 'found',
+                'data' => $data,
+                'message' => 'Registro encontrado. Redirigiendo en 3...',
+                'redirect_url' => route('drop-in.check'), // Asumiendo ruta /check-info
+            ], 200);
+        } else {
+            return response()->json([
+                'status' => 'not_found',
+                'message' => 'Lo siento, no tenemos registro',
+            ], 404);
+        }
+
+        // Preparar datos para el frontend/modal
+        $data = [
+            'client_name' => $dropIn->client_name ?? 'N/A',
+            'dog_name' => $dropIn->dog_name ?? 'N/A',
+            'breed' => $dropIn->breed ?? 'N/A',
+        ];
+
+        return response()->json([
+            'status' => 'found',
+            'data' => $data,
+            'message' => 'Registro encontrado. Redirigiendo en 3...',
+            'redirect_url' => route('check-info'), // Asumiendo ruta /check-info
+        ], 200);
     }
 
     public function readyToPrint(Request $request)
