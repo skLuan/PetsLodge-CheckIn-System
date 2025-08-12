@@ -6,6 +6,7 @@
     </x-slot>
 
     <div class="container px-4 py-8">
+        <x-progress.bar />
         <h1 class="text-center">Your Information</h1>
         <p class="text-lg text-center">Please follow the instructions to complete your process</p>
         <div id="stepContainer" class="py-4">
@@ -20,12 +21,11 @@
                     <input type="email" id="email" name="email" placeholder="Your Email" value="{{ old('email') }}" required>
                     <label class="" for="address">Address</label>
                     <input type="text" id="address" name="address" placeholder="Your Address" value="{{ old('address') }}" required>
-                    <button type="button" id="nextStep">Next</button>
                 </form>
             </div>
             <!-- Additional steps will be added here dynamically -->
         </div>
-        <div id="stepProgress"></div>
+        <x-tabbar />
     </div>
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>

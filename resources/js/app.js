@@ -1,4 +1,5 @@
 import './bootstrap';
+import "iconify-icon";
 
 import Alpine from 'alpinejs';
 

@@ -4,13 +4,16 @@
 
 @layer base {
     body {
-        @apply bg-white text-gray font-normal;
+        @apply bg-green-lightest text-gray font-normal;
     }
 
     h1 {
         @apply text-4xl font-bold text-gray;
     }
+    label {
+        @apply text-green-dark font-bold pl-2;
+    }
     input {
-        @apply !border !border-gray-light !rounded-md !p-2 !w-full placeholder:text-gray-light my-2;
+        @apply !border text-green-dark !border-green-30 !rounded-md !p-2 !w-full placeholder:text-gray-light mb-2;
     }
 }
