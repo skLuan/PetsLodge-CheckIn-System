@@ -13,7 +13,7 @@
            $dompdf = new Dompdf();
 
            // Generar HTML para el PDF (puedes usar una vista Blade)
-           $html = view('pdfs.drop-in', compact('data'))->render();
+           $html = view('pdf-for-print', compact('data'))->render();
 
            // Cargar HTML en Dompdf
            $dompdf->loadHtml($html);
@@ -32,8 +32,7 @@
 
            // Almacenar en el disco public
            Storage::disk('public')->put($fileName, $pdfContent);
-
            // Devolver la URL pública del PDF
-           //return Storage::disk('public')->url($fileName);
+           return Storage::url($fileName);
        }
    }

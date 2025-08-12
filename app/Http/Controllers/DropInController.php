@@ -38,5 +38,11 @@ class DropInController extends Controller
         // } else {
         //     return response()->json(['error' => 'Error en impresión'], 500);
         // }
+        // Respuesta JSON para frontend (éxito/error)
+        if ($pdfUri) {
+            return response()->json(['message' => 'PDF Creado! -> ' . $pdfUri], 200);
+        } else {
+            return response()->json(['error' => 'Error en impresión'], 500);
+        }
     }
 }
