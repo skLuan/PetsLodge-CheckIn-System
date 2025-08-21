@@ -61,11 +61,14 @@ function showStep(step) {
             .getElementById(`step${i}`)
             .classList.toggle("active", i === step);
         circles[i - 1].classList.toggle("active", i - 1 < step);
-        if (i === step) {
-            const url = new URL(window.location);
-            url.searchParams.set("step", step);
-            window.history.replaceState({}, "", url);
-        }
+
+        setTimeout(() => {
+            if (i === step) {
+                const url = new URL(window.location);
+                url.searchParams.set("step", step);
+                window.history.replaceState({}, "", url);
+            }
+        }, 0);
     }
 }
 deactivateAllSteps();

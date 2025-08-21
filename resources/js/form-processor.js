@@ -12,9 +12,10 @@ document.addEventListener("DOMContentLoaded", function () {
     }
     // Function to get form data from cookies
     function getFormDataFromCookies() {
-        const tempCookie = document.cookie
-            .split("; ");
-        const cookie = tempCookie.find((row) => row.includes(`formStep-${takeStep()+1}=`));
+        const tempCookie = document.cookie.split("; ");
+        const cookie = tempCookie.find((row) =>
+            row.includes(`formStep-${takeStep() + 1}=`)
+        );
         console.log("Getting form data from cookies...");
         console.log(cookie);
         if (!cookie) return null;
@@ -26,19 +27,24 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    let tempData = getFormDataFromCookies();
-    if (tempData) {
-        const form = forms[takeStep()]; // Get the current form
-        Object.keys(tempData).forEach((key) => {
-            const input = form.querySelector(`[name="${key}"]`);
-            if (input) {
-                if (input.type === "checkbox") {
-                    input.checked = tempData[key];
-                } else {
-                    input.value = tempData[key];
+    function populateFormWithCookies() {
+        let tempData = getFormDataFromCookies();
+        console.log("Populating form with cookies...");
+        console.log(tempData);
+        if (!tempData) return;
+        tempData.pet? tempData = tempData.pet : tempData; // Ensure we are working with the pet data
+            const form = forms[takeStep()]; // Get the current form
+            Object.keys(tempData).forEach((key) => {
+                const input = form.querySelector(`[name="${key}"]`);
+                if (input) {
+                    if (input.type === "checkbox") {
+                        input.checked = tempData[key];
+                    } else {
+                        input.value = tempData[key];
+                    }
                 }
-            }
-        });
+            });
+        
     }
 
     // Function to extract input values for a given form
@@ -50,6 +56,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         const inputs = formElement.querySelectorAll("input, select, textarea");
         const data = {};
+
         inputs.forEach((input) => {
             if (input.name) {
                 if (input.type === "checkbox") {
@@ -73,9 +80,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Function to save form data to cookies
     function saveFormDataToCookies(data) {
+        let newData = data || {};
         console.log("Saving form data to cookies...");
-        document.cookie = `formStep-${takeStep()}=${JSON.stringify(
-            data
+        if (!data) return;
+        if (takeStep() + 1 == 2) {
+            newData = { pet: data };
+        }
+        document.cookie = `formStep-${takeStep() + 1}=${JSON.stringify(
+            newData
         )}; path=/; max-age=3600`;
         console.log("Form data saved to cookies.");
     }
@@ -86,10 +98,16 @@ document.addEventListener("DOMContentLoaded", function () {
     const form = document.querySelector("#petInfoForm");
     if (form) {
         form.addEventListener("submit", function (e) {
+            e.preventDefault();
             const data = extractFormInputValues(form);
-            saveFormDataToCookies(data);
+
+            const newData = { pet: data };
+
+            saveFormDataToCookies(newData);
         });
     }
+
+    populateFormWithCookies();
 
     const nextButton = document.querySelector("#nextStep");
     let step = null;
@@ -97,8 +115,11 @@ document.addEventListener("DOMContentLoaded", function () {
         nextButton.addEventListener("click", function () {
             const step = takeStep();
             console.log(step);
-            const data = extractFormInputValues(forms[step - 1]);
+            const data = extractFormInputValues(forms[step]);
             saveFormDataToCookies(data);
+            setTimeout(() => {
+                populateFormWithCookies();
+            }, 0);
         });
     }
 });
