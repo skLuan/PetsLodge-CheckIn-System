@@ -11,10 +11,10 @@ document.addEventListener("DOMContentLoaded", function () {
         } else return 0;
     }
     // Function to get form data from cookies
-    function getFormDataFromCookies() {
+    function getFormDataFromCookies(index) {
         const tempCookie = document.cookie.split("; ");
         const cookie = tempCookie.find((row) =>
-            row.includes(`formStep-${takeStep() + 1}=`)
+            row.includes(`formStep-${index}=`)
         );
         console.log("Getting form data from cookies...");
         console.log(cookie);
@@ -28,11 +28,13 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function populateFormWithCookies() {
-        let tempData = getFormDataFromCookies();
-        console.log("Populating form with cookies...");
-        console.log(tempData);
-        if (!tempData) return;
-        tempData.pet? tempData = tempData.pet : tempData; // Ensure we are working with the pet data
+        for (let index = 0; index < forms.length; index++) {
+            const element = forms[index];
+            let tempData = getFormDataFromCookies(index + 1);
+            console.log("Populating form with cookies...");
+            console.log(tempData);
+            if (!tempData) return;
+            tempData.pet ? (tempData = tempData.pet) : tempData; // Ensure we are working with the pet data
             const form = forms[takeStep()]; // Get the current form
             Object.keys(tempData).forEach((key) => {
                 const input = form.querySelector(`[name="${key}"]`);
@@ -44,7 +46,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     }
                 }
             });
-        
+        }
     }
 
     // Function to extract input values for a given form
@@ -117,9 +119,6 @@ document.addEventListener("DOMContentLoaded", function () {
             console.log(step);
             const data = extractFormInputValues(forms[step]);
             saveFormDataToCookies(data);
-            setTimeout(() => {
-                populateFormWithCookies();
-            }, 0);
         });
     }
 });
