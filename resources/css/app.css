@@ -7,12 +7,14 @@
     body {
         @apply font-nun bg-green-lightest text-gray font-normal;
     }
-
+    h1,h2, label {
+        @apply font-bold text-green-dark;
+    }
     h1 {
-        @apply text-4xl font-bold text-gray;
+        @apply text-4xl;
     }
     label {
-        @apply text-green-dark font-bold pl-2;
+        @apply pl-2;
     }
     input {
         @apply !border text-green-dark !border-green-30 !rounded-md !p-2 !w-full placeholder:text-gray-light mb-2;
@@ -40,5 +42,12 @@
     }
     .circle.active {
         @apply !bg-yellow-second;
+    }
+
+    .step form {
+        @apply bg-green-lightest;
+    }
+    .step form .pl-input-container {
+        @apply pt-4;
     }
 }
