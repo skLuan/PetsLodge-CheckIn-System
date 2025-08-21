@@ -12,6 +12,7 @@ export default {
     theme: {
         extend: {
             fontFamily: {
+                nun: ['Nunito', 'Sans-serif'],
                 sans: ['Figtree', ...defaultTheme.fontFamily.sans],
             },
             colors: {
