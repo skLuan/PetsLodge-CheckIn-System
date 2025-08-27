@@ -14,10 +14,10 @@
         @apply text-4xl;
     }
     label {
-        @apply pl-2;
+        @apply pl-2 text-gray;
     }
     input {
-        @apply !border text-green-dark !border-green-30 !rounded-md !p-2 !w-full placeholder:text-gray-light mb-2;
+        @apply !border text-green-dark !border-green-30 !rounded-lg !p-2 !w-full placeholder:text-gray-light mb-2;
     }
 }
 
@@ -28,13 +28,13 @@
     .step h2 {
         @apply text-2xl font-bold text-gray mb-2;
     }
-    .step .active {
+    .step.active {
         @apply block translate-x-0 translate-y-0;
     }
-    .inactive-left {
-        @apply absolute -translate-x-full ;
+    .step.inactive-left {
+        @apply absolute -translate-x-full;
     }
-    .inactive-right {
+    .step.inactive-right {
         @apply absolute translate-x-full;
     }
     .circle {
@@ -49,5 +49,8 @@
     }
     .step form .pl-input-container {
         @apply pt-4;
+    }
+    .pill {
+        @apply inline-block bg-green text-white font-bold rounded-full px-3 py-1 m-1;
     }
 }

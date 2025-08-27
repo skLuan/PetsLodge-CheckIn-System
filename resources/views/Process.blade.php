@@ -1,4 +1,7 @@
 <x-app-layout>
+    <x-slot name="scripts">
+        @vite(['resources/js/form-processor.js'])
+    </x-slot>
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-white leading-tight">
             {{ __('Owner Info') }}
@@ -17,6 +20,7 @@
             <div id="step2" class="step w-full">
                 <h2 class="text-center font-bold">Pet Information</h2>
                 <p class="text-lg">General Information of your best friend</p>
+                <div id="petPillsContainer" class="pills"></div>
                 <x-forms.pet-info />
             </div>
 
