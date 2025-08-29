@@ -1,4 +1,4 @@
-<div class="bg-white transition-all duration-500 z-30 ease-in-out translate-y-[45vh] fixed bottom-0 left-0 flex flex-col p-4 mr-2 rounded-md shadow-lg w-full">
+<div id="feedingMedicationPopup" class="bg-white transition-all duration-500 z-30 ease-in-out translate-y-[45vh] fixed bottom-0 left-0 flex flex-col p-4 mr-2 rounded-md shadow-lg w-full">
 
     <div class="flex justify-evenly pb-4 border-b border-l-gray-light mb-4">
         <button class="px-4 flex flex-row py-2 font-bold bg-gray-lightest text-gray rounded-full shadow">

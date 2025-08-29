@@ -4,7 +4,7 @@
         <div class="flex items-center mb-2">
             <h3 class="text-2xl font-bold text-gray mr-2">Morning</h3>
             <iconify-icon icon="solar:sun-bold" class="text-2xl mr-2"></iconify-icon>
-            <button type="button" class="text-orange-600 hover:text-orange-400 add-food-med-btn relative ml-auto"
+            <button type="button" class="btn-add-feeding-med text-orange-600 hover:text-orange-400 add-food-med-btn relative ml-auto"
                 data-period="night">
                 <iconify-icon icon="ph:plus-circle" class="text-4xl font-bold"></iconify-icon>
             </button>
@@ -35,7 +35,7 @@
         <div class="flex items-center mb-2">
             <h3 class="text-2xl font-bold text-gray mr-2">Noon</h3>
             <iconify-icon icon="solar:sun-fog-bold" class="text-2xl mr-2"></iconify-icon>
-            <button type="button" class="text-orange-600 hover:text-orange-400 add-food-med-btn relative ml-auto"
+            <button type="button" class="btn-add-feeding-med text-orange-600 hover:text-orange-400 add-food-med-btn relative ml-auto"
                 data-period="night">
                 <iconify-icon icon="ph:plus-circle" class="text-4xl font-bold"></iconify-icon>
             </button>
@@ -66,7 +66,7 @@
         <div class="flex items-center mb-2">
             <h3 class="text-2xl font-bold text-gray mr-2">Night</h3>
             <iconify-icon icon="line-md:moon-filled" class="text-2xl mr-2"></iconify-icon>
-            <button type="button" class="text-orange-600 hover:text-orange-400 add-food-med-btn relative ml-auto"
+            <button type="button" class="btn-add-feeding-med text-orange-600 hover:text-orange-400 add-food-med-btn relative ml-auto"
                 data-period="night">
                 <iconify-icon icon="ph:plus-circle" class="text-4xl font-bold"></iconify-icon>
             </button>
