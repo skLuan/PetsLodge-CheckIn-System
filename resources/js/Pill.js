@@ -1,3 +1,4 @@
+import CookieHandler from "./CookieHandler.js";
 class Pill {
     constructor(name, type, index) {
         this.name = name;
@@ -5,6 +6,8 @@ class Pill {
         this.index = index;
         this.pillElement = document.createElement("div");
         this.pillElement.classList.add("pill");
+        this.pillElement.dataset.index = index;
+
         const closeIcon = document.createElement("iconify-icon");
         closeIcon.classList.add("close-icon");
         closeIcon.setAttribute("icon", "lucide:delete");
@@ -24,19 +27,37 @@ class Pill {
 
         this.pillElement.addEventListener("click", () => {
             this.select();
-            
         });
-
     }
 
     render() {
-        const pill = this.pillElement;
         return this.pillElement;
     }
 
     select() {
+        if (!this.pillElement) return;
+        document.querySelectorAll(".pill.selected").forEach((pill) => {
+            pill.classList.remove("selected");
+        });
+        // Populate form with this pet's data
+        const petData =
+            CookieHandler.getFormDataFromCookies(2)[`pet${this.index}`];
+        if (petData) {
+            Object.entries(petData).forEach(([key, value]) => {
+                const input = document.querySelector(`[name="${key}"]`);
+                if (input) {
+                    if (input.type === "radio") {
+                        input.checked = value;
+                    } else {
+                        input.value = value;
+                    }
+                }
+            });
+        }
+    }
+    deselect() {
         if (this.pillElement) {
-            this.pillElement.classList.add("selected");
+            this.pillElement.classList.remove("selected");
         }
     }
 
@@ -45,24 +66,11 @@ class Pill {
      * @param {number} index - The pet index to remove.
      */
     removePet(index) {
-        const cookieKey = "formStep-2";
-        let existingData = {};
-        try {
-            const cookie = document.cookie
-                .split("; ")
-                .find((row) => row.startsWith(`${cookieKey}=`));
-            if (cookie) {
-                existingData = JSON.parse(
-                    decodeURIComponent(cookie.split("=")[1])
-                );
-            }
-        } catch (e) {
-            console.error(`Error parsing ${cookieKey} cookie JSON:`, e);
-            return;
-        }
-
+        let existingData = CookieHandler.getFormDataFromCookies(2);
+        const cookieKey = `formStep-2`;
         // Remove the pet at the specified index
         delete existingData[`pet${index}`];
+        console.log(existingData);
 
         // Reindex remaining pets to maintain sequential keys
         const reindexedData = {};
@@ -76,10 +84,8 @@ class Pill {
                 }
             });
 
-        // Save updated data to cookies
-        document.cookie = `${cookieKey}=${encodeURIComponent(
-            JSON.stringify(reindexedData)
-        )}; path=/; max-age=3600`;
+        CookieHandler.setCookie(cookieKey, reindexedData);
+        console.log(reindexedData);
         console.log(`Removed pet${index} and reindexed cookies.`);
     }
 

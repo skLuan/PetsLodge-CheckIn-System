@@ -53,4 +53,7 @@
     .pill {
         @apply inline-block bg-green text-white font-bold rounded-full px-3 py-1 m-1;
     }
+    .pill.selected {
+        @apply !bg-yellow;
+    }
 }

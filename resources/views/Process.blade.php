@@ -8,7 +8,7 @@
         </h2>
     </x-slot>
 
-    <div class="container px-4 py-8">
+    <div class="container px-4 py-8 max-w-screen-sm mx-auto">
         <x-progress.bar />
         <div id="stepContainer" class="py-4 overflow-hidden relative min-h-[568px]">
             <div id="step1" class="step w-full active">

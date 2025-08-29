@@ -5,7 +5,7 @@
          </h2>
      </x-slot>
 
- <div class="container text-center px-4 py-8">
+ <div class="container text-center px-4 py-8 max-w-screen-sm mx-auto">
      <img src="{{ asset('images/logo-pets-lodge.png') }}" alt="Pet Lodge & Spa Logo" class="logo w-48 mx-auto">
      <h1 class="text-green-dark">Check In</h1>
      <p class="text-lg">Please enter your phone to start your process</p>
@@ -16,9 +16,9 @@
          </x-primary-button>
      </form>
  </div>
- <figure class="fixed bottom-0">
+ <figure class="fixed bottom-0 w-full">
     <picture>
-        <img src="{{ asset('images/dog-bg@2x.jpg') }}" alt="Check In" class="w-full">
+        <img src="{{ asset('images/dog-bg@2x.jpg') }}" alt="Check In" class="w-full lg:w-1/3 mx-auto">
     </picture>
  </figure>
 
