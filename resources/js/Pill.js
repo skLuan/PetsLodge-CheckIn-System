@@ -10,17 +10,37 @@ class Pill {
 
         const closeIcon = document.createElement("iconify-icon");
         closeIcon.classList.add("close-icon");
-        closeIcon.setAttribute("icon", "lucide:delete");
+        closeIcon.setAttribute("icon", "material-symbols:close");
         closeIcon.setAttribute("aria-label", `Remove ${this.name}`);
 
         closeIcon.addEventListener("click", () => {
             this.removePet(this.index);
             this.pillElement.remove();
         });
-        const textSpan = document.createElement("span");
-        textSpan.textContent = `${this.name} (${this.type})`;
 
+        const petTypeIcons = {
+            dog: "mdi:dog",
+            cat: "mdi:cat",
+            pig: "mdi:pig-variant",
+            rabbit: "mdi:rabbit",
+            bird: "mdi:bird",
+            fish: "mdi:fish",
+            turtle: "mdi:turtle",
+            hamster: "mdi:rodent",
+            horse: "mdi:horse",
+            other: "material-symbols:pet",
+        };
+        const iconName = petTypeIcons[this.type] || "material-symbols:pet";
+        const petIcon = document.createElement("iconify-icon");
+        petIcon.classList.add("pet-icon");
+        petIcon.setAttribute("icon", iconName);
+        petIcon.setAttribute("aria-label", `${this.name} (${this.type})`);
+
+        const textSpan = document.createElement("span");
+        textSpan.textContent = `${this.name}`;
+        
         this.pillElement.appendChild(textSpan);
+        this.pillElement.appendChild(petIcon);
         setTimeout(() => {
             this.pillElement.appendChild(closeIcon);
         }, 0);
@@ -36,9 +56,18 @@ class Pill {
 
     select() {
         if (!this.pillElement) return;
+        const isSelected = this.pillElement.classList.contains("selected");
+        if (isSelected) {
+            this.pillElement.classList.remove("selected");
+            // Optionally clear the form fields here if needed
+            const form = document.querySelector("#petInfoForm");
+            form.reset();
+            return;
+        }
         document.querySelectorAll(".pill.selected").forEach((pill) => {
             pill.classList.remove("selected");
         });
+        this.pillElement.classList.add("selected");
         // Populate form with this pet's data
         const petData =
             CookieHandler.getFormDataFromCookies(2)[`pet${this.index}`];
