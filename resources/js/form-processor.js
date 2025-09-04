@@ -94,6 +94,14 @@ document.addEventListener("DOMContentLoaded", function () {
         console.log(data);
         return data;
     }
+
+    function formReset(form) {
+        form.reset();
+        scrollTo({ top: 0, behavior: "smooth" });
+        setTimeout(() => {
+            addPetPillsToContainer();
+        }, 300);
+    }
     //------------------------------------------------
     //------------------------------------------------
     // Save form data on submit
@@ -106,11 +114,7 @@ document.addEventListener("DOMContentLoaded", function () {
             // const newData = { pet: data };
 
             CookieHandler.saveFormDataToCookies(data);
-            form.reset();
-            scrollTo({ top: 0, behavior: "smooth" });
-            setTimeout(() => {
-                addPetPillsToContainer();
-            }, 500);
+            formReset(form);
         });
     }
 
@@ -118,7 +122,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const addFeedMedButtons = document.querySelectorAll(".btn-add-feeding-med");
     const popup = document.querySelector("#feedingMedicationPopup");
-    
+
     addFeedMedButtons.forEach((btn) => {
         btn.addEventListener("click", function (e) {
             e.preventDefault();
@@ -131,18 +135,22 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     document.addEventListener("click", function (e) {
-        if (popup && !popup.contains(e.target) && !e.target.closest(".btn-add-feeding-med")) {
+        if (
+            popup &&
+            !popup.contains(e.target) &&
+            !e.target.closest(".btn-add-feeding-med")
+        ) {
             popup.classList.add("translate-y-[45vh]");
             popup.classList.remove("transform-y-0");
         }
     });
 
     const nextButton = document.querySelector("#nextStep");
-    let step = null;
     if (nextButton) {
         nextButton.addEventListener("click", function () {
             const step = Utils.actualStep();
-            const data = extractFormInputValues(forms[step]);
+            const form = forms[step];
+            const data = extractFormInputValues(form);
 
             const selectedPill = document.querySelector(".pill.selected");
             if (selectedPill) {
@@ -155,7 +163,11 @@ document.addEventListener("DOMContentLoaded", function () {
                 // Create new pet
                 CookieHandler.saveFormDataToCookies(data);
             }
-            addPetPillsToContainer();
+            if (step + 1 === 2) {
+                formReset(forms[2]);
+            } else {
+                scrollTo({ top: 0, behavior: "smooth" });
+            }
         });
     }
 });
