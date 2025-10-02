@@ -115,28 +115,61 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     populateFormWithCookies();
-
+    // ------------------------------------------------- Start button feeding/medication
     const addFeedMedButtons = document.querySelectorAll(".btn-add-feeding-med");
     const popup = document.querySelector("#feedingMedicationPopup");
-    
+    const popupForm = popup.querySelector("#feedingPopupForm");
+    const popButtons = popup.querySelectorAll("button");
+    const submitPopBtn = popup.querySelector("button[type='submit']");
+
     addFeedMedButtons.forEach((btn) => {
         btn.addEventListener("click", function (e) {
             e.preventDefault();
             if (popup) {
-                console.log(popup);
-                popup.classList.toggle("translate-y-[45vh]");
-                popup.classList.toggle("transform-y-0");
+                popup.classList.toggle("translate-y-[75vh]");
+                popup.classList.toggle("translate-y-0");
             }
+        });
+
+        btn.classList.contains("btn-day-time");
+    });
+    submitPopBtn.addEventListener("click", function (e) {
+        e.preventDefault();
+        console.log("Submit button clicked");
+        const feeding = [];
+        const medication = [];
+        const data = extractFormInputValues('#feedingPopupForm');
+        data.type === "food"? feeding.push(data) : medication.push(data);
+        const newData = { feeding, medication };
+        console.log(newData);
+        popupForm.reset();
+        CookieHandler.updatePetInCookies(0, {newData});
+    });
+    popButtons.forEach((btn) => {
+        btn.addEventListener("click", function (e) {
+            e.preventDefault();
+            popButtons.forEach((b) => {
+                b.classList.add("shadow");
+                b.classList.remove("active");
+            });
+            btn.classList.add("active");
+            btn.classList.remove("shadow");
         });
     });
 
     document.addEventListener("click", function (e) {
-        if (popup && !popup.contains(e.target) && !e.target.closest(".btn-add-feeding-med")) {
-            popup.classList.add("translate-y-[45vh]");
-            popup.classList.remove("transform-y-0");
+        if (
+            popup &&
+            !popup.contains(e.target) &&
+            !e.target.closest(".btn-add-feeding-med")
+        ) {
+            popup.classList.add("translate-y-[75vh]");
+            popup.classList.remove("translate-y-0");
         }
     });
+    // ------------------------------------------------- End button feeding/medication
 
+    // Save form data on next step
     const nextButton = document.querySelector("#nextStep");
     let step = null;
     if (nextButton) {

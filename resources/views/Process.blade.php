@@ -30,7 +30,6 @@
                 <h2 class="text-center font-bold">Feeding & medication</h2>
                 <p class="text-lg">Please fill out your feeding instructions.</p>
                 <x-forms.food-medication />
-                <x-pop-ups.feeding-medication />
             </div>
 
             <div id="step4" class="step w-full">
@@ -46,6 +45,7 @@
             </div>
             <!-- Additional steps will be added here dynamically -->
         </div>
+        <x-pop-ups.feeding-medication />
         <x-tabbar />
     </div>
 </x-app-layout>

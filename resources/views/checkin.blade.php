@@ -16,7 +16,7 @@
          </x-primary-button>
      </form>
  </div>
- <figure class="fixed bottom-0 w-full">
+ <figure class="fixed bottom-0 w-full -z-10">
     <picture>
         <img src="{{ asset('images/dog-bg@2x.jpg') }}" alt="Check In" class="w-full lg:w-1/3 mx-auto">
     </picture>
