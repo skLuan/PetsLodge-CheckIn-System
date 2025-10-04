@@ -8,6 +8,7 @@ export default defineConfig({
                 'resources/css/app.css',
                 'resources/js/app.js',
                 'resources/js/form-processor.js',
+                'resources/js/FormDataManager.js',
             ],
             refresh: true,
         }),

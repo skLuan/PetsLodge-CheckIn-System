@@ -1,5 +1,7 @@
 import Pill from "./Pill.js";
 import CookieHandler from "./CookieHandler.js";
+import { FormDataManager } from "./FormDataManager.js";
+import { CookieManager } from "./CookieManager.js";
 import Utils from "./Utils.js";
 document.addEventListener("DOMContentLoaded", function () {
     let forms = document.querySelectorAll(".step");
@@ -10,7 +12,7 @@ document.addEventListener("DOMContentLoaded", function () {
      * Adds .pill elements to #petPillsContainer for each pet, with a close icon.
      */
     function addPetPillsToContainer() {
-        const pets = CookieHandler.getPetsFromCookies();
+        const pets = FormDataManager.getAllPetsFromCookies();
         const container = document.querySelector("#petPillsContainer");
         console.log("addPetPillsToContainer called");
 
@@ -45,7 +47,7 @@ document.addEventListener("DOMContentLoaded", function () {
     function populateFormWithCookies() {
         for (let index = 0; index < forms.length; index++) {
             const element = forms[index];
-            let tempData = CookieHandler.getFormDataFromCookies(index + 1);
+            let tempData = FormDataManager.getFormDataFromStep(index + 1);
             console.log("Populating form with cookies...");
             console.log(tempData);
             if (!tempData) return;
@@ -136,14 +138,24 @@ document.addEventListener("DOMContentLoaded", function () {
     submitPopBtn.addEventListener("click", function (e) {
         e.preventDefault();
         console.log("Submit button clicked");
-        const feeding = [];
-        const medication = [];
-        const data = extractFormInputValues('#feedingPopupForm');
-        data.type === "food"? feeding.push(data) : medication.push(data);
-        const newData = { feeding, medication };
-        console.log(newData);
+
+        const data = extractFormInputValues("#feedingPopupForm");
+
+        // Estructura correcta para feeding/medication
+        const feedingMedData = {
+            [data.type === "food" ? "feeding" : "medication"]: [data],
+        };
+
+        console.log("Saving feeding/medication data:", feedingMedData);
+
         popupForm.reset();
-        CookieHandler.updatePetInCookies(0, {newData});
+
+        // Corregir: quitar el objeto wrapper innecesario
+        FormDataManager.updatePetInCookies(0, feedingMedData);
+
+        // Cerrar popup
+        popup.classList.add("translate-y-[75vh]");
+        popup.classList.remove("translate-y-0");
     });
     popButtons.forEach((btn) => {
         btn.addEventListener("click", function (e) {
@@ -171,24 +183,32 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Save form data on next step
     const nextButton = document.querySelector("#nextStep");
-    let step = null;
     if (nextButton) {
         nextButton.addEventListener("click", function () {
             const step = Utils.actualStep();
             const data = extractFormInputValues(forms[step]);
 
             const selectedPill = document.querySelector(".pill.selected");
-            if (selectedPill) {
-                // Update existing pet
-                const petIndex = parseInt(selectedPill.dataset.index, 10);
-                console.log(selectedPill.dataset.index);
+            const selectedPetIndex = selectedPill
+                ? parseInt(selectedPill.dataset.index, 10)
+                : null;
 
-                CookieHandler.updatePetInCookies(petIndex, data);
-            } else {
-                // Create new pet
-                CookieHandler.saveFormDataToCookies(data);
+            // Una sola línea maneja todo!
+            const success = FormDataManager.handleFormStep(
+                step,
+                data,
+                selectedPetIndex
+            );
+
+            if (success && step === FORM_CONFIG.STEPS.PET_INFO - 1) {
+                addPetPillsToContainer();
             }
-            addPetPillsToContainer();
         });
     }
 });
+
+window.debugCookies = () => {
+    return CookieHandler.debugCookies
+        ? CookieHandler.debugCookies()
+        : "Debug method not available";
+};
