@@ -1,13 +1,162 @@
 import { CookieManager } from "./CookieManager.js";
-import {
-    FORM_CONFIG,
-    DEFAULT_CHECKIN_STRUCTURE,
-    DEFAULT_PET_STRUCTURE,
-} from "./config.js";
+import config from "./config.js";
 import Utils from "./Utils.js";
 
+const { FORM_CONFIG, DEFAULT_CHECKIN_STRUCTURE, DEFAULT_PET_STRUCTURE } = config;
+
+/**
+ * Cookie reactivity system to listen for cookie changes and update UI
+ */
+class CookieReactivityManager {
+    static listeners = new Set();
+    static isListening = false;
+    static lastCookieValue = null;
+
+    /**
+     * Start listening for cookie changes
+     */
+    static startListening() {
+        if (this.isListening) return;
+
+        this.isListening = true;
+        this.lastCookieValue = CookieManager.getCookie(FormDataManager.CHECKIN_COOKIE_NAME);
+
+        // Use MutationObserver to detect programmatic cookie changes
+        this.setupMutationObserver();
+
+        // Note: Removed polling to prevent performance issues
+        // Cookie changes are primarily programmatic, so MutationObserver + manual triggers suffice
+
+        console.log("🍪 Cookie reactivity listening started (MutationObserver only)");
+    }
+
+    /**
+     * Setup MutationObserver for cookie changes
+     */
+    static setupMutationObserver() {
+        // Create a dummy element to observe cookie changes
+        const cookieObserver = document.createElement('div');
+        cookieObserver.id = 'cookie-observer';
+        cookieObserver.style.display = 'none';
+        document.body.appendChild(cookieObserver);
+
+        const observer = new MutationObserver(() => {
+            this.checkForCookieChanges();
+        });
+
+        observer.observe(cookieObserver, {
+            attributes: true,
+            attributeFilter: ['data-cookie-check']
+        });
+
+        // Store observer reference for cleanup
+        this.observer = observer;
+        this.cookieObserver = cookieObserver;
+    }
+
+    /**
+     * Setup polling fallback for cookie changes (less frequent)
+     */
+    static setupPolling() {
+        this.pollingInterval = setInterval(() => {
+            this.checkForCookieChanges();
+        }, 5000); // Check every 5 seconds instead of 1
+    }
+
+    /**
+     * Check if cookie has changed and notify listeners
+     */
+    static checkForCookieChanges() {
+        const currentValue = CookieManager.getCookie(FormDataManager.CHECKIN_COOKIE_NAME);
+
+        if (this.hasCookieChanged(currentValue)) {
+            console.log("🍪 Cookie change detected via polling, notifying listeners");
+            this.lastCookieValue = currentValue;
+            this.notifyListeners(currentValue);
+        }
+        // If no change, do nothing (no logging to avoid spam)
+    }
+
+    /**
+     * Check if cookie value has actually changed
+     */
+    static hasCookieChanged(newValue) {
+        if (this.lastCookieValue === null && newValue === null) return false;
+        if (this.lastCookieValue === null || newValue === null) return true;
+
+        // Deep compare JSON objects
+        try {
+            const lastParsed = JSON.parse(this.lastCookieValue);
+            const newParsed = JSON.parse(newValue);
+            return JSON.stringify(lastParsed) !== JSON.stringify(newParsed);
+        } catch {
+            return this.lastCookieValue !== newValue;
+        }
+    }
+
+    /**
+     * Add a listener for cookie changes
+     */
+    static addListener(callback) {
+        this.listeners.add(callback);
+    }
+
+    /**
+     * Remove a listener
+     */
+    static removeListener(callback) {
+        this.listeners.delete(callback);
+    }
+
+    /**
+     * Notify all listeners of cookie change
+     */
+    static notifyListeners(cookieData) {
+        console.log("🍪 Cookie changed, notifying listeners:", cookieData);
+        this.listeners.forEach(callback => {
+            try {
+                callback(cookieData);
+            } catch (error) {
+                console.error("Error in cookie change listener:", error);
+            }
+        });
+    }
+
+    /**
+     * Stop listening for changes
+     */
+    static stopListening() {
+        if (!this.isListening) return;
+
+        this.isListening = false;
+
+        if (this.observer) {
+            this.observer.disconnect();
+        }
+
+        if (this.cookieObserver) {
+            this.cookieObserver.remove();
+        }
+
+        this.listeners.clear();
+        console.log("🍪 Cookie reactivity listening stopped");
+    }
+
+    /**
+     * Manually trigger cookie check (useful after programmatic changes)
+     */
+    static triggerCheck() {
+        // Update the observer element to trigger MutationObserver
+        if (this.cookieObserver) {
+            this.cookieObserver.setAttribute('data-cookie-check', Date.now());
+        }
+        // Also do immediate check
+        this.checkForCookieChanges();
+    }
+}
+
 class FormDataManager {
-    static CHECKIN_COOKIE_NAME = "checkin_data";
+    static CHECKIN_COOKIE_NAME = "pl_checkin_data";
     static AUTO_SAVE_INTERVAL = 30000; // 30 segundos
     static autoSaveTimer = null;
 
@@ -24,10 +173,204 @@ class FormDataManager {
         // Iniciar auto-save
         this.startAutoSave();
 
+        // Iniciar sistema de reactividad de cookies
+        CookieReactivityManager.startListening();
+
+        // Registrar listener para actualizar UI automáticamente
+        this.registerUIUpdateListener();
+
         console.log(
             "FormDataManager initialized with checkin data:",
             this.getCheckinData()
         );
+    }
+
+    /**
+     * Registra listener para actualizar UI automáticamente cuando cambia la cookie
+     */
+    static registerUIUpdateListener() {
+        CookieReactivityManager.addListener((cookieData) => {
+            this.updateUIFromCookieData(cookieData);
+        });
+    }
+
+    /**
+     * Actualiza todos los elementos UI basándose en los datos de la cookie
+     */
+    static updateUIFromCookieData(cookieData) {
+        if (!cookieData) return;
+
+        // Reduced logging to prevent console spam - only log significant updates
+        // console.log("🔄 Updating UI from cookie data");
+
+        try {
+            // Update owner info form
+            this.updateOwnerInfoForm(cookieData.user?.info);
+
+            // Update emergency contact
+            this.updateEmergencyContactForm(cookieData.user?.emergencyContact);
+
+            // Update pet pills and forms
+            this.updatePetPillsAndForms(cookieData.pets);
+
+            // Update grooming and inventory
+            this.updateGroomingAndInventoryUI(cookieData.grooming, cookieData.inventory, cookieData.groomingDetails);
+
+            // Update feeding/medication displays
+            this.updateFeedingMedicationUI(cookieData.pets);
+
+        } catch (error) {
+            console.error("Error updating UI from cookie:", error);
+        }
+    }
+
+    /**
+     * Actualiza el formulario de información del propietario
+     */
+    static updateOwnerInfoForm(userInfo) {
+        if (!userInfo) return;
+
+        const fields = ['phone', 'name', 'email', 'address', 'city', 'zip'];
+        fields.forEach(field => {
+            const element = document.getElementById(field) || document.querySelector(`[name="${field}"]`);
+            if (element && userInfo[field]) {
+                element.value = userInfo[field];
+            }
+        });
+    }
+
+    /**
+     * Actualiza el formulario de contacto de emergencia
+     */
+    static updateEmergencyContactForm(emergencyContact) {
+        if (!emergencyContact) return;
+
+        const nameField = document.querySelector('[name="emergencyContactName"]') || document.getElementById('emergencyContactName');
+        const phoneField = document.querySelector('[name="emergencyContactPhone"]') || document.getElementById('emergencyContactPhone');
+
+        if (nameField) nameField.value = emergencyContact.name || '';
+        if (phoneField) phoneField.value = emergencyContact.phone || '';
+    }
+
+    /**
+     * Actualiza las pills de mascotas y formularios relacionados
+     */
+    static updatePetPillsAndForms(pets) {
+        if (!Array.isArray(pets)) return;
+
+        // Update pet pills container
+        const container = document.querySelector("#petPillsContainer");
+        if (container) {
+            container.innerHTML = "";
+            pets.forEach((pet, index) => {
+                if (pet && pet.info?.petName) {
+                    // This would need to be imported or recreated
+                    // For now, just log that we need to update pills
+                    console.log(`Pet pill ${index}: ${pet.info.petName}`);
+                }
+            });
+        }
+
+        // Update current pet form if visible
+        const currentPetIndex = this.getCurrentSelectedPetIndex();
+        if (currentPetIndex !== null && pets[currentPetIndex]) {
+            this.updatePetForm(pets[currentPetIndex]);
+        }
+    }
+
+    /**
+     * Actualiza el formulario de una mascota específica
+     */
+    static updatePetForm(petData) {
+        if (!petData?.info) return;
+
+        const petFields = ['petName', 'petColor', 'petType', 'petBreed', 'petAge', 'petWeight', 'petGender', 'petSpayed'];
+        petFields.forEach(field => {
+            const element = document.getElementById(field) || document.querySelector(`[name="${field}"]`);
+            if (element && petData.info[field]) {
+                if (element.type === 'radio') {
+                    const radioButton = document.querySelector(`[name="${field}"][value="${petData.info[field]}"]`);
+                    if (radioButton) radioButton.checked = true;
+                } else {
+                    element.value = petData.info[field];
+                }
+            }
+        });
+    }
+
+    /**
+     * Actualiza la UI de alimentación y medicación
+     */
+    static updateFeedingMedicationUI(pets) {
+        if (!Array.isArray(pets)) return;
+
+        // Update feeding/medication displays for each time slot
+        const timeSlots = ['morning', 'noon', 'night'];
+        timeSlots.forEach(timeSlot => {
+            this.updateTimeSlotDisplay(timeSlot, pets);
+        });
+    }
+
+    /**
+     * Actualiza la visualización de un slot de tiempo específico
+     */
+    static updateTimeSlotDisplay(timeSlot, pets) {
+        const foodContainer = document.querySelector(`#${timeSlot}-food-list`);
+        const medContainer = document.querySelector(`#${timeSlot}-med-list`);
+
+        if (foodContainer) foodContainer.innerHTML = '';
+        if (medContainer) medContainer.innerHTML = '';
+
+        pets.forEach(pet => {
+            if (pet?.feeding) {
+                pet.feeding.forEach(feed => {
+                    if (feed.day_time === timeSlot) {
+                        // Add food pill
+                        console.log(`Food for ${pet.info?.petName} at ${timeSlot}: ${feed.feeding_med_details}`);
+                    }
+                });
+            }
+
+            if (pet?.medication) {
+                pet.medication.forEach(med => {
+                    if (med.day_time === timeSlot) {
+                        // Add medication pill
+                        console.log(`Medication for ${pet.info?.petName} at ${timeSlot}: ${med.feeding_med_details}`);
+                    }
+                });
+            }
+        });
+    }
+
+    /**
+     * Actualiza la UI de grooming e inventory
+     */
+    static updateGroomingAndInventoryUI(grooming, inventory, details) {
+        if (grooming) {
+            Object.keys(grooming).forEach(service => {
+                const checkbox = document.querySelector(`[name="${service}"]`) || document.getElementById(service);
+                if (checkbox && checkbox.type === 'checkbox') {
+                    checkbox.checked = grooming[service] || false;
+                }
+            });
+        }
+
+        // Update grooming details
+        const detailsField = document.querySelector('[name="groomingDetails"]') || document.getElementById('groomingDetails');
+        if (detailsField) {
+            detailsField.value = details || '';
+        }
+
+        // Update inventory (this would need specific implementation based on your inventory structure)
+        console.log("Inventory update needed:", inventory);
+    }
+
+    /**
+     * Obtiene el índice de la mascota actualmente seleccionada
+     */
+    static getCurrentSelectedPetIndex() {
+        const selectedPill = document.querySelector(".pill.selected");
+        return selectedPill ? parseInt(selectedPill.dataset.index, 10) : null;
     }
 
     /**
@@ -79,11 +422,18 @@ class FormDataManager {
         const success = CookieManager.setCookie(
             this.CHECKIN_COOKIE_NAME,
             updatedData,
-            FORM_CONFIG.DEFAULT_COOKIE_DAYS
+            FORM_CONFIG.DEFAULT_COOKIE_DAYS,
+            {
+                secure: window.location.protocol === 'https:',
+                sameSite: 'Lax',
+                obfuscate: false // Set to true for sensitive data in production
+            }
         );
 
         if (success) {
             console.log("Checkin data updated:", updatedData);
+            // Trigger reactivity check
+            CookieReactivityManager.triggerCheck();
         }
 
         return success;

@@ -17,3 +17,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
+
+// Check-in API routes
+Route::post('/checkin/submit', [App\Http\Controllers\CheckInController::class, 'submitCheckIn']);
+Route::post('/checkin/autosave', [App\Http\Controllers\CheckInController::class, 'autoSaveCheckIn']);

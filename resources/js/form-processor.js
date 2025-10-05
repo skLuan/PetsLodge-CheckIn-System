@@ -3,6 +3,9 @@ import CookieHandler from "./CookieHandler.js";
 import { FormDataManager } from "./FormDataManager.js";
 import { CookieManager } from "./CookieManager.js";
 import Utils from "./Utils.js";
+import config from "./config.js";
+
+const { FORM_CONFIG } = config;
 document.addEventListener("DOMContentLoaded", function () {
     let forms = document.querySelectorAll(".step");
     forms = Array.from(forms).map((form) => form.querySelector("form"));
@@ -12,7 +15,7 @@ document.addEventListener("DOMContentLoaded", function () {
      * Adds .pill elements to #petPillsContainer for each pet, with a close icon.
      */
     function addPetPillsToContainer() {
-        const pets = FormDataManager.getAllPetsFromCookies();
+        const pets = FormDataManager.getAllPetsFromCheckin();
         const container = document.querySelector("#petPillsContainer");
         console.log("addPetPillsToContainer called");
 
@@ -203,7 +206,91 @@ document.addEventListener("DOMContentLoaded", function () {
             if (success && step === FORM_CONFIG.STEPS.PET_INFO - 1) {
                 addPetPillsToContainer();
             }
+
+            // Check if this is the final step (before Thanks)
+            if (step === FORM_CONFIG.STEPS.INVENTORY - 1) {
+                // Trigger final submission
+                setTimeout(() => {
+                    submitFinalCheckIn();
+                }, 500);
+            }
         });
+    }
+
+    // Final check-in submission function
+    async function submitFinalCheckIn() {
+        try {
+            console.log("🚀 Starting final check-in submission...");
+
+            // Get complete check-in data
+            const checkinData = FormDataManager.getCheckinData();
+
+            if (!checkinData) {
+                alert("No check-in data found. Please complete the form first.");
+                return;
+            }
+
+            // Validate minimum required data
+            if (!checkinData.user?.info?.phone || !checkinData.pets?.length) {
+                alert("Please complete owner information and add at least one pet.");
+                return;
+            }
+
+            // Show loading state
+            const submitButton = document.querySelector("#finalSubmit") || document.querySelector("#nextStep");
+            if (submitButton) {
+                submitButton.disabled = true;
+                submitButton.textContent = "Submitting...";
+            }
+
+            // Submit to API
+            const response = await fetch('/api/checkin/submit', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                },
+                body: JSON.stringify({
+                    checkin_data: checkinData
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                console.log("✅ Check-in submitted successfully:", result);
+
+                // Clear the cookie after successful submission
+                FormDataManager.clearCheckinData();
+
+                // Show success message
+                alert("Check-in completed successfully!");
+
+                // Redirect to success page or dashboard
+                window.location.href = '/dashboard';
+
+            } else {
+                console.error("❌ Submission failed:", result);
+                alert("Failed to submit check-in: " + (result.message || "Unknown error"));
+
+                // Re-enable button
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    submitButton.textContent = "Submit Check-in";
+                }
+            }
+
+        } catch (error) {
+            console.error("❌ Submission error:", error);
+            alert("An error occurred while submitting. Please try again.");
+
+            // Re-enable button
+            const submitButton = document.querySelector("#finalSubmit") || document.querySelector("#nextStep");
+            if (submitButton) {
+                submitButton.disabled = false;
+                submitButton.textContent = "Submit Check-in";
+            }
+        }
     }
 });
 

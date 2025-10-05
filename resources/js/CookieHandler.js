@@ -2,6 +2,9 @@
 import { FormDataManager } from './FormDataManager.js';
 import { CookieManager } from './CookieManager.js';
 
+// Update CookieManager to use the new cookie name for backward compatibility
+CookieManager.PL_CHECKIN_COOKIE = "pl_checkin_data";
+
 /**
  * Wrapper para mantener compatibilidad con la API existente
  * @deprecated Usar FormDataManager y CookieManager directamente
