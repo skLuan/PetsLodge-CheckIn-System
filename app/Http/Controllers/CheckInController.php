@@ -39,10 +39,14 @@ class CheckInController extends Controller
         ]);
     }
 
-    public function newForm()
+    public function newForm(Request $request)
     {
-        // Logic for new form creation
-        return view('Process');
+        $phone = $request->get('phone');
+        $user = null;
+        if ($phone) {
+            $user = User::where('phone', $phone)->first();
+        }
+        return view('Process', compact('user'));
     }
 
     public function newFormPreFilled(Request $request)
@@ -50,7 +54,7 @@ class CheckInController extends Controller
         $phone = $request->input('phone');
         $user = User::where('phone', $phone)->first();
         // Pre-fill form with user data
-        return view('new-form-pre-filled', compact('user'));
+        return view('Process', compact('user'));
     }
 
     public function viewCheckIn(Request $request)

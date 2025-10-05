@@ -55,15 +55,24 @@ document.addEventListener("DOMContentLoaded", function () {
 
         if (!currentForm) return;
 
-        let tempData = FormDataManager.getFormDataFromStep(currentStep + 1);
-        console.log("Populating current form with cookies (step " + currentStep + "):", tempData);
+        const checkinData = FormDataManager.getCheckinData();
+        console.log("Populating current form with cookies (step " + currentStep + "):", checkinData);
 
-        if (!tempData) return;
+        if (!checkinData) return;
 
-        // Handle pet data structure
-        if (tempData.pet) {
-            tempData = tempData.pet;
+        let tempData = {};
+
+        if (currentStep === 0) { // Owner info step
+            tempData = checkinData.user?.info || {};
+        } else if (currentStep === 1) { // Pet info step
+            const selectedPetIndex = document.querySelector(".pill.selected") ? parseInt(document.querySelector(".pill.selected").dataset.index, 10) : 0;
+            tempData = checkinData.pets?.[selectedPetIndex]?.info || {};
+        } else {
+            // For other steps, no population from cookies for now
+            return;
         }
+
+        console.log("Temp data for population:", tempData);
 
         // Only populate fields that are empty to avoid overwriting user input
         Object.keys(tempData).forEach((key) => {
@@ -75,6 +84,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 } else {
                     input.value = tempData[key] || '';
                 }
+                console.log("Setting", key, "to", tempData[key]);
             }
         });
     }

@@ -17,7 +17,7 @@
             <div id="step1" class="step w-full active">
                 <h1 class="text-center">Your Information</h1>
                 <p class="text-lg text-center">Please follow the instructions to complete your process</p>
-                <x-forms.owner-info />
+                <x-forms.owner-info :user="$user ?? null" />
             </div>
 
             <div id="step2" class="step w-full">

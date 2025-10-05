@@ -1,6 +1,7 @@
 import { CookieManager } from "./CookieManager.js";
 import config from "./config.js";
 import Utils from "../Utils.js";
+import Pill from "../Pill.js";
 
 const { FORM_CONFIG, DEFAULT_CHECKIN_STRUCTURE, DEFAULT_PET_STRUCTURE } = config;
 
@@ -253,24 +254,38 @@ class FormDataManager {
 
     /**
      * Actualiza las pills de mascotas y formularios relacionados
+     * Solo recrea pills en el paso de información de mascotas para evitar manipulaciones DOM redundantes
      */
     static updatePetPillsAndForms(pets) {
         if (!Array.isArray(pets)) return;
 
-        // Update pet pills container
-        const container = document.querySelector("#petPillsContainer");
-        if (container) {
-            container.innerHTML = "";
-            pets.forEach((pet, index) => {
-                if (pet && pet.info?.petName) {
-                    // This would need to be imported or recreated
-                    // For now, just log that we need to update pills
-                    console.log(`Pet pill ${index}: ${pet.info.petName}`);
-                }
-            });
+        const currentStep = Utils.actualStep();
+        const isPetInfoStep = currentStep === (FORM_CONFIG.STEPS.PET_INFO - 1); // step 1
+
+        // Solo actualizar pills completamente en el paso de mascotas (donde se agregan nuevas)
+        if (isPetInfoStep) {
+            const container = document.querySelector("#petPillsContainer");
+            if (container) {
+                container.innerHTML = "";
+
+                // Recordar cuál estaba seleccionado antes de limpiar
+                const previouslySelectedIndex = this.getCurrentSelectedPetIndex();
+
+                pets.forEach((pet, index) => {
+                    if (pet && pet.info?.petName) {
+                        const pill = new Pill(pet.info.petName, pet.info.petType, index);
+                        container.appendChild(pill.render());
+
+                        // Si era el seleccionado previamente, re-seleccionarlo
+                        if (index === previouslySelectedIndex) {
+                            pill.select();
+                        }
+                    }
+                });
+            }
         }
 
-        // Update current pet form if visible
+        // Siempre actualizar el formulario de la mascota seleccionada si existe
         const currentPetIndex = this.getCurrentSelectedPetIndex();
         if (currentPetIndex !== null && pets[currentPetIndex]) {
             this.updatePetForm(pets[currentPetIndex]);
@@ -498,6 +513,21 @@ class FormDataManager {
             info: { ...petData },
             lastUpdated: new Date().toISOString(),
         });
+
+        return this.updateCheckinData({ pets: updatedPets });
+    }
+
+    /**
+     * Elimina una mascota específica del checkin
+     */
+    static removePetFromCheckin(petIndex) {
+        const currentData = this.getCheckinData();
+        if (!currentData || !currentData.pets || !currentData.pets[petIndex]) {
+            console.warn(`Pet at index ${petIndex} not found for removal`);
+            return false;
+        }
+
+        const updatedPets = currentData.pets.filter((_, index) => index !== petIndex);
 
         return this.updateCheckinData({ pets: updatedPets });
     }
