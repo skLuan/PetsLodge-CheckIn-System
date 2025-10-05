@@ -916,6 +916,15 @@ class FormDataManager {
     }
 
     /**
+     * Marca los términos como aceptados
+     */
+    static setTermsAccepted(accepted) {
+        return this.updateCheckinData({
+            termsAccepted: accepted
+        });
+    }
+
+    /**
      * Actualiza la UI del inventario
      */
     static updateInventoryUI(inventory, inventoryComplete) {
@@ -1068,15 +1077,23 @@ class FormDataManager {
 
             case FORM_CONFIG.STEPS.INVENTORY - 1: // step 4 = INVENTORY
                 // Inventory is managed separately via add/remove and checkbox
-                // Just validate that it's complete for progression
+                // Validate both inventory completion and terms acceptance
                 const checkinData = this.getCheckinData();
                 const hasItems = checkinData?.inventory?.length > 0;
                 const isComplete = checkinData?.inventoryComplete;
+                const termsAccepted = checkinData?.termsAccepted;
 
                 if (!hasItems && !isComplete) {
                     alert('Please add inventory items or confirm you are not leaving anything in inventory.');
                     return false;
                 }
+
+                if (!termsAccepted) {
+                    // Show terms popup if not accepted yet
+                    this.showTermsPopup();
+                    return false;
+                }
+
                 return true;
 
             default:
@@ -1273,6 +1290,26 @@ class FormDataManager {
             "updatePetInCookies is deprecated, use updatePetInCheckin instead"
         );
         return this.updatePetInCheckin(petIndex, data);
+    }
+
+    /**
+     * Muestra el popup de términos y condiciones
+     */
+    static showTermsPopup() {
+        const popup = document.getElementById('termsConditionsPopup');
+        if (popup) {
+            popup.classList.remove('hidden');
+        }
+    }
+
+    /**
+     * Oculta el popup de términos y condiciones
+     */
+    static hideTermsPopup() {
+        const popup = document.getElementById('termsConditionsPopup');
+        if (popup) {
+            popup.classList.add('hidden');
+        }
     }
 
     /**

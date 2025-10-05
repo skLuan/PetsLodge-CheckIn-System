@@ -317,6 +317,56 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
+    // Terms and conditions popup handling
+    const termsPopup = document.getElementById('termsConditionsPopup');
+    if (termsPopup) {
+        const termsContent = document.getElementById('termsContent');
+        const termsAcceptedCheckbox = document.getElementById('termsAccepted');
+        const closeTermsPopupBtn = document.getElementById('closeTermsPopup');
+
+        // Enable checkbox and adjust opacity when scrolled to bottom
+        if (termsContent && termsAcceptedCheckbox) {
+            // Set initial opacity
+            termsAcceptedCheckbox.style.opacity = '0.7';
+
+            termsContent.addEventListener('scroll', function() {
+                const isAtBottom = Math.abs(this.scrollHeight - this.clientHeight - this.scrollTop) < 1;
+                termsAcceptedCheckbox.disabled = !isAtBottom;
+                termsAcceptedCheckbox.style.opacity = isAtBottom ? '1.0' : '0.7';
+            });
+        }
+
+        // Handle terms acceptance
+        if (termsAcceptedCheckbox) {
+            termsAcceptedCheckbox.addEventListener('change', function() {
+                if (this.checked) {
+                    FormDataManager.setTermsAccepted(true);
+                    // Allow closing the popup
+                    if (closeTermsPopupBtn) {
+                        closeTermsPopupBtn.style.display = '';
+                    }
+                } else {
+                    FormDataManager.setTermsAccepted(false);
+                }
+            });
+        }
+
+        // Handle close button - just close popup without proceeding
+        if (closeTermsPopupBtn) {
+            closeTermsPopupBtn.addEventListener('click', function() {
+                if (termsAcceptedCheckbox && termsAcceptedCheckbox.checked) {
+                    FormDataManager.hideTermsPopup();
+                    // Update tabbar to reflect terms acceptance
+                    if (typeof window.updateTabbarForStep === 'function') {
+                        window.updateTabbarForStep();
+                    }
+                } else {
+                    alert('Please read the terms and conditions and check the box to accept.');
+                }
+            });
+        }
+    }
+
     // Function to update tabbar based on current step
     window.updateTabbarForStep = function() {
         const currentStep = Utils.actualStep();
@@ -387,9 +437,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 success = FormDataManager.handleFormStep(step, data, selectedPetIndex);
             }
 
-            // Check if this is the final step (before Thanks)
-            if (step === FORM_CONFIG.STEPS.INVENTORY - 1) {
-                // Trigger final submission
+            // Check if this is the final step (before Thanks) and step was successful
+            if (step === FORM_CONFIG.STEPS.INVENTORY - 1 && success) {
+                // Trigger final submission only if step validation passed
                 setTimeout(() => {
                     submitFinalCheckIn();
                 }, 500);
