@@ -72,9 +72,7 @@
         @apply !bg-yellow shadow;
     }
 
-    .container-day {
-        @apply hidden;
-    }
+    /* .container-day visibility controlled by JS */
 
     #feedingMedicationPopup .active {
         @apply bg-gray text-white shadow-inner;

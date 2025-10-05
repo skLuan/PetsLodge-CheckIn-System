@@ -149,13 +149,19 @@ document.addEventListener("DOMContentLoaded", function () {
     addFeedMedButtons.forEach((btn) => {
         btn.addEventListener("click", function (e) {
             e.preventDefault();
+            const period = btn.getAttribute('data-period') || 'morning';
+
+            // Pre-select the time in the popup
+            const timeRadio = document.querySelector(`input[name="day_time"][value="${period}"]`);
+            if (timeRadio) {
+                timeRadio.checked = true;
+            }
+
             if (popup) {
-                popup.classList.toggle("translate-y-[75vh]");
-                popup.classList.toggle("translate-y-0");
+                popup.classList.remove("translate-y-[75vh]");
+                popup.classList.add("translate-y-0");
             }
         });
-
-        btn.classList.contains("btn-day-time");
     });
     submitPopBtn.addEventListener("click", function (e) {
         e.preventDefault();
@@ -163,19 +169,40 @@ document.addEventListener("DOMContentLoaded", function () {
 
         const data = extractFormInputValues("#feedingPopupForm");
 
-        // Estructura correcta para feeding/medication
-        const feedingMedData = {
-            [data.type === "food" ? "feeding" : "medication"]: [data],
+        // Validate required fields
+        if (!data.day_time || !data.type || !data.feeding_med_details?.trim()) {
+            alert("Please fill in all required fields");
+            return;
+        }
+
+        const itemData = {
+            day_time: data.day_time,
+            type: data.type,
+            feeding_med_details: data.feeding_med_details.trim()
         };
 
-        console.log("Saving feeding/medication data:", feedingMedData);
+        console.log("Saving feeding/medication data:", itemData);
 
         popupForm.reset();
 
-        // Update the selected pet or the first pet if none selected
+        // Get selected pet or first pet
         const selectedPill = document.querySelector(".pill.selected");
         const petIndex = selectedPill ? parseInt(selectedPill.dataset.index, 10) : 0;
-        FormDataManager.updatePetInCheckin(petIndex, feedingMedData);
+
+        // Check if "same feeding for all" is checked and it's food
+        const sameFeedingCheckbox = document.getElementById("sameFeedingForAll");
+        const isSameFeedingForAll = sameFeedingCheckbox && sameFeedingCheckbox.checked && data.type === "food";
+
+        if (isSameFeedingForAll) {
+            // Add to all pets
+            const allPets = FormDataManager.getAllPetsFromCheckin();
+            allPets.forEach((_, index) => {
+                FormDataManager.addPetFeedingOrMedication(index, "feeding", itemData);
+            });
+        } else {
+            // Add to selected pet
+            FormDataManager.addPetFeedingOrMedication(petIndex, data.type === "food" ? "feeding" : "medication", itemData);
+        }
 
         // Cerrar popup
         popup.classList.add("translate-y-[75vh]");
@@ -204,6 +231,46 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     });
     // ------------------------------------------------- End button feeding/medication
+
+    // Health info form handling
+    const healthInfoForm = document.getElementById('healthInfoForm');
+    if (healthInfoForm) {
+        // Handle unusual health behavior radio buttons
+        const healthBehaviorRadios = healthInfoForm.querySelectorAll('input[name="unusualHealthBehavior"]');
+        healthBehaviorRadios.forEach(radio => {
+            radio.addEventListener('change', function() {
+                const detailsContainer = healthInfoForm.querySelector('.conditional-health-details');
+                if (this.value === 'yes') {
+                    detailsContainer.style.display = '';
+                } else {
+                    detailsContainer.style.display = 'none';
+                    // Clear the details field
+                    const detailsField = healthInfoForm.querySelector('#healthBehaviorDetails');
+                    if (detailsField) detailsField.value = '';
+                }
+            });
+        });
+
+        // Handle grooming checkboxes
+        const groomingCheckboxes = healthInfoForm.querySelectorAll('input[name="grooming[]"]');
+        groomingCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const notesContainer = healthInfoForm.querySelector('.conditional-grooming-notes');
+                const hasGroomingSelected = Array.from(groomingCheckboxes).some(cb =>
+                    cb.checked && cb.value !== 'no'
+                );
+
+                if (hasGroomingSelected) {
+                    notesContainer.style.display = '';
+                } else {
+                    notesContainer.style.display = 'none';
+                    // Clear the notes field
+                    const notesField = healthInfoForm.querySelector('#groomingDetails');
+                    if (notesField) notesField.value = '';
+                }
+            });
+        });
+    }
 
     // Save form data on next step
     const nextButton = document.querySelector("#nextStep");

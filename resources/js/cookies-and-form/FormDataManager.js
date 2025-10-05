@@ -217,6 +217,12 @@ class FormDataManager {
             // Update feeding/medication displays (these are display-only)
             this.updateFeedingMedicationUI(cookieData.pets);
 
+            // Update health info UI
+            this.updateHealthInfoUI(cookieData.pets, cookieData.grooming, cookieData.groomingDetails);
+
+            // Update same feeding checkbox visibility
+            this.updateSameFeedingCheckbox(cookieData.pets);
+
             // Update grooming checkboxes and inventory (less likely to be actively edited)
             this.updateGroomingAndInventoryUI(cookieData.grooming, cookieData.inventory, cookieData.groomingDetails);
 
@@ -324,10 +330,13 @@ class FormDataManager {
         if (!Array.isArray(pets)) return;
 
         // Update feeding/medication displays for each time slot
-        const timeSlots = ['morning', 'noon', 'night'];
+        const timeSlots = ['morning', 'noon', 'afternoon', 'night'];
         timeSlots.forEach(timeSlot => {
             this.updateTimeSlotDisplay(timeSlot, pets);
         });
+
+        // Update day section visibility
+        this.updateDaySectionVisibility(pets);
     }
 
     /**
@@ -340,25 +349,274 @@ class FormDataManager {
         if (foodContainer) foodContainer.innerHTML = '';
         if (medContainer) medContainer.innerHTML = '';
 
-        pets.forEach(pet => {
+        if (!Array.isArray(pets)) return;
+
+        pets.forEach((pet, petIndex) => {
             if (pet?.feeding) {
-                pet.feeding.forEach(feed => {
-                    if (feed.day_time === timeSlot) {
-                        // Add food pill
-                        console.log(`Food for ${pet.info?.petName} at ${timeSlot}: ${feed.feeding_med_details}`);
+                pet.feeding.forEach((feed, feedIndex) => {
+                    if (feed.day_time === timeSlot && foodContainer) {
+                        this.createEditableItem(foodContainer, feed, petIndex, 'feeding', feedIndex, pet.info?.petName);
                     }
                 });
             }
 
             if (pet?.medication) {
-                pet.medication.forEach(med => {
-                    if (med.day_time === timeSlot) {
-                        // Add medication pill
-                        console.log(`Medication for ${pet.info?.petName} at ${timeSlot}: ${med.feeding_med_details}`);
+                pet.medication.forEach((med, medIndex) => {
+                    if (med.day_time === timeSlot && medContainer) {
+                        this.createEditableItem(medContainer, med, petIndex, 'medication', medIndex, pet.info?.petName);
                     }
                 });
             }
         });
+
+        // Hide/show food section based on content
+        if (foodContainer) {
+            const foodSection = foodContainer.parentElement;
+            if (foodContainer.children.length === 0) {
+                foodSection.style.display = 'none';
+            } else {
+                foodSection.style.display = '';
+            }
+        }
+
+        // Hide/show medication section based on content
+        if (medContainer) {
+            const medSection = medContainer.parentElement;
+            if (medContainer.children.length === 0) {
+                medSection.style.display = 'none';
+            } else {
+                medSection.style.display = '';
+            }
+        }
+    }
+
+    /**
+     * Crea un elemento editable para alimentación/medicación
+     */
+    static createEditableItem(container, item, petIndex, type, itemIndex, petName) {
+        if (!container) return;
+
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'flex items-center rounded-b-sm pl-2 py-1';
+
+        // Edit button
+        const editBtn = document.createElement('button');
+        editBtn.type = 'button';
+        editBtn.className = 'ml-2 text-blue-500 hover:text-blue-700 focus:outline focus:outline-2 focus:outline-blue-500 w-11 h-11 flex items-center justify-center rounded';
+        editBtn.setAttribute('aria-label', 'Edit item');
+        editBtn.innerHTML = '<iconify-icon icon="material-symbols:edit" class="text-lg"></iconify-icon>';
+        editBtn.onclick = () => this.toggleEdit(input, editBtn);
+
+        // Input field
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = item.feeding_med_details || '';
+        input.disabled = true;
+        input.className = 'flex-1 mb-0 mx-1';
+        input.dataset.petIndex = petIndex;
+        input.dataset.type = type;
+        input.dataset.itemIndex = itemIndex;
+
+        // Delete button
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'ml-2 text-red-500 hover:text-red-700 focus:outline focus:outline-2 focus:outline-red-500 w-11 h-11 flex items-center justify-center rounded';
+        deleteBtn.setAttribute('aria-label', 'Delete item');
+        deleteBtn.innerHTML = '<iconify-icon icon="material-symbols:delete" class="text-lg"></iconify-icon>';
+        deleteBtn.onclick = () => {
+            if (confirm('Are you sure you want to delete this item?')) {
+                this.removeFeedingMedicationItem(petIndex, type, itemIndex);
+                itemDiv.remove();
+            }
+        };
+
+        itemDiv.appendChild(input);
+        itemDiv.appendChild(editBtn);
+        itemDiv.appendChild(deleteBtn);
+        container.appendChild(itemDiv);
+    }
+
+    /**
+     * Alterna el modo de edición del input
+     */
+    static toggleEdit(input, editBtn) {
+        const isEditing = !input.disabled;
+        input.disabled = isEditing;
+
+        if (isEditing) {
+            // Save changes
+            const newValue = input.value.trim();
+            if (newValue !== '') {
+                this.updateFeedingMedicationItem(
+                    parseInt(input.dataset.petIndex),
+                    input.dataset.type,
+                    parseInt(input.dataset.itemIndex),
+                    { feeding_med_details: newValue }
+                );
+            }
+            editBtn.innerHTML = '<iconify-icon icon="material-symbols:edit" class="text-lg"></iconify-icon>';
+            editBtn.className = 'mr-2 text-blue-500 hover:text-blue-700 focus:outline focus:outline-2 focus:outline-blue-500 w-11 h-11 flex items-center justify-center rounded';
+            editBtn.setAttribute('aria-label', 'Edit item');
+        } else {
+            // Enter edit mode
+            input.focus();
+            editBtn.innerHTML = '<iconify-icon icon="material-symbols:check" class="text-lg"></iconify-icon>';
+            editBtn.className = 'mr-2 text-green-500 hover:text-green-700 focus:outline focus:outline-2 focus:outline-green-500 w-11 h-11 flex items-center justify-center rounded';
+            editBtn.setAttribute('aria-label', 'Save changes');
+        }
+    }
+
+    /**
+     * Actualiza un elemento específico de alimentación/medicación
+     */
+    static updateFeedingMedicationItem(petIndex, type, itemIndex, updates) {
+        const currentData = this.getCheckinData();
+        if (!currentData || !currentData.pets || !currentData.pets[petIndex]) return false;
+
+        const pet = { ...currentData.pets[petIndex] };
+        const array = type === 'feeding' ? pet.feeding : pet.medication;
+
+        if (array && array[itemIndex]) {
+            array[itemIndex] = { ...array[itemIndex], ...updates };
+            pet.lastUpdated = new Date().toISOString();
+
+            const updatedPets = [...currentData.pets];
+            updatedPets[petIndex] = pet;
+
+            return this.updateCheckinData({ pets: updatedPets });
+        }
+
+        return false;
+    }
+
+    /**
+     * Elimina un elemento específico de alimentación/medicación
+     */
+    static removeFeedingMedicationItem(petIndex, type, itemIndex) {
+        const currentData = this.getCheckinData();
+        if (!currentData || !currentData.pets || !currentData.pets[petIndex]) return false;
+
+        const pet = { ...currentData.pets[petIndex] };
+        const array = type === 'feeding' ? pet.feeding : pet.medication;
+
+        if (array && array[itemIndex]) {
+            array.splice(itemIndex, 1); // Remove the item
+            pet.lastUpdated = new Date().toISOString();
+
+            const updatedPets = [...currentData.pets];
+            updatedPets[petIndex] = pet;
+
+            return this.updateCheckinData({ pets: updatedPets });
+        }
+
+        return false;
+    }
+
+    /**
+     * Actualiza la visibilidad de las secciones de día
+     */
+    static updateDaySectionVisibility(pets) {
+        const timeSlots = ['morning', 'noon', 'afternoon', 'night'];
+
+        timeSlots.forEach(timeSlot => {
+            const dayContainer = document.querySelector(`[data-time-slot="${timeSlot}"]`);
+
+            if (dayContainer) {
+                let hasData = false;
+
+                if (Array.isArray(pets)) {
+                    pets.forEach(pet => {
+                        if (pet?.feeding?.some(f => f.day_time === timeSlot) ||
+                            pet?.medication?.some(m => m.day_time === timeSlot)) {
+                            hasData = true;
+                        }
+                    });
+                }
+
+                if (hasData) {
+                    dayContainer.classList.remove('hidden');
+                } else {
+                    dayContainer.classList.add('hidden');
+                }
+            }
+        });
+    }
+
+    /**
+     * Actualiza la visibilidad y estado del checkbox "Same feeding for all"
+     */
+    static updateSameFeedingCheckbox(pets) {
+        const container = document.getElementById('sameFeedingContainer');
+        const checkbox = document.getElementById('sameFeedingForAll');
+
+        if (!container || !checkbox) return;
+
+        const petCount = Array.isArray(pets) ? pets.length : 0;
+
+        if (petCount > 1) {
+            container.classList.remove('hidden');
+            checkbox.checked = true; // Default checked for multiple pets
+        } else {
+            container.classList.add('hidden');
+            checkbox.checked = false;
+        }
+    }
+
+    /**
+     * Actualiza la UI de información de salud
+     */
+    static updateHealthInfoUI(pets, grooming, groomingDetails) {
+        const healthForm = document.getElementById('healthInfoForm');
+        if (!healthForm) return;
+
+        // Get selected pet or first pet
+        const selectedPetIndex = this.getCurrentSelectedPetIndex();
+        const petIndex = selectedPetIndex !== null ? selectedPetIndex : 0;
+        const petData = pets && pets[petIndex] ? pets[petIndex] : null;
+
+        if (petData && petData.health) {
+            // Populate unusual health behavior
+            const unusualRadio = healthForm.querySelector(`input[name="unusualHealthBehavior"][value="${petData.health.unusualHealthBehavior ? 'yes' : 'no'}"]`);
+            if (unusualRadio) unusualRadio.checked = true;
+
+            // Show/hide conditional details
+            const detailsContainer = healthForm.querySelector('.conditional-health-details');
+            const detailsField = healthForm.querySelector('#healthBehaviorDetails');
+            if (petData.health.unusualHealthBehavior) {
+                if (detailsContainer) detailsContainer.style.display = '';
+                if (detailsField) detailsField.value = petData.health.healthBehaviors || '';
+            } else {
+                if (detailsContainer) detailsContainer.style.display = 'none';
+                if (detailsField) detailsField.value = '';
+            }
+
+            // Populate warnings
+            const warningsField = healthForm.querySelector('#warnings');
+            if (warningsField) warningsField.value = petData.health.warnings || '';
+        }
+
+        // Populate grooming
+        if (grooming) {
+            Object.keys(grooming).forEach(service => {
+                const checkbox = healthForm.querySelector(`input[name="grooming[]"][value="${service}"]`);
+                if (checkbox) {
+                    checkbox.checked = grooming[service] || false;
+                }
+            });
+        }
+
+        // Populate grooming details
+        const groomingDetailsField = healthForm.querySelector('#groomingDetails');
+        if (groomingDetailsField) {
+            groomingDetailsField.value = groomingDetails || '';
+        }
+
+        // Show/hide grooming notes based on selection
+        const groomingNotesContainer = healthForm.querySelector('.conditional-grooming-notes');
+        const hasGroomingSelected = grooming && Object.values(grooming).some(val => val && val !== 'no');
+        if (groomingNotesContainer) {
+            groomingNotesContainer.style.display = hasGroomingSelected ? '' : 'none';
+        }
     }
 
     /**
@@ -582,6 +840,26 @@ class FormDataManager {
     }
 
     /**
+     * Actualiza información de salud de una mascota
+     */
+    static updatePetHealthInfo(petIndex, healthData) {
+        const currentData = this.getCheckinData();
+        if (!currentData || !currentData.pets || !currentData.pets[petIndex]) {
+            console.warn(`Pet at index ${petIndex} not found for health update`);
+            return false;
+        }
+
+        const pet = { ...currentData.pets[petIndex] };
+        pet.health = { ...pet.health, ...healthData };
+        pet.lastUpdated = new Date().toISOString();
+
+        const updatedPets = [...currentData.pets];
+        updatedPets[petIndex] = pet;
+
+        return this.updateCheckinData({ pets: updatedPets });
+    }
+
+    /**
      * Actualiza información de grooming e inventory
      */
     static updateGroomingAndInventory(
@@ -641,18 +919,35 @@ class FormDataManager {
                 return true;
 
             case FORM_CONFIG.STEPS.HEALTH_INFO - 1: // step 3 = HEALTH_INFO
+                // Health info applies to all pets or selected pet
+                const healthData = {
+                    unusualHealthBehavior: formData.unusualHealthBehavior === 'yes',
+                    healthBehaviors: formData.healthBehaviorDetails || '',
+                    warnings: formData.warnings || '',
+                };
+
                 if (selectedPetIndex !== null) {
-                    return this.updatePetHealth(selectedPetIndex, formData);
+                    this.updatePetHealthInfo(selectedPetIndex, healthData);
                 } else {
-                    // Aplicar a todas las mascotas si no hay una seleccionada
+                    // Apply to all pets if none selected
                     const checkinData = this.getCheckinData();
                     if (checkinData && checkinData.pets) {
                         checkinData.pets.forEach((_, index) => {
-                            this.updatePetHealth(index, formData);
+                            this.updatePetHealthInfo(index, healthData);
                         });
                     }
-                    return true;
                 }
+
+                // Handle grooming data (global, not per-pet)
+                const groomingData = {};
+                if (formData.grooming && Array.isArray(formData.grooming)) {
+                    formData.grooming.forEach(service => {
+                        groomingData[service] = true;
+                    });
+                }
+                this.updateGroomingAndInventory(groomingData, [], formData.groomingDetails || '');
+
+                return true;
 
             case FORM_CONFIG.STEPS.INVENTORY - 1: // step 4 = INVENTORY
                 return this.updateGroomingAndInventory(
