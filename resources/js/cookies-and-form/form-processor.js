@@ -128,9 +128,8 @@ document.addEventListener("DOMContentLoaded", function () {
             e.preventDefault();
             const data = extractFormInputValues(form);
 
-            // const newData = { pet: data };
-
-            CookieHandler.saveFormDataToCookies(data);
+            // Use the same method as the "next" button for consistency
+            FormDataManager.handleFormStep(1, data, null); // step 1 = PET_INFO, selectedPetIndex = null to add new
             form.reset();
             scrollTo({ top: 0, behavior: "smooth" });
             setTimeout(() => {
@@ -218,15 +217,26 @@ document.addEventListener("DOMContentLoaded", function () {
                 ? parseInt(selectedPill.dataset.index, 10)
                 : null;
 
-            // Una sola línea maneja todo!
-            const success = FormDataManager.handleFormStep(
-                step,
-                data,
-                selectedPetIndex
-            );
+            let success = false;
 
-            if (success && step === FORM_CONFIG.STEPS.PET_INFO - 1) {
-                addPetPillsToContainer();
+            if (step === FORM_CONFIG.STEPS.PET_INFO - 1) { // Pet info step
+                if (selectedPetIndex !== null) {
+                    // Update existing pet
+                    success = FormDataManager.handleFormStep(step, data, selectedPetIndex);
+                } else if (FormDataManager.getAllPetsFromCheckin().length === 0) {
+                    // Only add new pet if no pets exist
+                    success = FormDataManager.handleFormStep(step, data, selectedPetIndex);
+                } else {
+                    // Do nothing if pets exist and none selected
+                    success = true; // Allow navigation
+                }
+
+                if (success) {
+                    addPetPillsToContainer();
+                }
+            } else {
+                // For other steps, proceed normally
+                success = FormDataManager.handleFormStep(step, data, selectedPetIndex);
             }
 
             // Check if this is the final step (before Thanks)

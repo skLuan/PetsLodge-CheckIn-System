@@ -171,14 +171,17 @@ class FormDataManager {
             this.createInitialCheckin();
         }
 
-        // Iniciar auto-save
-        this.startAutoSave();
+        // Auto-save disabled for now
+        // this.startAutoSave();
 
         // Iniciar sistema de reactividad de cookies
         CookieReactivityManager.startListening();
 
         // Registrar listener para actualizar UI automáticamente
         this.registerUIUpdateListener();
+
+        // Trigger initial UI update with existing data
+        this.updateUIFromCookieData(this.getCheckinData());
 
         console.log(
             "FormDataManager initialized with checkin data:",
@@ -205,7 +208,9 @@ class FormDataManager {
         console.log("🔄 Updating UI from cookie data (conservative mode)");
 
         try {
-            // Only update non-active forms and displays, not input fields being edited
+            // Populate owner info form globally (regardless of current step)
+            this.updateOwnerInfoForm(cookieData.user?.info);
+
             // Update pet pills and forms (these are display-only, not user input)
             this.updatePetPillsAndForms(cookieData.pets);
 
