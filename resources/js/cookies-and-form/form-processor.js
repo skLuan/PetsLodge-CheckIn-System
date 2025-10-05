@@ -232,6 +232,51 @@ document.addEventListener("DOMContentLoaded", function () {
     });
     // ------------------------------------------------- End button feeding/medication
 
+    // Inventory form handling
+    const inventoryForm = document.getElementById('inventoryForm');
+    if (inventoryForm) {
+        const itemInput = document.getElementById('itemName');
+        const addItemBtn = document.getElementById('addInventoryItem');
+
+        // Function to add item
+        function addInventoryItem() {
+            const itemText = itemInput.value.trim();
+            if (!itemText) {
+                alert('Please enter an item name');
+                return;
+            }
+
+            FormDataManager.addInventoryItem(itemText);
+
+            // Clear input
+            itemInput.value = '';
+            itemInput.focus();
+        }
+
+        // Add item on button click
+        if (addItemBtn) {
+            addItemBtn.addEventListener('click', addInventoryItem);
+        }
+
+        // Add item on Enter key
+        if (itemInput) {
+            itemInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addInventoryItem();
+                }
+            });
+        }
+
+        // Handle inventory complete checkbox
+        const completeCheckbox = document.getElementById('inventoryComplete');
+        if (completeCheckbox) {
+            completeCheckbox.addEventListener('change', function() {
+                FormDataManager.setInventoryComplete(this.checked);
+            });
+        }
+    }
+
     // Health info form handling
     const healthInfoForm = document.getElementById('healthInfoForm');
     if (healthInfoForm) {
@@ -271,6 +316,42 @@ document.addEventListener("DOMContentLoaded", function () {
             });
         });
     }
+
+    // Function to update tabbar based on current step
+    window.updateTabbarForStep = function() {
+        const currentStep = Utils.actualStep();
+        const nextButton = document.querySelector("#nextStep");
+
+        if (!nextButton) return;
+
+        if (currentStep === FORM_CONFIG.STEPS.INVENTORY - 1) {
+            // Inventory step - change to "Complete Inventory"
+            nextButton.innerHTML = 'Complete Inventory <iconify-icon class="text-3xl" icon="fluent:next-frame-20-filled"></iconify-icon>';
+
+            // Check inventory status
+            const checkinData = FormDataManager.getCheckinData();
+            const hasItems = checkinData?.inventory?.length > 0;
+            const isComplete = checkinData?.inventoryComplete;
+
+            // Enable next button if items exist OR (no items AND checkbox checked)
+            const shouldEnable = hasItems || (!hasItems && isComplete);
+
+            nextButton.disabled = !shouldEnable;
+            if (nextButton.disabled) {
+                nextButton.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                nextButton.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        } else {
+            // Other steps - normal "Next"
+            nextButton.innerHTML = 'Next <iconify-icon class="text-3xl" icon="fluent:next-frame-20-filled"></iconify-icon>';
+            nextButton.disabled = false;
+            nextButton.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+    };
+
+    // Update tabbar when step changes or inventory updates
+    updateTabbarForStep();
 
     // Save form data on next step
     const nextButton = document.querySelector("#nextStep");

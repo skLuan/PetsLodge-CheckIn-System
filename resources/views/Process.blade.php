@@ -37,7 +37,7 @@
             </div>
 
             <div id="step5" class="step w-full">
-                <form id="Inventory" action=""></form>
+                <x-forms.inventory />
             </div>
 
             <div id="step6" class="step w-full">

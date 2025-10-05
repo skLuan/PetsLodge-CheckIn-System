@@ -220,6 +220,9 @@ class FormDataManager {
             // Update health info UI
             this.updateHealthInfoUI(cookieData.pets, cookieData.grooming, cookieData.groomingDetails);
 
+            // Update inventory UI
+            this.updateInventoryUI(cookieData.inventory, cookieData.inventoryComplete);
+
             // Update same feeding checkbox visibility
             this.updateSameFeedingCheckbox(cookieData.pets);
 
@@ -860,6 +863,120 @@ class FormDataManager {
     }
 
     /**
+     * Agrega un item al inventario
+     */
+    static addInventoryItem(itemText) {
+        const currentData = this.getCheckinData();
+        if (!currentData) return false;
+
+        const inventory = currentData.inventory || [];
+        const updatedInventory = [...inventory, itemText];
+
+        return this.updateCheckinData({
+            inventory: updatedInventory
+        });
+    }
+
+    /**
+     * Elimina un item del inventario por índice
+     */
+    static removeInventoryItem(itemIndex) {
+        const currentData = this.getCheckinData();
+        if (!currentData || !currentData.inventory) return false;
+
+        const updatedInventory = currentData.inventory.filter((_, index) => index !== itemIndex);
+
+        return this.updateCheckinData({
+            inventory: updatedInventory
+        });
+    }
+
+    /**
+     * Actualiza un item del inventario por índice
+     */
+    static updateInventoryItem(itemIndex, newText) {
+        const currentData = this.getCheckinData();
+        if (!currentData || !currentData.inventory) return false;
+
+        const updatedInventory = [...currentData.inventory];
+        updatedInventory[itemIndex] = newText;
+
+        return this.updateCheckinData({
+            inventory: updatedInventory
+        });
+    }
+
+    /**
+     * Marca el inventario como completo
+     */
+    static setInventoryComplete(complete) {
+        return this.updateCheckinData({
+            inventoryComplete: complete
+        });
+    }
+
+    /**
+     * Actualiza la UI del inventario
+     */
+    static updateInventoryUI(inventory, inventoryComplete) {
+        const itemsList = document.getElementById('inventoryItemsList');
+        const completeCheckbox = document.getElementById('inventoryComplete');
+        const completeContainer = completeCheckbox ? completeCheckbox.closest('.mt-8') : null;
+
+        if (itemsList && Array.isArray(inventory)) {
+            itemsList.innerHTML = '';
+            inventory.forEach((itemText, index) => {
+                this.createInventoryItemElement(itemText, index, itemsList);
+            });
+        }
+
+        // Handle checkbox visibility and state
+        if (completeCheckbox && completeContainer) {
+            if (inventory && inventory.length > 0) {
+                // Hide checkbox when items exist
+                completeContainer.style.display = 'none';
+                completeCheckbox.checked = false;
+            } else {
+                // Show checkbox when no items
+                completeContainer.style.display = '';
+                completeCheckbox.checked = inventoryComplete || false;
+            }
+        }
+
+        // Update tabbar if we're on inventory step
+        if (typeof window.updateTabbarForStep === 'function') {
+            window.updateTabbarForStep();
+        }
+    }
+
+    /**
+     * Crea un elemento de item de inventario
+     */
+    static createInventoryItemElement(itemText, itemIndex, container) {
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'flex items-center justify-between bg-white p-3 rounded-md border mb-2';
+
+        const textSpan = document.createElement('span');
+        textSpan.className = 'flex-1 font-medium';
+        textSpan.textContent = itemText;
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'text-red-500 hover:text-red-700 px-2 py-1 ml-2';
+        deleteBtn.setAttribute('aria-label', 'Delete item');
+        deleteBtn.innerHTML = '<iconify-icon icon="material-symbols:delete" class="text-lg"></iconify-icon>';
+        deleteBtn.onclick = () => {
+            if (confirm('Are you sure you want to delete this item?')) {
+                this.removeInventoryItem(itemIndex);
+            }
+        };
+
+        itemDiv.appendChild(textSpan);
+        itemDiv.appendChild(deleteBtn);
+        container.appendChild(itemDiv);
+    }
+
+    /**
      * Actualiza información de grooming e inventory
      */
     static updateGroomingAndInventory(
@@ -950,11 +1067,17 @@ class FormDataManager {
                 return true;
 
             case FORM_CONFIG.STEPS.INVENTORY - 1: // step 4 = INVENTORY
-                return this.updateGroomingAndInventory(
-                    formData.grooming,
-                    formData.inventory,
-                    formData.groomingDetails
-                );
+                // Inventory is managed separately via add/remove and checkbox
+                // Just validate that it's complete for progression
+                const checkinData = this.getCheckinData();
+                const hasItems = checkinData?.inventory?.length > 0;
+                const isComplete = checkinData?.inventoryComplete;
+
+                if (!hasItems && !isComplete) {
+                    alert('Please add inventory items or confirm you are not leaving anything in inventory.');
+                    return false;
+                }
+                return true;
 
             default:
                 console.log("No specific handler for step:", step);
