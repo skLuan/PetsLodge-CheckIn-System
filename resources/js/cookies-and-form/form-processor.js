@@ -1,8 +1,8 @@
-import Pill from "./Pill.js";
+import Pill from "../Pill.js";
 import CookieHandler from "./CookieHandler.js";
 import { FormDataManager } from "./FormDataManager.js";
 import { CookieManager } from "./CookieManager.js";
-import Utils from "./Utils.js";
+import Utils from "../Utils.js";
 import config from "./config.js";
 
 const { FORM_CONFIG } = config;

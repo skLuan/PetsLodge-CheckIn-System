@@ -1,4 +1,4 @@
-import CookieHandler from "./CookieHandler.js";
+import CookieHandler from "./cookies-and-form/CookieHandler.js";
 class Pill {
     constructor(name, type, index) {
         this.name = name;

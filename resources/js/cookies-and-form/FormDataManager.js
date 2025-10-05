@@ -1,6 +1,6 @@
 import { CookieManager } from "./CookieManager.js";
 import config from "./config.js";
-import Utils from "./Utils.js";
+import Utils from "../Utils.js";
 
 const { FORM_CONFIG, DEFAULT_CHECKIN_STRUCTURE, DEFAULT_PET_STRUCTURE } = config;
 
