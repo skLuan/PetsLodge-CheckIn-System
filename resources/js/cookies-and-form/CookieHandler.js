@@ -29,11 +29,11 @@ class CookieHandler {
     }
 
     static getPetsFromCookies() {
-        return FormDataManager.getAllPetsFromCookies();
+        return FormDataManager.getAllPetsFromCheckin();
     }
 
     static updatePetInCookies(petIndex, data) {
-        return FormDataManager.updatePetInCookies(petIndex, data);
+        return FormDataManager.updatePetInCheckin(petIndex, data);
     }
 
     static saveFormDataToCookies(data) {

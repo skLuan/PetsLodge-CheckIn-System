@@ -246,6 +246,8 @@ Test scenarios:
 4. **Validation Failures**: Review cookie data structure
 5. **Performance Issues**: If methods execute too frequently, check that polling is disabled (MutationObserver only)
 6. **Method Not Found**: Ensure method names match (e.g., `getAllPetsFromCheckin()`, not `getAllPetsFromCookies()`)
+7. **Deprecated Method Issues**: The `saveFormDataToStep` method was updated to work with the new cookie system to maintain backward compatibility
+8. **UI Reactivity Conflicts**: Automatic UI updates now only affect display elements, not user input fields, to prevent clearing user data during active editing
 
 ### Debug Tools
 

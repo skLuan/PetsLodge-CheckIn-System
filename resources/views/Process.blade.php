@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="scripts">
-        @vite(['resources/js/form-processor.js'])
+        @vite(['resources/js/cookies-and-form/form-processor.js'])
     </x-slot>
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-white leading-tight">

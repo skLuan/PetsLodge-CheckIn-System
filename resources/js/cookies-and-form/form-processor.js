@@ -48,25 +48,35 @@ document.addEventListener("DOMContentLoaded", function () {
     addPetPillsToContainer();
 
     function populateFormWithCookies() {
-        for (let index = 0; index < forms.length; index++) {
-            const element = forms[index];
-            let tempData = FormDataManager.getFormDataFromStep(index + 1);
-            console.log("Populating form with cookies...");
-            console.log(tempData);
-            if (!tempData) return;
-            tempData.pet ? (tempData = tempData.pet) : tempData; // Ensure we are working with the pet data
-            const form = forms[Utils.actualStep()]; // Get the current form
-            Object.keys(tempData).forEach((key) => {
-                const input = form.querySelector(`[name="${key}"]`);
-                if (input) {
-                    if (input.type === "checkbox") {
-                        input.checked = tempData[key];
-                    } else {
-                        input.value = tempData[key];
-                    }
-                }
-            });
+        // Only populate the current step's form, and only if it's empty or has minimal data
+        // This prevents overwriting user input during active editing
+        const currentStep = Utils.actualStep();
+        const currentForm = forms[currentStep];
+
+        if (!currentForm) return;
+
+        let tempData = FormDataManager.getFormDataFromStep(currentStep + 1);
+        console.log("Populating current form with cookies (step " + currentStep + "):", tempData);
+
+        if (!tempData) return;
+
+        // Handle pet data structure
+        if (tempData.pet) {
+            tempData = tempData.pet;
         }
+
+        // Only populate fields that are empty to avoid overwriting user input
+        Object.keys(tempData).forEach((key) => {
+            const input = currentForm.querySelector(`[name="${key}"]`);
+            if (input && (!input.value || input.value.trim() === '')) {
+                // Only set value if the field is empty
+                if (input.type === "checkbox") {
+                    input.checked = tempData[key];
+                } else {
+                    input.value = tempData[key] || '';
+                }
+            }
+        });
     }
 
     // Function to extract input values for a given form
@@ -153,8 +163,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
         popupForm.reset();
 
-        // Corregir: quitar el objeto wrapper innecesario
-        FormDataManager.updatePetInCookies(0, feedingMedData);
+        // Update the selected pet or the first pet if none selected
+        const selectedPill = document.querySelector(".pill.selected");
+        const petIndex = selectedPill ? parseInt(selectedPill.dataset.index, 10) : 0;
+        FormDataManager.updatePetInCheckin(petIndex, feedingMedData);
 
         // Cerrar popup
         popup.classList.add("translate-y-[75vh]");

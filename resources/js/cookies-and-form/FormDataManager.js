@@ -196,28 +196,27 @@ class FormDataManager {
 
     /**
      * Actualiza todos los elementos UI basándose en los datos de la cookie
+     * Solo actualiza elementos que no están siendo editados activamente por el usuario
      */
     static updateUIFromCookieData(cookieData) {
         if (!cookieData) return;
 
-        // Reduced logging to prevent console spam - only log significant updates
-        // console.log("🔄 Updating UI from cookie data");
+        console.log("🔄 Updating UI from cookie data (conservative mode)");
 
         try {
-            // Update owner info form
-            this.updateOwnerInfoForm(cookieData.user?.info);
-
-            // Update emergency contact
-            this.updateEmergencyContactForm(cookieData.user?.emergencyContact);
-
-            // Update pet pills and forms
+            // Only update non-active forms and displays, not input fields being edited
+            // Update pet pills and forms (these are display-only, not user input)
             this.updatePetPillsAndForms(cookieData.pets);
 
-            // Update grooming and inventory
+            // Update feeding/medication displays (these are display-only)
+            this.updateFeedingMedicationUI(cookieData.pets);
+
+            // Update grooming checkboxes and inventory (less likely to be actively edited)
             this.updateGroomingAndInventoryUI(cookieData.grooming, cookieData.inventory, cookieData.groomingDetails);
 
-            // Update feeding/medication displays
-            this.updateFeedingMedicationUI(cookieData.pets);
+            // NOTE: Intentionally NOT updating text input fields automatically
+            // to prevent clearing user input. Use populateFormWithCookies() explicitly
+            // when needed (e.g., on page load or step changes)
 
         } catch (error) {
             console.error("Error updating UI from cookie:", error);
@@ -791,18 +790,22 @@ class FormDataManager {
             return false;
         }
 
-        const currentStep = step || Utils.actualStep() + 1;
-        const cookieKey = this.getStepCookieKey(currentStep);
-
-        // Validar tamaño antes de guardar
-        if (!CookieManager.canSetCookie(cookieKey, data)) {
-            console.error("Data too large for cookie storage");
-            return false;
-        }
         console.warn(
             "saveFormDataToStep is deprecated, use handleFormStep instead"
         );
-        return this.handleFormStep(currentStep, data);
+
+        // For backward compatibility, try to determine the step and handle it
+        const currentStep = step || Utils.actualStep() + 1;
+
+        // Since we now use a single cookie, we'll try to add this as pet data
+        // This is a fallback for legacy code
+        if (data.petName || data.petType || data.petBreed) {
+            // This looks like pet data, add it to the checkin
+            return this.addPetToCheckin(data);
+        } else {
+            // For other data, try to handle it with the new system
+            return this.handleFormStep(currentStep - 1, data); // Adjust for 0-based indexing
+        }
     }
 
     static getPetsFromCookies() {

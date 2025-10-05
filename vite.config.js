@@ -7,8 +7,7 @@ export default defineConfig({
             input: [
                 'resources/css/app.css',
                 'resources/js/app.js',
-                'resources/js/form-processor.js',
-                'resources/js/FormDataManager.js',
+                'resources/js/cookies-and-form/form-processor.js',
             ],
             refresh: true,
         }),
