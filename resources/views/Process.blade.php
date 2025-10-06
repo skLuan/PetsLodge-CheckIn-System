@@ -41,7 +41,22 @@
             </div>
 
             <div id="step6" class="step w-full">
-                <form id="Thanks" action=""></form>
+                <div class="text-center">
+                    <h2 class="text-2xl font-bold text-green-800 mb-4">Thank You!</h2>
+                    <p class="text-lg text-gray-700 mb-6">Please review your information and submit your check-in when ready.</p>
+
+                    <div class="bg-green-50 p-4 rounded-lg mb-6">
+                        <h3 class="font-semibold text-green-800 mb-2">Check-in Summary:</h3>
+                        <div id="checkinSummary" class="text-left text-sm text-gray-600">
+                            <!-- Summary will be populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <button type="button" id="finalSubmit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg text-lg transition-colors duration-200">
+                        Submit Check-in
+                        <iconify-icon class="ml-2 text-xl" icon="fluent:checkmark-20-filled"></iconify-icon>
+                    </button>
+                </div>
             </div>
             <!-- Additional steps will be added here dynamically -->
         </div>

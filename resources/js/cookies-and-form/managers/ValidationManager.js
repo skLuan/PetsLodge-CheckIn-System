@@ -57,7 +57,11 @@ class ValidationManager {
                         groomingData[service] = true;
                     });
                 }
-                this.updateGroomingAndInventory(groomingData, [], formData.groomingDetails || '');
+
+                // Preserve existing inventory data - don't overwrite with empty array
+                const existingData = CoreDataManager.getCheckinData();
+                const existingInventory = existingData?.inventory || [];
+                this.updateGroomingAndInventory(groomingData, existingInventory, formData.groomingDetails || '');
 
                 return true;
 

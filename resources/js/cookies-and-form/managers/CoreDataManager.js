@@ -55,6 +55,12 @@ class CoreDataManager {
         const updatedData = this.deepMerge(currentData, updates);
         updatedData.lastUpdated = new Date().toISOString();
 
+        // Check cookie size before setting to prevent data loss
+        if (!CookieManager.canSetCookie(this.CHECKIN_COOKIE_NAME, updatedData)) {
+            console.error("Cookie data too large, cannot save. Size limit exceeded.");
+            return false;
+        }
+
         const success = CookieManager.setCookie(
             this.CHECKIN_COOKIE_NAME,
             updatedData,
@@ -67,7 +73,13 @@ class CoreDataManager {
         );
 
         if (success) {
-            console.log("Checkin data updated:", updatedData);
+            console.log("Checkin data updated successfully");
+            console.log("Cookie size:", JSON.stringify(updatedData).length, "characters");
+        } else {
+            console.error("Failed to update checkin data - cookie could not be set");
+            console.error("Data size attempted:", JSON.stringify(updatedData).length, "characters");
+            console.error("Cookie limit: 4096 characters");
+            // Don't show alert to user, just log for debugging
         }
 
         return success;

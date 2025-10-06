@@ -35,6 +35,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Initialize navigation
     NavigationManager.updateTabbarForStep();
+
+    // Handle final submission from THANKS step
+    const finalSubmitButton = document.querySelector("#finalSubmit");
+    if (finalSubmitButton) {
+        finalSubmitButton.addEventListener("click", function () {
+            SubmissionManager.submitFinalCheckIn();
+        });
+    }
+
     //------------------------------------------------
     //------------------------------------------------
     // Save form data on submit
@@ -83,13 +92,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
             const success = SubmissionManager.handleNextStep(step, data, selectedPetIndex);
 
-            // Check if this is the final step and step was successful
-            if (NavigationManager.isFinalStep() && success) {
-                // Trigger final submission
-                setTimeout(() => {
-                    SubmissionManager.submitFinalCheckIn();
-                }, 500);
-            }
+            // Note: Automatic submission removed. Final submission should only happen
+            // when explicitly triggered from a submit button (e.g., in THANKS step)
+            // The next button should only handle step navigation, not final submission.
         });
     }
 });

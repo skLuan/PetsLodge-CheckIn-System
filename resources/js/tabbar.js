@@ -67,6 +67,11 @@ function showStep(step) {
                 const url = new URL(window.location);
                 url.searchParams.set("step", step);
                 window.history.replaceState({}, "", url);
+
+                // Update navigation button text after step change
+                if (typeof window.updateTabbarForStep === 'function') {
+                    window.updateTabbarForStep();
+                }
             }
         }, 0);
     }

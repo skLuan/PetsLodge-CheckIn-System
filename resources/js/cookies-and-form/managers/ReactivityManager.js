@@ -62,6 +62,8 @@ class CookieReactivityManager {
 
         if (this.hasCookieChanged(currentValue)) {
             console.log("🍪 Cookie change detected, notifying listeners");
+            console.log("Previous cookie size:", this.lastCookieValue ? JSON.stringify(this.lastCookieValue).length : 0);
+            console.log("New cookie size:", currentValue ? JSON.stringify(currentValue).length : 0);
             this.lastCookieValue = currentValue;
             this.notifyListeners(currentValue);
         }
@@ -185,6 +187,9 @@ class UIManager {
 
             // Update grooming checkboxes
             this.updateGroomingAndInventoryUI(cookieData.grooming, cookieData.inventory, cookieData.groomingDetails);
+
+            // Update check-in summary in THANKS step
+            this.updateCheckinSummary(cookieData);
 
         } catch (error) {
             console.error("Error updating UI from cookie:", error);
@@ -379,6 +384,58 @@ class UIManager {
     static updateGroomingAndInventoryUI(grooming, inventory, details) {
         // Simplified implementation
         console.log("Update grooming and inventory UI");
+    }
+
+    static updateCheckinSummary(cookieData) {
+        const summaryElement = document.getElementById('checkinSummary');
+        if (!summaryElement) return;
+
+        let summaryHTML = '';
+
+        // Owner information
+        if (cookieData.user?.info) {
+            const user = cookieData.user.info;
+            summaryHTML += `<div class="mb-3"><strong>Owner:</strong> ${user.name || 'Not provided'}<br>`;
+            summaryHTML += `<strong>Phone:</strong> ${user.phone || 'Not provided'}<br>`;
+            summaryHTML += `<strong>Email:</strong> ${user.email || 'Not provided'}</div>`;
+        }
+
+        // Pets information
+        if (cookieData.pets && cookieData.pets.length > 0) {
+            summaryHTML += `<div class="mb-3"><strong>Pets:</strong><br>`;
+            cookieData.pets.forEach((pet, index) => {
+                if (pet?.info) {
+                    summaryHTML += `• ${pet.info.petName || 'Unnamed'} (${pet.info.petType || 'Unknown type'})<br>`;
+                }
+            });
+            summaryHTML += `</div>`;
+        }
+
+        // Inventory information
+        if (cookieData.inventory && cookieData.inventory.length > 0) {
+            summaryHTML += `<div class="mb-3"><strong>Items to leave:</strong><br>`;
+            cookieData.inventory.forEach(item => {
+                summaryHTML += `• ${item}<br>`;
+            });
+            summaryHTML += `</div>`;
+        } else {
+            summaryHTML += `<div class="mb-3"><strong>Items to leave:</strong> None</div>`;
+        }
+
+        // Grooming services
+        if (cookieData.grooming) {
+            const services = Object.entries(cookieData.grooming)
+                .filter(([key, value]) => value)
+                .map(([key]) => key.charAt(0).toUpperCase() + key.slice(1));
+
+            if (services.length > 0) {
+                summaryHTML += `<div class="mb-3"><strong>Grooming Services:</strong> ${services.join(', ')}</div>`;
+            } else {
+                summaryHTML += `<div class="mb-3"><strong>Grooming Services:</strong> None requested</div>`;
+            }
+        }
+
+        summaryElement.innerHTML = summaryHTML;
     }
 
     static getCurrentStep() {
