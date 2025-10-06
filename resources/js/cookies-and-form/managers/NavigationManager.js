@@ -18,32 +18,51 @@ class NavigationManager {
     static updateTabbarForStep() {
         const currentStep = Utils.actualStep();
         const nextButton = document.querySelector("#nextStep");
+        const thankYouTitle = document.getElementById('thankYouTitle');
+        const petPillsContainer = document.getElementById('petPillsContainer');
 
         if (!nextButton) return;
 
-        if (currentStep === FORM_CONFIG.STEPS.INVENTORY - 1) {
-            // Inventory step - change to "Complete Inventory"
-            nextButton.innerHTML = 'Complete Inventory <iconify-icon class="text-3xl" icon="fluent:next-frame-20-filled"></iconify-icon>';
+        // Toggle thank you title and pet pills container
+        if (currentStep === FORM_CONFIG.STEPS.INVENTORY) { // Step 6 (0-based: 5)
+            // Hide next button in final step
+            nextButton.style.display = 'none';
 
-            // Check inventory status
-            const checkinData = FormDataManager.getCheckinData();
-            const hasItems = checkinData?.inventory?.length > 0;
-            const isComplete = checkinData?.inventoryComplete;
+            // Show thank you title, hide pet pills
+            if (thankYouTitle) thankYouTitle.classList.remove('hidden');
+            if (petPillsContainer) petPillsContainer.classList.add('hidden');
+        } else {
+            // Show next button for other steps
+            nextButton.style.display = '';
 
-            // Enable next button if items exist OR (no items AND checkbox checked)
-            const shouldEnable = hasItems || (!hasItems && isComplete);
+            // Hide thank you title, show pet pills
+            if (thankYouTitle) thankYouTitle.classList.add('hidden');
+            if (petPillsContainer) petPillsContainer.classList.remove('hidden');
 
-            nextButton.disabled = !shouldEnable;
-            if (nextButton.disabled) {
-                nextButton.classList.add('opacity-50', 'cursor-not-allowed');
+            if (currentStep === FORM_CONFIG.STEPS.INVENTORY - 1) {
+                // Inventory step - change to "Complete Inventory"
+                nextButton.innerHTML = 'Complete Inventory <iconify-icon class="text-3xl" icon="fluent:next-frame-20-filled"></iconify-icon>';
+
+                // Check inventory status
+                const checkinData = FormDataManager.getCheckinData();
+                const hasItems = checkinData?.inventory?.length > 0;
+                const isComplete = checkinData?.inventoryComplete;
+
+                // Enable next button if items exist OR (no items AND checkbox checked)
+                const shouldEnable = hasItems || (!hasItems && isComplete);
+
+                nextButton.disabled = !shouldEnable;
+                if (nextButton.disabled) {
+                    nextButton.classList.add('opacity-50', 'cursor-not-allowed');
+                } else {
+                    nextButton.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
             } else {
+                // Other steps - normal "Next"
+                nextButton.innerHTML = 'Next <iconify-icon class="text-3xl" icon="fluent:next-frame-20-filled"></iconify-icon>';
+                nextButton.disabled = false;
                 nextButton.classList.remove('opacity-50', 'cursor-not-allowed');
             }
-        } else {
-            // Other steps - normal "Next"
-            nextButton.innerHTML = 'Next <iconify-icon class="text-3xl" icon="fluent:next-frame-20-filled"></iconify-icon>';
-            nextButton.disabled = false;
-            nextButton.classList.remove('opacity-50', 'cursor-not-allowed');
         }
     }
 

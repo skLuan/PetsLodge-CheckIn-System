@@ -22,8 +22,8 @@ export { SubmissionManager } from './SubmissionManager.js';
 // Utilities and helpers
 export { UtilitiesManager } from './UtilitiesManager.js';
 
-// Reactivity and UI updates
-export { CookieReactivityManager, UIManager } from './ReactivityManager.js';
+// Reactivity and UI updates are now in the reactivitySystem folder
+// Import from there if needed: import { CookieReactivityManager, UIManager } from '../reactivitySystem/index.js';
 
 // Legacy compatibility - re-export main FormDataManager interface
 import { FormDataManager } from '../FormDataManager.js';
