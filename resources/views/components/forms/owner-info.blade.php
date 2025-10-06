@@ -27,4 +27,16 @@
         <input type="number" id="zip" name="zip" placeholder="Your Zip Code" value="{{ $user?->zip ?? old('zip') }}"
             required>
     </div>
+
+    <div class="mt-6 pt-4 border-t border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-800 mb-3">🚨 Emergency Contact</h3>
+        <div class="pl-input-container">
+            <label class="" for="emergencyContactName">Emergency Contact Name</label>
+            <input type="text" id="emergencyContactName" name="emergencyContactName" placeholder="Emergency Contact Name">
+        </div>
+        <div class="pl-input-container">
+            <label class="" for="emergencyContactPhone">Emergency Contact Phone</label>
+            <input type="tel" id="emergencyContactPhone" name="emergencyContactPhone" placeholder="Emergency Contact Phone" pattern="[0-9]{10}">
+        </div>
+    </div>
 </form>

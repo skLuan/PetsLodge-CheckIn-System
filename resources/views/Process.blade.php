@@ -12,6 +12,8 @@
         <div class="sticky top-0 z-20 bg-green-lightest py-3 border-b border-b-green">
             <x-progress.bar />
             <div id="petPillsContainer" class="pills"></div>
+            <h2 id="thankYouTitle" class="text-2xl text-center font-bold mb-4 hidden">Thank You!</h2>
+
         </div>
         <div id="stepContainer" class="py-4 overflow-hidden relative min-h-[568px]">
             <div id="step1" class="step w-full active">
@@ -42,20 +44,39 @@
 
             <div id="step6" class="step w-full">
                 <div class="text-center">
-                    <h2 class="text-2xl font-bold text-green-800 mb-4">Thank You!</h2>
-                    <p class="text-lg text-gray-700 mb-6">Please review your information and submit your check-in when ready.</p>
-
-                    <div class="bg-green-50 p-4 rounded-lg mb-6">
-                        <h3 class="font-semibold text-green-800 mb-2">Check-in Summary:</h3>
+                    <p class="text-lg text-gray-700 mb-6">Please review your information and submit your check-in when
+                        ready.
+                    </p>
+                    <div class="bg-white p-4 rounded-lg mb-6 border border-green">
+                        <h3 class="font-bold text-lg">Check-in Receipt</h3>
                         <div id="checkinSummary" class="text-left text-sm text-gray-600">
                             <!-- Summary will be populated by JavaScript -->
                         </div>
                     </div>
 
-                    <button type="button" id="finalSubmit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg text-lg transition-colors duration-200">
-                        Submit Check-in
-                        <iconify-icon class="ml-2 text-xl" icon="fluent:checkmark-20-filled"></iconify-icon>
-                    </button>
+                    <div class="bg-white p-4 rounded-lg border border-gray-300 mb-6">
+                        <div class="flex flex-col items-center justify-between mb-3">
+                            <label for="finalTermsAccepted" class="flex items-center cursor-pointer">
+                                <input type="checkbox" id="finalTermsAccepted"
+                                    class="mr-3 h-4 w-4 focus:ring-green border-gray-300 rounded">
+                                <span class="text-sm text-gray-700">I accept the <strong>Terms and
+                                        Conditions</strong></span>
+                            </label>
+                            <button type="button" id="readTermsAgainBtn"
+                                class="text-sm text-blue-600 hover:text-blue-800 underline">
+                                Read Terms Again
+                            </button>
+                        </div>
+                        <p class="text-xs text-gray-500">By submitting this check-in, you agree to our terms and
+                            conditions regarding pet care services.</p>
+                    </div>
+                    <div class="flex justify-center">
+                        <button type="button" id="finalSubmit"
+                            class="px-3 flex text-center justify-center flex-row items-center w-full shadow-md py-2 font-bold rounded-full bg-yellow-second text-gray transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                            Submit Check-in
+                            <iconify-icon class="ml-2 text-xl" icon="fluent:checkmark-20-filled"></iconify-icon>
+                        </button>
+                    </div>
                 </div>
             </div>
             <!-- Additional steps will be added here dynamically -->

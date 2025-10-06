@@ -34,10 +34,13 @@ import {
     ValidationManager,
     InventoryManager,
     PetManager,
-    UtilitiesManager,
+    UtilitiesManager
+} from "./managers/index.js";
+
+import {
     CookieReactivityManager,
     UIManager
-} from "./managers/index.js";
+} from "./reactivitySystem/index.js";
 
 /**
  * Main FormDataManager class - Unified interface for pet check-in data management
