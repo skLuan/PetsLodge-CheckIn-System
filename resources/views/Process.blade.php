@@ -47,7 +47,7 @@
                     <p class="text-lg text-gray-700 mb-6">Please review your information and submit your check-in when
                         ready.
                     </p>
-                    <div class="bg-white p-4 rounded-lg mb-6 border border-green">
+                    <div class="bg-white p-4 rounded-lg mb-6 border border-green border-opacity-40">
                         <h3 class="font-bold text-lg">Check-in Receipt</h3>
                         <div id="checkinSummary" class="text-left text-sm text-gray-600">
                             <!-- Summary will be populated by JavaScript -->

@@ -77,7 +77,7 @@ class SummaryRenderer {
         summaryElement.innerHTML = summaryHTML;
 
         // Setup interactive elements
-        this.setupTermsCheckbox(termsCheckbox);
+        this.setupTermsCheckbox(termsCheckbox, cookieData.termsAccepted);
         this.setupReadTermsButton(readTermsBtn);
         this.updateSubmitButtonState(finalSubmitBtn, cookieData.termsAccepted);
     }
@@ -93,9 +93,10 @@ class SummaryRenderer {
     static renderReceiptHeader(cookieData) {
         const checkinDate = cookieData.date ? new Date(cookieData.date).toLocaleDateString() : new Date().toLocaleDateString();
         return `
-            <div class="text-center mb-4 pb-2 border-b border-yellow-300">
-                <div class="text-xs text-gray-500">Check-in Date: ${checkinDate}</div>
-                <div class="text-xs text-gray-500">Receipt ID: ${cookieData.id || 'N/A'}</div>
+            <div class="mb-4 py-2 border-b border-green">
+            <div class="text-xs text-gray-500">Receipt ID: ${cookieData.id || 'N/A'}</div>
+                <div class="text-sm flex justify-between pt-1 text-gray-500">Check-in Date: <strong>${checkinDate}</strong></div>
+            
             </div>
         `;
     }
@@ -112,15 +113,15 @@ class SummaryRenderer {
         if (!userInfo) return '';
 
         let html = `
-            <div class="mb-4">
-                <div class="font-semibold text-yellow-800 mb-1">👤 Owner Information</div>
+            <div class="mb-4 border-b pb-1">
+                <h3 class="font-semibold text-green-dark mb-1">👤 Owner Information</h3>
                 <div class="pl-4 text-sm">
-                    <div><strong>Name:</strong> ${userInfo.name || 'Not provided'}</div>
-                    <div><strong>Phone:</strong> ${userInfo.phone || 'Not provided'}</div>
-                    <div><strong>Email:</strong> ${userInfo.email || 'Not provided'}</div>`;
+                    <div class="flex justify-between"><strong>Name:</strong> ${userInfo.name || 'Not provided'}</div>
+                    <div class="flex justify-between"><strong>Phone:</strong> ${userInfo.phone || 'Not provided'}</div>
+                    <div class="flex justify-between"><strong>Email:</strong> ${userInfo.email || 'Not provided'}</div>`;
 
-        if (userInfo.address) html += `<div><strong>Address:</strong> ${userInfo.address}</div>`;
-        if (userInfo.city && userInfo.zip) html += `<div><strong>Location:</strong> ${userInfo.city}, ${userInfo.zip}</div>`;
+        if (userInfo.address) html += `<div class="flex justify-between"><strong>Address:</strong> ${userInfo.address}</div>`;
+        if (userInfo.city && userInfo.zip) html += `<div class="flex justify-between"><strong>Location:</strong> ${userInfo.city}, ${userInfo.zip}</div>`;
 
         html += `
                 </div>
@@ -142,10 +143,10 @@ class SummaryRenderer {
 
         return `
             <div class="mb-4">
-                <div class="font-semibold text-yellow-800 mb-1">🚨 Emergency Contact</div>
+                <div class="font-semibold text-green-dark mb-1">🚨 Emergency Contact</div>
                 <div class="pl-4 text-sm">
-                    <div><strong>Name:</strong> ${emergencyContact.name || 'Not provided'}</div>
-                    <div><strong>Phone:</strong> ${emergencyContact.phone || 'Not provided'}</div>
+                    <div class="flex justify-between"><strong>Name:</strong> ${emergencyContact.name || 'Not provided'}</div>
+                    <div class="flex justify-between"><strong>Phone:</strong> ${emergencyContact.phone || 'Not provided'}</div>
                 </div>
             </div>`;
     }
@@ -163,22 +164,22 @@ class SummaryRenderer {
 
         let html = `
             <div class="mb-4">
-                <div class="font-semibold text-yellow-800 mb-2">🐾 Pet Details (${pets.length} pet${pets.length > 1 ? 's' : ''})</div>`;
+                <h3 class="font-semibold text-green-dark mb-2">🐾 Pet Details (${pets.length} pet${pets.length > 1 ? 's' : ''})</h3>`;
 
         pets.forEach((pet, index) => {
             if (pet?.info) {
                 html += `
-                    <div class="mb-3 pl-4 border-l-2 border-yellow-300">
-                        <div class="font-medium">${pet.info.petName || 'Unnamed'} (${pet.info.petType || 'Unknown type'})</div>
-                        <div class="text-xs text-gray-600 pl-2">`;
+                    <div class="mb-3 py-1 pl-4 border-l-2 border-yellow">
+                        <div class="font-bold text-base pb-2">${pet.info.petName || 'Unnamed'} (${pet.info.petType || 'Unknown type'})</div>
+                        <div class="text-sm text-gray-600 pl-2">`;
 
                 // Basic info
-                if (pet.info.petColor) html += `Color: ${pet.info.petColor} | `;
-                if (pet.info.petBreed) html += `Breed: ${pet.info.petBreed} | `;
-                if (pet.info.petAge) html += `Age: ${new Date(pet.info.petAge).toLocaleDateString()} | `;
-                if (pet.info.petWeight) html += `Weight: ${pet.info.petWeight} lbs | `;
-                if (pet.info.petGender) html += `Gender: ${pet.info.petGender} | `;
-                if (pet.info.petSpayed) html += `Spayed/Neutered: ${pet.info.petSpayed}`;
+                if (pet.info.petColor) html += `<div class="flex justify-between"><strong>Color:</strong> ${pet.info.petColor}</div>`;
+                if (pet.info.petBreed) html += `<div class="flex justify-between"><strong>Breed:</strong> ${pet.info.petBreed}</div>`;
+                if (pet.info.petAge) html += `<div class="flex justify-between"><strong>Age:</strong> ${new Date(pet.info.petAge).toLocaleDateString()}</div>`;
+                if (pet.info.petWeight) html += `<div class="flex justify-between"><strong>Weight:</strong> ${pet.info.petWeight} lbs</div>`;
+                if (pet.info.petGender) html += `<div class="flex justify-between"><strong>Gender:</strong> ${pet.info.petGender}</div>`;
+                if (pet.info.petSpayed) html += `<div class="flex justify-between"><strong>Spayed/Neutered:</strong> ${pet.info.petSpayed}</div>`;
 
                 html += `
                         </div>`;
@@ -214,7 +215,7 @@ class SummaryRenderer {
     static renderFeedingSchedule(feeding) {
         if (!feeding || feeding.length === 0) return '';
 
-        let html = `<div class="mt-2"><strong>🍽️ Feeding Schedule:</strong></div>`;
+        let html = `<div class="mt-2 pb-1"><strong>🍽️ Feeding Schedule:</strong></div>`;
         const feedingByTime = {};
 
         feeding.forEach(feed => {
@@ -223,7 +224,7 @@ class SummaryRenderer {
         });
 
         Object.entries(feedingByTime).forEach(([time, items]) => {
-            html += `<div class="pl-2 text-xs">• ${time.charAt(0).toUpperCase() + time.slice(1)}: ${items.join(', ')}</div>`;
+            html += `<p class="pl-2 flex justify-between text-xs"><strong>${time.charAt(0).toUpperCase() + time.slice(1)}:</strong> ${items.join(', ')}</p>`;
         });
 
         return html;
@@ -240,7 +241,7 @@ class SummaryRenderer {
     static renderMedicationSchedule(medication) {
         if (!medication || medication.length === 0) return '';
 
-        let html = `<div class="mt-2"><strong>💊 Medication Schedule:</strong></div>`;
+        let html = `<div class="mt-2 pb-1"><strong>💊 Medication Schedule:</strong></div>`;
         const medByTime = {};
 
         medication.forEach(med => {
@@ -249,7 +250,7 @@ class SummaryRenderer {
         });
 
         Object.entries(medByTime).forEach(([time, items]) => {
-            html += `<div class="pl-2 text-xs">• ${time.charAt(0).toUpperCase() + time.slice(1)}: ${items.join(', ')}</div>`;
+            html += `<p class="pl-2 flex justify-between text-xs"><strong>${time.charAt(0).toUpperCase() + time.slice(1)}:</strong> ${items.join(', ')}</p>`;
         });
 
         return html;
@@ -363,19 +364,26 @@ class SummaryRenderer {
     }
 
     /**
-     * Setup terms checkbox event listener
+     * Setup terms checkbox event listener and initial state
      *
      * @static
      * @private
      * @param {HTMLElement} checkbox - Terms acceptance checkbox element
+     * @param {boolean} termsAccepted - Current terms acceptance state from cookie
      * @returns {void}
      */
-    static setupTermsCheckbox(checkbox) {
+    static setupTermsCheckbox(checkbox, termsAccepted = false) {
         if (!checkbox) return;
 
-        checkbox.checked = false; // Reset to unchecked by default
+        // Set checkbox state based on cookie data
+        checkbox.checked = termsAccepted;
 
-        checkbox.addEventListener('change', function() {
+        // Remove existing event listeners to avoid duplicates
+        const newCheckbox = checkbox.cloneNode(true);
+        checkbox.parentNode.replaceChild(newCheckbox, checkbox);
+
+        // Add event listener to the new checkbox
+        newCheckbox.addEventListener('change', function() {
             // Import FormDataManager dynamically to avoid circular imports
             import('../FormDataManager.js').then(({ FormDataManager }) => {
                 FormDataManager.setTermsAccepted(this.checked);
