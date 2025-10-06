@@ -1,4 +1,5 @@
 import { CoreDataManager } from "./CoreDataManager.js";
+import { FormDataManager } from "../FormDataManager.js";
 import config from "../config.js";
 
 const { DEFAULT_PET_STRUCTURE } = config;
@@ -25,7 +26,7 @@ class PetManager {
 
         const updatedPets = [...(currentData.pets || []), newPet];
 
-        return CoreDataManager.updateCheckinData({ pets: updatedPets });
+        return FormDataManager.updateCheckinData({ pets: updatedPets });
     }
 
     /**
@@ -46,7 +47,7 @@ class PetManager {
             lastUpdated: new Date().toISOString(),
         });
 
-        return CoreDataManager.updateCheckinData({ pets: updatedPets });
+        return FormDataManager.updateCheckinData({ pets: updatedPets });
     }
 
     /**
@@ -61,7 +62,7 @@ class PetManager {
 
         const updatedPets = currentData.pets.filter((_, index) => index !== petIndex);
 
-        return CoreDataManager.updateCheckinData({ pets: updatedPets });
+        return FormDataManager.updateCheckinData({ pets: updatedPets });
     }
 
     /**
@@ -86,7 +87,7 @@ class PetManager {
         pet.lastUpdated = new Date().toISOString();
         updatedPets[petIndex] = pet;
 
-        return CoreDataManager.updateCheckinData({ pets: updatedPets });
+        return FormDataManager.updateCheckinData({ pets: updatedPets });
     }
 
     /**
@@ -105,7 +106,7 @@ class PetManager {
             lastUpdated: new Date().toISOString(),
         });
 
-        return CoreDataManager.updateCheckinData({ pets: updatedPets });
+        return FormDataManager.updateCheckinData({ pets: updatedPets });
     }
 
     /**
@@ -125,7 +126,7 @@ class PetManager {
         const updatedPets = [...currentData.pets];
         updatedPets[petIndex] = pet;
 
-        return CoreDataManager.updateCheckinData({ pets: updatedPets });
+        return FormDataManager.updateCheckinData({ pets: updatedPets });
     }
 
     /**
@@ -145,7 +146,7 @@ class PetManager {
             const updatedPets = [...currentData.pets];
             updatedPets[petIndex] = pet;
 
-            return CoreDataManager.updateCheckinData({ pets: updatedPets });
+            return FormDataManager.updateCheckinData({ pets: updatedPets });
         }
 
         return false;
@@ -168,7 +169,7 @@ class PetManager {
             const updatedPets = [...currentData.pets];
             updatedPets[petIndex] = pet;
 
-            return CoreDataManager.updateCheckinData({ pets: updatedPets });
+            return FormDataManager.updateCheckinData({ pets: updatedPets });
         }
 
         return false;

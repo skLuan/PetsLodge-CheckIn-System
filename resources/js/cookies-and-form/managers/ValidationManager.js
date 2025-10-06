@@ -1,5 +1,7 @@
 import config from "../config.js";
 import { CoreDataManager } from "./CoreDataManager.js";
+import { PetManager } from "./PetManager.js";
+import { FormDataManager } from "../FormDataManager.js";
 
 const { FORM_CONFIG } = config;
 
@@ -105,7 +107,7 @@ class ValidationManager {
             };
         }
 
-        return CoreDataManager.updateCheckinData(userUpdate);
+        return FormDataManager.updateCheckinData(userUpdate);
     }
 
     /**
@@ -132,7 +134,7 @@ class ValidationManager {
      * Marca los términos como aceptados
      */
     static setTermsAccepted(accepted) {
-        return CoreDataManager.updateCheckinData({
+        return FormDataManager.updateCheckinData({
             termsAccepted: accepted
         });
     }
@@ -151,7 +153,7 @@ class ValidationManager {
     }
 
     static updateGroomingAndInventory(groomingData, inventoryData, groomingDetails) {
-        return CoreDataManager.updateCheckinData({
+        return FormDataManager.updateCheckinData({
             grooming: { ...groomingData },
             inventory: inventoryData || [],
             groomingDetails: groomingDetails,

@@ -1,4 +1,6 @@
 import { CoreDataManager } from "./CoreDataManager.js";
+import { FormDataManager } from "../FormDataManager.js";
+import { UtilitiesManager } from "./UtilitiesManager.js";
 
 /**
  * Inventory Manager - Handles inventory-related operations
@@ -14,7 +16,7 @@ class InventoryManager {
         const inventory = currentData.inventory || [];
         const updatedInventory = [...inventory, itemText];
 
-        return CoreDataManager.updateCheckinData({
+        return FormDataManager.updateCheckinData({
             inventory: updatedInventory
         });
     }
@@ -28,7 +30,7 @@ class InventoryManager {
 
         const updatedInventory = currentData.inventory.filter((_, index) => index !== itemIndex);
 
-        return CoreDataManager.updateCheckinData({
+        return FormDataManager.updateCheckinData({
             inventory: updatedInventory
         });
     }
@@ -43,7 +45,7 @@ class InventoryManager {
         const updatedInventory = [...currentData.inventory];
         updatedInventory[itemIndex] = newText;
 
-        return CoreDataManager.updateCheckinData({
+        return FormDataManager.updateCheckinData({
             inventory: updatedInventory
         });
     }
@@ -52,7 +54,7 @@ class InventoryManager {
      * Marca el inventario como completo
      */
     static setInventoryComplete(complete) {
-        return CoreDataManager.updateCheckinData({
+        return FormDataManager.updateCheckinData({
             inventoryComplete: complete
         });
     }
@@ -92,30 +94,17 @@ class InventoryManager {
     }
 
     /**
-     * Crea un elemento de item de inventario
+     * Crea un elemento de item de inventario usando la plantilla estandarizada
      */
     static createInventoryItemElement(itemText, itemIndex, container) {
-        const itemDiv = document.createElement('div');
-        itemDiv.className = 'flex items-center justify-between bg-white p-3 rounded-md border mb-2';
-
-        const textSpan = document.createElement('span');
-        textSpan.className = 'flex-1 font-medium';
-        textSpan.textContent = itemText;
-
-        const deleteBtn = document.createElement('button');
-        deleteBtn.type = 'button';
-        deleteBtn.className = 'text-red-500 hover:text-red-700 px-2 py-1 ml-2';
-        deleteBtn.setAttribute('aria-label', 'Delete item');
-        deleteBtn.innerHTML = '<iconify-icon icon="material-symbols:delete" class="text-lg"></iconify-icon>';
-        deleteBtn.onclick = () => {
-            if (confirm('Are you sure you want to delete this item?')) {
-                this.removeInventoryItem(itemIndex);
-            }
-        };
-
-        itemDiv.appendChild(textSpan);
-        itemDiv.appendChild(deleteBtn);
-        container.appendChild(itemDiv);
+        // Use the standardized template from UtilitiesManager with callbacks
+        UtilitiesManager.createInventoryItemElement(
+            container,
+            itemText,
+            itemIndex,
+            (index, newText) => this.updateInventoryItem(index, newText), // onUpdate
+            (index) => this.removeInventoryItem(index) // onDelete
+        );
     }
 }
 

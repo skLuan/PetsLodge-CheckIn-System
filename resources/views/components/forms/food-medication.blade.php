@@ -7,7 +7,7 @@
         </label>
     </div>
     <!------------------------------------------------------------------------ Morning Section -->
-    <div class="container-day mb-8" data-time-slot="morning">
+    <div class="container-day mb-8 hidden" data-time-slot="morning">
         <div class="flex items-center mb-2">
             <h3 class="text-2xl font-bold text-gray mr-2">Morning</h3>
             <iconify-icon icon="solar:sun-bold" class="text-2xl mr-2"></iconify-icon>
@@ -38,7 +38,7 @@
         </div>
     </div>
     <!------------------------------------------------------------------------ Afternoon Section -->
-    <div class="container-day mb-8" data-time-slot="afternoon">
+    <div class="container-day mb-8 hidden" data-time-slot="afternoon">
         <div class="flex items-center mb-2">
             <h3 class="text-2xl font-bold text-gray mr-2">Afternoon</h3>
             <iconify-icon icon="solar:sun-fog-bold" class="text-2xl mr-2"></iconify-icon>
@@ -69,7 +69,7 @@
         </div>
     </div>
     <!------------------------------------------------------------------------ Night Section -->
-    <div class="container-day mb-8" data-time-slot="night">
+    <div class="container-day mb-8 hidden" data-time-slot="night">
         <div class="flex items-center mb-2">
             <h3 class="text-2xl font-bold text-gray mr-2">Night</h3>
             <iconify-icon icon="line-md:moon-filled" class="text-2xl mr-2"></iconify-icon>

@@ -487,7 +487,12 @@ class FormDataManager {
      * @see CookieReactivityManager.triggerCheck
      */
     static updateCheckinData(updates) {
-        return CoreDataManager.updateCheckinData(updates);
+        const result = CoreDataManager.updateCheckinData(updates);
+        if (result) {
+            // Trigger reactivity for UI updates
+            CookieReactivityManager.triggerCheck();
+        }
+        return result;
     }
 
     /**

@@ -2,6 +2,7 @@ import { CoreDataManager } from "./CoreDataManager.js";
 import { InventoryManager } from "./InventoryManager.js";
 import { PetManager } from "./PetManager.js";
 import { UtilitiesManager } from "./UtilitiesManager.js";
+import { NavigationManager } from "./NavigationManager.js";
 import config from "../config.js";
 
 const { FORM_CONFIG } = config;
@@ -163,8 +164,6 @@ class UIManager {
     static updateUIFromCookieData(cookieData) {
         if (!cookieData) return;
 
-        console.log("🔄 Updating UI from cookie data (conservative mode)");
-
         try {
             // Update owner info form globally
             this.updateOwnerInfoForm(cookieData.user?.info);
@@ -265,8 +264,98 @@ class UIManager {
     // For brevity, including simplified versions
 
     static updateFeedingMedicationUI(pets) {
-        // Simplified implementation
-        console.log("Update feeding/medication UI for pets:", pets);
+        if (!Array.isArray(pets)) return;
+
+        // Track which time slots have items
+        const timeSlotsWithItems = new Set();
+
+        // Check all pets for feeding/medication items
+        pets.forEach(pet => {
+            if (pet?.feeding && Array.isArray(pet.feeding)) {
+                pet.feeding.forEach(item => {
+                    if (item.day_time) {
+                        timeSlotsWithItems.add(item.day_time);
+                    }
+                });
+            }
+
+            if (pet?.medication && Array.isArray(pet.medication)) {
+                pet.medication.forEach(item => {
+                    if (item.day_time) {
+                        timeSlotsWithItems.add(item.day_time);
+                    }
+                });
+            }
+        });
+
+        // Show/hide container-day sections based on whether they have items
+        const timeSlots = ['morning', 'afternoon', 'night'];
+        timeSlots.forEach(timeSlot => {
+            const container = document.querySelector(`.container-day[data-time-slot="${timeSlot}"]`);
+            if (container) {
+                if (timeSlotsWithItems.has(timeSlot)) {
+                    container.classList.remove('hidden');
+                } else {
+                    container.classList.add('hidden');
+                }
+            }
+        });
+
+        // Update the actual feeding/medication displays
+        this.updateFeedingMedicationDisplays(pets);
+    }
+
+    static updateFeedingMedicationDisplays(pets) {
+        // Clear all existing displays
+        const timeSlots = ['morning', 'afternoon', 'night'];
+        timeSlots.forEach(timeSlot => {
+            const foodContainer = document.querySelector(`#${timeSlot}-food-list`);
+            const medContainer = document.querySelector(`#${timeSlot}-med-list`);
+
+            if (foodContainer) foodContainer.innerHTML = '';
+            if (medContainer) medContainer.innerHTML = '';
+        });
+
+        // Populate displays with current data
+        if (!Array.isArray(pets)) return;
+
+        pets.forEach((pet, petIndex) => {
+            if (pet?.feeding && Array.isArray(pet.feeding)) {
+                pet.feeding.forEach((feed, itemIndex) => {
+                    if (feed.day_time) {
+                        const container = document.querySelector(`#${feed.day_time}-food-list`);
+                        if (container) {
+                            UtilitiesManager.createEditableItem(
+                                container,
+                                feed,
+                                petIndex,
+                                'feeding',
+                                itemIndex,
+                                pet.info?.petName || 'Pet'
+                            );
+                        }
+                    }
+                });
+            }
+
+            if (pet?.medication && Array.isArray(pet.medication)) {
+                pet.medication.forEach((med, itemIndex) => {
+                    if (med.day_time) {
+                        const container = document.querySelector(`#${med.day_time}-med-list`);
+                        if (container) {
+                            UtilitiesManager.createEditableItem(
+                                container,
+                                med,
+                                petIndex,
+                                'medication',
+                                itemIndex,
+                                pet.info?.petName || 'Pet'
+                            );
+                        }
+                    }
+                });
+            }
+        });
     }
 
     static updateHealthInfoUI(pets, grooming, groomingDetails) {
@@ -275,8 +364,16 @@ class UIManager {
     }
 
     static updateSameFeedingCheckbox(pets) {
-        // Simplified implementation
-        console.log("Update same feeding checkbox");
+        const sameFeedingContainer = document.getElementById('sameFeedingContainer');
+        if (!sameFeedingContainer) return;
+
+        // Show the checkbox only if there are multiple pets
+        const hasMultiplePets = Array.isArray(pets) && pets.length > 1;
+        if (hasMultiplePets) {
+            sameFeedingContainer.classList.remove('hidden');
+        } else {
+            sameFeedingContainer.classList.add('hidden');
+        }
     }
 
     static updateGroomingAndInventoryUI(grooming, inventory, details) {
@@ -285,8 +382,7 @@ class UIManager {
     }
 
     static getCurrentStep() {
-        // This would need to be implemented based on your step tracking logic
-        return 0; // Placeholder
+        return NavigationManager.getCurrentStep();
     }
 }
 
