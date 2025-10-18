@@ -31,6 +31,17 @@ class NavigationManager {
             // Show thank you title, hide pet pills
             if (thankYouTitle) thankYouTitle.classList.remove('hidden');
             if (petPillsContainer) petPillsContainer.classList.add('hidden');
+
+            // Trigger grooming popup after inventory step (only if not already acknowledged)
+            const checkinData = FormDataManager.getCheckinData();
+            if (!checkinData?.groomingAcknowledged) {
+                setTimeout(() => {
+                    const groomingPopup = document.getElementById('groomingPopup');
+                    if (groomingPopup) {
+                        groomingPopup.classList.remove('hidden');
+                    }
+                }, 500); // Small delay to allow UI to settle
+            }
         } else {
             // Show next button for other steps
             nextButton.style.display = '';

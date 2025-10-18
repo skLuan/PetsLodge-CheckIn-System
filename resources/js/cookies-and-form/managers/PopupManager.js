@@ -112,6 +112,82 @@ class PopupManager {
     }
 
     /**
+     * Initializes grooming popup event handlers
+     */
+    static initializeGroomingPopup() {
+        const groomingPopup = document.getElementById('groomingPopup');
+        if (!groomingPopup) return;
+
+        const groomingCheckboxes = groomingPopup.querySelectorAll('input[name="groomingOptions[]"]');
+        const groomingNotesTextarea = document.getElementById('groomingNotes');
+        const confirmGroomingBtn = document.getElementById('confirmGrooming');
+        const closeGroomingPopupBtn = document.getElementById('closeGroomingPopup');
+
+        // Handle grooming checkbox changes for conditional notes display
+        groomingCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const hasGroomingSelected = Array.from(groomingCheckboxes).some(cb =>
+                    cb.checked && cb.value !== 'no'
+                );
+
+                const notesContainer = groomingPopup.querySelector('.conditional-grooming-notes-popup');
+                if (hasGroomingSelected) {
+                    notesContainer.style.display = '';
+                } else {
+                    notesContainer.style.display = 'none';
+                    // Clear the notes field
+                    if (groomingNotesTextarea) {
+                        groomingNotesTextarea.value = '';
+                    }
+                }
+            });
+        });
+
+        // Handle confirm button
+        if (confirmGroomingBtn) {
+            confirmGroomingBtn.addEventListener('click', function() {
+                // Collect grooming data
+                const groomingData = {};
+                groomingCheckboxes.forEach(checkbox => {
+                    groomingData[checkbox.value] = checkbox.checked;
+                });
+
+                const groomingNotes = groomingNotesTextarea ? groomingNotesTextarea.value.trim() : '';
+
+                // Save to FormDataManager
+                FormDataManager.updateCheckinData({
+                    grooming: groomingData,
+                    groomingDetails: groomingNotes,
+                    groomingAcknowledged: true // Mark as acknowledged
+                });
+
+                // Hide grooming popup permanently
+                groomingPopup.classList.add('hidden');
+
+                // Show terms popup after grooming confirmation
+                const termsPopup = document.getElementById('termsConditionsPopup');
+                if (termsPopup) {
+                    termsPopup.classList.remove('hidden');
+                }
+            });
+        }
+
+        // Handle close button - allow closing without acknowledgment
+        if (closeGroomingPopupBtn) {
+            closeGroomingPopupBtn.addEventListener('click', function() {
+                groomingPopup.classList.add('hidden');
+            });
+        }
+
+        // Handle outside click to close
+        document.addEventListener('click', function(e) {
+            if (groomingPopup && !groomingPopup.contains(e.target) && !e.target.closest('.btn-trigger-grooming')) {
+                groomingPopup.classList.add('hidden');
+            }
+        });
+    }
+
+    /**
      * Initializes terms and conditions popup event handlers
      */
     static initializeTermsPopup() {

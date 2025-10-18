@@ -82,6 +82,7 @@
             <!-- Additional steps will be added here dynamically -->
         </div>
         <x-pop-ups.feeding-medication />
+        <x-pop-ups.grooming />
         <x-pop-ups.terms-conditions />
         <x-tabbar />
     </div>

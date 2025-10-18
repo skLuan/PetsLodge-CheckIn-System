@@ -27,6 +27,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Initialize popup handlers
     PopupManager.initializeFeedingMedicationPopup();
+    PopupManager.initializeGroomingPopup();
     PopupManager.initializeTermsPopup();
 
     // Initialize form-specific handlers
