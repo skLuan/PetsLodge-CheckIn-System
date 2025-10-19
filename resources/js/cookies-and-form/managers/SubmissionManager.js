@@ -67,7 +67,7 @@ class SubmissionManager {
                 alert("Check-in completed successfully!");
 
                 // Redirect to success page or dashboard
-                window.location.href = '/dashboard';
+                window.location.href = `/view-check-in?phone=${checkinData.user?.info?.phone}`;
 
             } else {
                 console.error("❌ Submission failed:", result);
