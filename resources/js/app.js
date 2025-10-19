@@ -1,6 +1,5 @@
 import './bootstrap';
 import "iconify-icon";
-import "./tabbar";
 
 import Alpine from 'alpinejs';
 

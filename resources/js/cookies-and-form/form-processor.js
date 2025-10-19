@@ -21,6 +21,17 @@ import config from "./config.js";
 const { FORM_CONFIG } = config;
 
 document.addEventListener("DOMContentLoaded", function () {
+    // Check if phone number from URL differs from stored cookie data
+    const urlParams = new URLSearchParams(window.location.search);
+    const phoneFromUrl = urlParams.get('phone');
+    const existingData = FormDataManager.getCheckinData();
+
+    // If phone from URL differs from phone in cookie (if cookie exists), clear the form data
+    if (phoneFromUrl && existingData && existingData.user && existingData.user.info &&
+        existingData.user.info.phone !== phoneFromUrl) {
+        FormDataManager.clearCheckinData();
+    }
+
     // Initialize all form managers
     PetPillManager.addPetPillsToContainer();
     FormHandler.populateFormWithCookies();
