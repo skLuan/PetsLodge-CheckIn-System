@@ -19,5 +19,5 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 });
 
 // Check-in API routes
-Route::post('/checkin/submit', [App\Http\Controllers\CheckInController::class, 'submitCheckIn']);
-Route::post('/checkin/autosave', [App\Http\Controllers\CheckInController::class, 'autoSaveCheckIn']);
+Route::post('/checkin/submit', [App\Http\Controllers\CheckInApiController::class, 'submitCheckIn']);
+Route::post('/checkin/autosave', [App\Http\Controllers\CheckInApiController::class, 'autoSaveCheckIn']);
