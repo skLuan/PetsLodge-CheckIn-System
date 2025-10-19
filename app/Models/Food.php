@@ -9,7 +9,9 @@ class Food extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'description', 'check_in_id', 'moment_of_day_id'];
+    protected $table = 'foods';
+
+    protected $fillable = ['name', 'description', 'pet_id', 'check_in_id', 'moment_of_day_id'];
 
     public function checkIn()
     {
@@ -19,5 +21,10 @@ class Food extends Model
     public function momentOfDay()
     {
         return $this->belongsTo(MomentOfDay::class);
+    }
+
+    public function pet()
+    {
+        return $this->belongsTo(Pet::class);
     }
 }
