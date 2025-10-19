@@ -12,6 +12,9 @@ class PetManager {
      * Agrega una nueva mascota al checkin
      */
     static addPetToCheckin(petData) {
+        console.log("DEBUG: Adding pet to checkin with data:", petData);
+        console.log("DEBUG: Checking petName in petData:", petData.petName || "NOT FOUND");
+
         const currentData = CoreDataManager.getCheckinData();
         if (!currentData) return false;
 
@@ -23,6 +26,9 @@ class PetManager {
             },
             id: this.generatePetId(),
         };
+
+        console.log("DEBUG: New pet structure created:", newPet);
+        console.log("DEBUG: New pet info.petName:", newPet.info.petName || "NOT FOUND");
 
         const updatedPets = [...(currentData.pets || []), newPet];
 

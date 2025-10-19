@@ -59,7 +59,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const finalSubmitButton = document.querySelector("#finalSubmit");
     if (finalSubmitButton) {
         finalSubmitButton.addEventListener("click", function () {
-            SubmissionManager.submitFinalCheckIn();
+            SubmissionManager.submitSequentialCheckIn();
         });
     }
 

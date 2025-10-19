@@ -10,6 +10,7 @@ use App\Models\KindOfPet;
 use App\Models\Castrated;
 use App\Models\MomentOfDay;
 use App\Models\CheckIn;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Service class for handling pet and feeding/medication operations during check-in
@@ -44,11 +45,12 @@ class CheckInPetService
 
         // Check if pet exists (by user and basic info)
         $pet = Pet::where('user_id', $user->id)
-                 ->where('race', $petInfo['petBreed'])
-                 ->where('color', $petInfo['petColor'])
-                 ->first();
+                  ->where('race', $petInfo['petBreed'])
+                  ->where('color', $petInfo['petColor'])
+                  ->first();
 
         $petAttributes = [
+            'name' => $petInfo['petName'] ?? null, // Add pet name
             'birth_date' => isset($petInfo['petAge']) ? date('Y-m-d', strtotime($petInfo['petAge'])) : null,
             'race' => $petInfo['petBreed'],
             'color' => $petInfo['petColor'],
@@ -81,6 +83,13 @@ class CheckInPetService
      */
     public function processFeedingAndMedication(Pet $pet, CheckIn $checkIn, array $petData): void
     {
+        Log::info('CheckInPetService: Processing feeding and medication', [
+            'pet_id' => $pet->id,
+            'checkin_id' => $checkIn->id,
+            'feeding_count' => isset($petData['feeding']) ? count($petData['feeding']) : 0,
+            'medication_count' => isset($petData['medication']) ? count($petData['medication']) : 0
+        ]);
+
         // Process feeding
         if (isset($petData['feeding']) && is_array($petData['feeding'])) {
             foreach ($petData['feeding'] as $feedData) {
@@ -94,6 +103,19 @@ class CheckInPetService
                     'check_in_id' => $checkIn->id,
                 ]);
             }
+            Log::info('CheckInPetService: Created feeding entries', ['count' => count($petData['feeding'])]);
+        } else {
+            // Create a default food entry if no feeding data provided
+            // This ensures the pet_id is properly set even with minimal data
+            $momentOfDay = MomentOfDay::firstOrCreate(['name' => 'morning']);
+            Food::create([
+                'name' => 'Food',
+                'description' => 'Standard food',
+                'pet_id' => $pet->id,
+                'moment_of_day_id' => $momentOfDay->id,
+                'check_in_id' => $checkIn->id,
+            ]);
+            Log::info('CheckInPetService: Created default food entry');
         }
 
         // Process medication
@@ -109,6 +131,19 @@ class CheckInPetService
                     'check_in_id' => $checkIn->id,
                 ]);
             }
+            Log::info('CheckInPetService: Created medication entries', ['count' => count($petData['medication'])]);
+        } else {
+            // Create a default medicine entry if no medication data provided
+            // This ensures the pet_id is properly set even with minimal data
+            $momentOfDay = MomentOfDay::firstOrCreate(['name' => 'morning']);
+            Medicine::create([
+                'name' => 'None',
+                'description' => '',
+                'pet_id' => $pet->id,
+                'moment_of_day_id' => $momentOfDay->id,
+                'check_in_id' => $checkIn->id,
+            ]);
+            Log::info('CheckInPetService: Created default medicine entry');
         }
     }
 }

@@ -47,6 +47,7 @@ class FormHandler {
         });
 
         console.log("Extracted form input values:", data);
+        // console.log("DEBUG: Checking for petName field specifically:", data.petName || "NOT FOUND");
         return data;
     }
 
