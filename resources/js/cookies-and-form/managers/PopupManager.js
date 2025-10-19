@@ -123,9 +123,26 @@ class PopupManager {
         const confirmGroomingBtn = document.getElementById('confirmGrooming');
         const closeGroomingPopupBtn = document.getElementById('closeGroomingPopup');
 
-        // Handle grooming checkbox changes for conditional notes display
+        // Handle grooming checkbox changes for mutual exclusivity and conditional notes display
         groomingCheckboxes.forEach(checkbox => {
             checkbox.addEventListener('change', function() {
+                if (this.checked) {
+                    if (this.value === 'no') {
+                        // If "no" is checked, uncheck all other checkboxes
+                        groomingCheckboxes.forEach(cb => {
+                            if (cb !== this) {
+                                cb.checked = false;
+                            }
+                        });
+                    } else {
+                        // If any other option is checked, uncheck "no"
+                        const noCheckbox = Array.from(groomingCheckboxes).find(cb => cb.value === 'no');
+                        if (noCheckbox) {
+                            noCheckbox.checked = false;
+                        }
+                    }
+                }
+
                 const hasGroomingSelected = Array.from(groomingCheckboxes).some(cb =>
                     cb.checked && cb.value !== 'no'
                 );
