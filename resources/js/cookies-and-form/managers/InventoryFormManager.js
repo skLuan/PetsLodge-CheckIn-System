@@ -33,16 +33,24 @@ class InventoryFormManager {
             itemInput.focus();
         }
 
+        // Prevent form submission when Enter is pressed in itemInput
+        if (inventoryForm) {
+            inventoryForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+            });
+        }
+
         // Add item on button click
         if (addItemBtn) {
             addItemBtn.addEventListener('click', addInventoryItem);
         }
 
-        // Add item on Enter key
+        // Add item on Enter key - use keydown for better cross-browser compatibility
         if (itemInput) {
-            itemInput.addEventListener('keypress', function(e) {
+            itemInput.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter') {
                     e.preventDefault();
+                    e.stopPropagation();
                     addInventoryItem();
                 }
             });

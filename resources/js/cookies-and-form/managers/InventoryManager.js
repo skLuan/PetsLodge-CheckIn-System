@@ -87,10 +87,8 @@ class InventoryManager {
             }
         }
 
-        // Update tabbar if we're on inventory step
-        if (typeof window.updateTabbarForStep === 'function') {
-            window.updateTabbarForStep();
-        }
+        // Note: Removed updateTabbarForStep call to prevent popup triggers from add item actions
+        // Popup logic should only be triggered by the "Complete Inventory" button click in NavigationManager
     }
 
     /**

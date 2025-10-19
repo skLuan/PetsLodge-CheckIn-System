@@ -9,10 +9,57 @@ import Utils from "../../Utils.js";
 import config from "../config.js";
 import { FormDataManager } from "../FormDataManager.js";
 import { PopupManager } from "./PopupManager.js";
+import { CookieReactivityManager } from "../reactivitySystem/CookieReactivityManager.js";
 
 const { FORM_CONFIG } = config;
 
 class NavigationManager {
+    /**
+     * Initialize navigation reactivity
+     */
+    static initializeNavigationReactivity() {
+        // Register listener for cookie changes to update navigation state
+        CookieReactivityManager.addListener((cookieData) => {
+            this.updateNavigationState(cookieData);
+        });
+    }
+
+    /**
+     * Update navigation state based on cookie data changes
+     * @param {Object} cookieData - Updated cookie data
+     */
+    static updateNavigationState(cookieData) {
+        // Only update navigation if we're on the inventory step
+        const currentStep = Utils.actualStep();
+        if (currentStep === FORM_CONFIG.STEPS.INVENTORY - 1) {
+            this.updateInventoryStepNavigation(cookieData);
+        }
+    }
+
+    /**
+     * Update navigation for inventory step based on cookie data
+     * @param {Object} cookieData - Current cookie data
+     */
+    static updateInventoryStepNavigation(cookieData) {
+        const nextButton = document.querySelector("#nextStep");
+        if (!nextButton) return;
+
+        // Check inventory status from cookie data
+        const hasItems = cookieData?.inventory?.length > 0;
+        const isComplete = cookieData?.inventoryComplete;
+
+        // Enable next button if items exist OR (no items AND checkbox checked)
+        const inventoryReady = hasItems || (!hasItems && isComplete);
+        const shouldEnable = inventoryReady;
+
+        nextButton.disabled = !shouldEnable;
+        if (nextButton.disabled) {
+            nextButton.classList.add('opacity-50', 'cursor-not-allowed');
+        } else {
+            nextButton.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+    }
+
     /**
      * Updates the tab bar based on current step and form state
      */
@@ -52,18 +99,29 @@ class NavigationManager {
                 // Inventory step - change to "Complete Inventory"
                 nextButton.innerHTML = 'Complete Inventory <iconify-icon class="text-3xl" icon="fluent:next-frame-20-filled"></iconify-icon>';
 
-                // Check inventory status and terms acceptance
+                // Check inventory status, grooming acknowledgment, and terms acceptance
                 const checkinData = FormDataManager.getCheckinData();
                 const hasItems = checkinData?.inventory?.length > 0;
                 const isComplete = checkinData?.inventoryComplete;
+                const groomingAcknowledged = checkinData?.groomingAcknowledged;
                 const termsAccepted = checkinData?.termsAccepted;
 
-                // Enable next button if items exist OR (no items AND checkbox checked) AND terms are accepted
+                // Enable next button if items exist OR (no items AND checkbox checked)
+                // Grooming and terms checks are only for the final submit button in step 6
                 const inventoryReady = hasItems || (!hasItems && isComplete);
-                const shouldEnable = inventoryReady && termsAccepted;
+                const shouldEnable = inventoryReady;
 
-                // If inventory is ready but terms not accepted, show terms popup
-                if (inventoryReady && !termsAccepted) {
+                // Show grooming popup first if inventory is ready but grooming not acknowledged
+                if (inventoryReady && !groomingAcknowledged) {
+                    setTimeout(() => {
+                        const groomingPopup = document.getElementById('groomingPopup');
+                        if (groomingPopup) {
+                            groomingPopup.classList.remove('hidden');
+                        }
+                    }, 100); // Small delay
+                }
+                // Show terms popup only after grooming is acknowledged but terms not accepted
+                else if (inventoryReady && groomingAcknowledged && !termsAccepted) {
                     setTimeout(() => {
                         const termsPopup = document.getElementById('termsConditionsPopup');
                         if (termsPopup) {

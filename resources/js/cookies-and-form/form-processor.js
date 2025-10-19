@@ -29,6 +29,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // If phone from URL differs from phone in cookie (if cookie exists), clear the form data
     if (phoneFromUrl && existingData && existingData.user && existingData.user.info &&
         existingData.user.info.phone !== phoneFromUrl) {
+            console.log(existingData);
         FormDataManager.clearCheckinData();
     }
 
@@ -47,6 +48,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Initialize navigation
     NavigationManager.updateTabbarForStep();
+
+    // Initialize navigation reactivity for dynamic button state updates
+    NavigationManager.initializeNavigationReactivity();
 
     // Handle final submission from THANKS step
     const finalSubmitButton = document.querySelector("#finalSubmit");
