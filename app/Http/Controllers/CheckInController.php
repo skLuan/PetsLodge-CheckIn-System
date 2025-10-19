@@ -349,6 +349,114 @@ class CheckInController extends Controller
     }
 
     /**
+     * Transform check-in data to cookie format for editing
+     */
+    private function transformCheckInToCookieFormat($checkIn)
+    {
+        $pet = $checkIn->pet;
+        $user = $checkIn->user;
+
+        // Build pet data structure
+        $petData = [
+            'info' => [
+                'petName' => $pet->name ?? 'Unnamed Pet',
+                'petType' => $pet->kindOfPet->name ?? 'Unknown',
+                'petBreed' => $pet->race ?? '',
+                'petColor' => $pet->color ?? '',
+                'petAge' => $pet->birth_date ? date('Y-m-d', strtotime($pet->birth_date)) : '',
+                'petWeight' => '', // Not stored in current model
+                'petGender' => $pet->gender->name ?? '',
+                'petSpayed' => $pet->castrated->status ?? '',
+            ],
+            'health' => [
+                'unusualHealthBehavior' => $pet->health_conditions ?? '',
+                'warnings' => $pet->warnings ?? '',
+                'healthBehaviors' => '', // Not stored separately
+            ],
+            'feeding' => [],
+            'medication' => [],
+        ];
+
+        // Add feeding data
+        foreach ($checkIn->foods as $food) {
+            $petData['feeding'][] = [
+                'day_time' => $food->moment_of_day->name ?? 'morning',
+                'feeding_med_details' => $food->name . ($food->description ? ' - ' . $food->description : ''),
+            ];
+        }
+
+        // Add medication data
+        foreach ($checkIn->medicines as $medicine) {
+            $petData['medication'][] = [
+                'day_time' => $medicine->moment_of_day->name ?? 'morning',
+                'feeding_med_details' => $medicine->name . ($medicine->description ? ' - ' . $medicine->description : ''),
+            ];
+        }
+
+        // Build user data structure
+        $userData = [
+            'info' => [
+                'name' => $user->name ?? '',
+                'phone' => $user->phone ?? '',
+                'email' => $user->email ?? '',
+                'address' => $user->address ?? '',
+                'city' => '', // Not stored separately
+                'zip' => '', // Not stored separately
+            ],
+            'emergencyContact' => [
+                'name' => $user->emergencyContact->name ?? '',
+                'phone' => $user->emergencyContact->phone ?? '',
+            ],
+        ];
+
+        // Build inventory data
+        $inventoryData = [];
+        foreach ($checkIn->items as $item) {
+            $inventoryData[] = $item->name . ($item->description ? ' - ' . $item->description : '');
+        }
+
+        // Build grooming data
+        $groomingData = [];
+        foreach ($checkIn->extraServices as $service) {
+            $groomingData[$service->name] = true;
+        }
+
+        return [
+            'user' => $userData,
+            'pets' => [$petData], // Single pet per check-in
+            'inventory' => $inventoryData,
+            'grooming' => $groomingData,
+            'groomingDetails' => '', // Not stored separately
+            'date' => $checkIn->check_in ? $checkIn->check_in->toISOString() : now()->toISOString(),
+            'id' => $checkIn->id,
+        ];
+    }
+
+    /**
+     * Prepare check-in data for editing
+     */
+    public function editCheckIn(Request $request, $checkInId)
+    {
+        $checkIn = CheckIn::with([
+            'pet.gender',
+            'pet.kindOfPet',
+            'pet.castrated',
+            'user.emergencyContact',
+            'foods.moment_of_day',
+            'medicines.moment_of_day',
+            'items',
+            'extraServices'
+        ])->findOrFail($checkInId);
+
+        $cookieData = $this->transformCheckInToCookieFormat($checkIn);
+
+        // Store in session for pre-population
+        session(['checkin_data' => $cookieData]);
+
+        return redirect()->route('new-form-pre-filled', ['phone' => $checkIn->user->phone]);
+    }
+
+    /**
      * Auto-save check-in data (for future implementation)
      */
     public function autoSaveCheckIn(Request $request)

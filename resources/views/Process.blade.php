@@ -1,6 +1,14 @@
 <x-app-layout>
     <x-slot name="scripts">
         @vite(['resources/js/cookies-and-form/form-processor.js', 'resources/js/tabbar.js'])
+        <script>
+            // Check for session data to pre-populate (for editing existing check-ins)
+            const sessionData = @json(session('checkin_data', null));
+            if (sessionData) {
+                console.log('Pre-populating form with session data for editing:', sessionData);
+                // The FormDataManager will handle this in the DOMContentLoaded event
+            }
+        </script>
     </x-slot>
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-white leading-tight">

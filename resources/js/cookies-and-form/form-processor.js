@@ -33,6 +33,9 @@ document.addEventListener("DOMContentLoaded", function () {
         FormDataManager.clearCheckinData();
     }
 
+    // Check for session data to pre-populate (for editing existing check-ins)
+    // Note: This is handled server-side in the Blade template, so no client-side logic needed here
+
     // Initialize all form managers
     PetPillManager.addPetPillsToContainer();
     FormHandler.populateFormWithCookies();

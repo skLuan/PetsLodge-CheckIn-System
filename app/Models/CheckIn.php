@@ -11,6 +11,11 @@ class CheckIn extends Model
 
     protected $fillable = ['check_in', 'check_out', 'pet_id', 'user_id'];
 
+    protected $casts = [
+        'check_in' => 'datetime',
+        'check_out' => 'datetime',
+    ];
+
     public function pet()
     {
         return $this->belongsTo(Pet::class);

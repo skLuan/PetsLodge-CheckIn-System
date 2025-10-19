@@ -4,72 +4,177 @@
     </x-slot>
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-white leading-tight">
-            {{ __('Submits') }}
+            {{ __('Your Check-ins') }}
         </h2>
     </x-slot>
 
-    <div class="container px-4 pb-8 max-w-screen-sm mx-auto">
-        <div class="sticky top-0 z-20 bg-green-lightest py-3 border-b border-b-green">
-            <x-progress.bar />
-            <div id="petPillsContainer" class="pills"></div>
-            <h2 id="thankYouTitle" class="text-2xl text-center font-bold mb-4 hidden">Your Check in</h2>
+    <div class="container px-4 pb-8 max-w-screen-lg mx-auto">
+        <div class="py-6">
+            <h1 class="text-2xl font-bold text-center mb-6">Your Active Check-ins</h1>
 
-        </div>
-        <div id="step6" class="step w-full">
-            <div class="text-center">
-                <p class="text-lg text-gray-700 mb-6">Please review your information and submit your check-in when
-                    ready.
-                </p>
-                <div class="bg-white p-4 rounded-lg mb-6 border border-green border-opacity-40">
-                    <h3 class="font-bold text-lg">Check-in Receipt</h3>
-                    <div id="checkinSummary" class="text-left text-sm text-gray-600">
-                        <!-- Summary will be populated by JavaScript -->
-                    </div>
-                </div>
+            @if($checkIns->count() > 0)
+                <div class="space-y-6">
+                    @foreach($checkIns as $checkIn)
+                        <div class="bg-white rounded-lg shadow-md border border-green border-opacity-40 overflow-hidden">
+                            <!-- Check-in Header -->
+                            <div class="bg-green-lightest px-6 py-4 border-b border-green">
+                                <div class="flex justify-between items-center">
+                                    <div>
+                                        <h3 class="text-lg font-semibold text-green-dark">
+                                            Check-in #{{ $checkIn->id }}
+                                        </h3>
+                                        <p class="text-sm text-gray-600">
+                                            Checked in: {{ $checkIn->check_in ? $checkIn->check_in->format('M j, Y g:i A') : 'N/A' }}
+                                        </p>
+                                    </div>
+                                    <button type="button"
+                                            onclick="editCheckIn({{ $checkIn->id }})"
+                                            class="bg-yellow-second hover:bg-yellow text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200">
+                                        Edit Check-in
+                                    </button>
+                                </div>
+                            </div>
 
-                <div class="grooming bg-white p-4 rounded-lg border border-gray-300 mb-6">
-                    <div class="flex flex-col items-center justify-between mb-3">
-                        <label for="groomingAcknowledged" class="flex items-center cursor-pointer">
-                            <input type="checkbox" id="groomingAcknowledged"
-                                class="mr-3 h-4 w-4 focus:ring-green border-gray-300 rounded">
-                            <span class="text-sm text-gray-700">Grooming options confirmed</span>
-                        </label>
-                        <button type="button" id="editGroomingBtn"
-                            class="text-sm text-blue-600 hover:text-blue-800 underline">
-                            Edit Grooming Options
-                        </button>
-                    </div>
-                    <div id="groomingSummary" class="text-sm text-gray-600">
-                        <!-- Grooming summary will be populated by JavaScript -->
-                    </div>
-                    <p class="text-xs text-gray-500 mt-2">Please confirm your grooming preferences before submitting.</p>
-                </div>
+                            <!-- Pet Information -->
+                            <div class="px-6 py-4">
+                                <div class="mb-4">
+                                    <h4 class="font-semibold text-green-dark mb-3">🐾 Pet Information</h4>
+                                    <div class="bg-gray-50 rounded-lg p-4">
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <h5 class="font-bold text-base mb-2">
+                                                    {{ $checkIn->pet->name ?? 'Unnamed Pet' }}
+                                                    ({{ $checkIn->pet->kindOfPet->name ?? 'Unknown type' }})
+                                                </h5>
+                                                <div class="text-sm text-gray-600 space-y-1">
+                                                    @if($checkIn->pet->race)
+                                                        <div><strong>Breed:</strong> {{ $checkIn->pet->race }}</div>
+                                                    @endif
+                                                    @if($checkIn->pet->color)
+                                                        <div><strong>Color:</strong> {{ $checkIn->pet->color }}</div>
+                                                    @endif
+                                                    @if($checkIn->pet->birth_date)
+                                                        <div><strong>Age:</strong> {{ \Carbon\Carbon::parse($checkIn->pet->birth_date)->age }} years old</div>
+                                                    @endif
+                                                    @if($checkIn->pet->gender)
+                                                        <div><strong>Gender:</strong> {{ $checkIn->pet->gender->name }}</div>
+                                                    @endif
+                                                    @if($checkIn->pet->castrated)
+                                                        <div><strong>Spayed/Neutered:</strong> {{ $checkIn->pet->castrated->status }}</div>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                            <div>
+                                                @if($checkIn->pet->health_conditions || $checkIn->pet->warnings)
+                                                    <h6 class="font-semibold text-red-600 mb-2">Health Notes:</h6>
+                                                    <div class="text-sm text-gray-600">
+                                                        @if($checkIn->pet->health_conditions)
+                                                            <div>⚠️ {{ $checkIn->pet->health_conditions }}</div>
+                                                        @endif
+                                                        @if($checkIn->pet->warnings)
+                                                            <div>⚠️ {{ $checkIn->pet->warnings }}</div>
+                                                        @endif
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
 
-                <div class="bg-white p-4 rounded-lg border border-gray-300 mb-6">
-                    <div class="flex flex-col items-center justify-between mb-3">
-                        <label for="finalTermsAccepted" class="flex items-center cursor-pointer pl-0">
-                            <input type="checkbox" id="finalTermsAccepted"
-                                class="mr-3 mb-0 h-4 w-4 focus:ring-green border-gray-300 rounded">
-                            <span class="text-sm text-gray-700">I accept the <strong>Terms and
-                                    Conditions</strong></span>
-                        </label>
-                        <button type="button" id="readTermsAgainBtn"
-                            class="text-sm text-left text-blue-600 hover:text-blue-800 underline">
-                            Read Terms Again
-                        </button>
-                    </div>
-                    <p class="text-xs text-gray-500">By submitting this check-in, you agree to our terms and
-                        conditions regarding pet care services.</p>
+                                <!-- Feeding Schedule -->
+                                @if($checkIn->foods->count() > 0)
+                                    <div class="mb-4">
+                                        <h4 class="font-semibold text-green-dark mb-2">🍽️ Feeding Schedule</h4>
+                                        <div class="bg-blue-50 rounded-lg p-3">
+                                            @php
+                                                $feedingByTime = [];
+                                                foreach($checkIn->foods as $food) {
+                                                    $time = $food->moment_of_day->name ?? 'morning';
+                                                    if (!isset($feedingByTime[$time])) $feedingByTime[$time] = [];
+                                                    $feedingByTime[$time][] = $food->name . ($food->description ? ' - ' . $food->description : '');
+                                                }
+                                            @endphp
+                                            @foreach($feedingByTime as $time => $items)
+                                                <div class="text-sm mb-1">
+                                                    <strong>{{ ucfirst($time) }}:</strong> {{ implode(', ', $items) }}
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endif
+
+                                <!-- Medication Schedule -->
+                                @if($checkIn->medicines->count() > 0)
+                                    <div class="mb-4">
+                                        <h4 class="font-semibold text-green-dark mb-2">💊 Medication Schedule</h4>
+                                        <div class="bg-red-50 rounded-lg p-3">
+                                            @php
+                                                $medByTime = [];
+                                                foreach($checkIn->medicines as $medicine) {
+                                                    $time = $medicine->moment_of_day->name ?? 'morning';
+                                                    if (!isset($medByTime[$time])) $medByTime[$time] = [];
+                                                    $medByTime[$time][] = $medicine->name . ($medicine->description ? ' - ' . $medicine->description : '');
+                                                }
+                                            @endphp
+                                            @foreach($medByTime as $time => $items)
+                                                <div class="text-sm mb-1">
+                                                    <strong>{{ ucfirst($time) }}:</strong> {{ implode(', ', $items) }}
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endif
+
+                                <!-- Inventory Items -->
+                                @if($checkIn->items->count() > 0)
+                                    <div class="mb-4">
+                                        <h4 class="font-semibold text-green-dark mb-2">🎒 Items to Store</h4>
+                                        <div class="bg-yellow-50 rounded-lg p-3">
+                                            <ul class="text-sm list-disc list-inside">
+                                                @foreach($checkIn->items as $item)
+                                                    <li>{{ $item->name }}{{ $item->description ? ' - ' . $item->description : '' }}</li>
+                                                @endforeach
+                                            </ul>
+                                        </div>
+                                    </div>
+                                @endif
+
+                                <!-- Extra Services -->
+                                @if($checkIn->extraServices->count() > 0)
+                                    <div class="mb-4">
+                                        <h4 class="font-semibold text-green-dark mb-2">✂️ Grooming Services</h4>
+                                        <div class="bg-purple-50 rounded-lg p-3">
+                                            <div class="flex flex-wrap gap-2">
+                                                @foreach($checkIn->extraServices as $service)
+                                                    <span class="bg-purple-200 text-purple-800 px-3 py-1 rounded-full text-sm">
+                                                        {{ $service->name }}
+                                                    </span>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                    @endforeach
                 </div>
-                <div class="flex justify-center">
-                    <button type="button" id="finalSubmit"
-                        class="px-3 flex text-center justify-center flex-row items-center w-full shadow-md py-2 font-bold rounded-full bg-yellow-second text-gray transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
-                        Submit Check-in
-                        <iconify-icon class="ml-2 text-xl" icon="fluent:checkmark-20-filled"></iconify-icon>
-                    </button>
+            @else
+                <div class="text-center py-12">
+                    <div class="text-gray-500 text-lg mb-4">No active check-ins found</div>
+                    <a href="{{ route('check-in-form') }}"
+                       class="bg-green hover:bg-green-dark text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200">
+                        Create New Check-in
+                    </a>
                 </div>
-            </div>
+            @endif
         </div>
         <x-tabbar />
     </div>
+
+    <script>
+        function editCheckIn(checkInId) {
+            // Redirect to edit endpoint
+            window.location.href = `/edit-check-in/${checkInId}`;
+        }
+    </script>
 </x-app-layout>

@@ -45,6 +45,7 @@ Route::post('/check-user', [CheckInController::class, 'checkUser'])->name('check
 Route::get('/new-form', [CheckInController::class, 'newForm'])->name('new-form');
 Route::get('/new-form-pre-filled', [CheckInController::class, 'newFormPreFilled'])->name('new-form-pre-filled');
 Route::get('/view-check-in', [CheckInController::class, 'viewCheckIn'])->name('view-check-in');
+Route::get('/edit-check-in/{checkInId}', [CheckInController::class, 'editCheckIn'])->name('edit-check-in');
 require __DIR__.'/auth.php';
 
 Route::get('/drop-in/check', [DropInController::class, 'checkInfo'])->name('drop-in.check');
