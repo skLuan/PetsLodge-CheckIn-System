@@ -54,16 +54,34 @@
                         </div>
                     </div>
 
+                    <div class="grooming bg-white p-4 rounded-lg border border-gray-300 mb-6">
+                        <div class="flex flex-col items-center justify-between mb-3">
+                            <label for="groomingAcknowledged" class="flex items-center cursor-pointer">
+                                <input type="checkbox" id="groomingAcknowledged"
+                                    class="mr-3 h-4 w-4 focus:ring-green border-gray-300 rounded">
+                                <span class="text-sm text-gray-700">Grooming options confirmed</span>
+                            </label>
+                            <button type="button" id="editGroomingBtn"
+                                class="text-sm text-blue-600 hover:text-blue-800 underline">
+                                Edit Grooming Options
+                            </button>
+                        </div>
+                        <div id="groomingSummary" class="text-sm text-gray-600">
+                            <!-- Grooming summary will be populated by JavaScript -->
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2">Please confirm your grooming preferences before submitting.</p>
+                    </div>
+
                     <div class="bg-white p-4 rounded-lg border border-gray-300 mb-6">
                         <div class="flex flex-col items-center justify-between mb-3">
-                            <label for="finalTermsAccepted" class="flex items-center cursor-pointer">
+                            <label for="finalTermsAccepted" class="flex items-center cursor-pointer pl-0">
                                 <input type="checkbox" id="finalTermsAccepted"
-                                    class="mr-3 h-4 w-4 focus:ring-green border-gray-300 rounded">
+                                    class="mr-3 mb-0 h-4 w-4 focus:ring-green border-gray-300 rounded">
                                 <span class="text-sm text-gray-700">I accept the <strong>Terms and
                                         Conditions</strong></span>
                             </label>
                             <button type="button" id="readTermsAgainBtn"
-                                class="text-sm text-blue-600 hover:text-blue-800 underline">
+                                class="text-sm text-left text-blue-600 hover:text-blue-800 underline">
                                 Read Terms Again
                             </button>
                         </div>

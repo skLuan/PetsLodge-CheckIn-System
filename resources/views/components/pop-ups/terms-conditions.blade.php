@@ -1,6 +1,6 @@
 <div id="termsConditionsPopup" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden">
     <div class="flex items-center justify-center min-h-screen p-4">
-        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90dvh] overflow-hidden">
             <!-- Header -->
             <div class="flex justify-between items-center p-6 border-b">
                 <h3 class="text-xl font-bold text-gray-800">Terms & Conditions</h3>
@@ -11,7 +11,7 @@
 
             <!-- Content -->
             <div class="relative p-6">
-                <div id="termsContent" class="max-h-96 overflow-y-auto pr-4">
+                <div id="termsContent" class="pr-4 overflow-y-auto max-h-[70dvh]">
                     <p class="text-gray-700 leading-relaxed">
                         Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
 
@@ -28,12 +28,18 @@
                 </div>
 
                 <!-- Checkbox Container -->
-                <div class="absolute w-full bottom-0 bg-white border-t pt-4">
-                    <div class="flex items-center justify-center pb-4">
+                <div class="absolute w-full flex flex-row flex-wrap bottom-0 bg-white border-t py-4">
+                    <div class="flex items-center justify-center w-7/12">
                         <label class="flex items-center">
                             <input type="checkbox" id="termsAccepted" name="termsAccepted" class="mr-3 w-5 h-5" disabled>
                             <span class="text-sm font-medium">I have read the Terms & Conditions</span>
                         </label>
+                    </div>
+                    <!-- Continue Button -->
+                    <div class="flex justify-center">
+                        <button type="button" id="continueButton" class="hidden bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition-colors duration-200">
+                            Continue
+                        </button>
                     </div>
                 </div>
             </div>

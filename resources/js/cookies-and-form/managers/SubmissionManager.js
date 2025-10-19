@@ -30,6 +30,12 @@ class SubmissionManager {
                 return;
             }
 
+            // Validate grooming acknowledgment
+            if (!checkinData.groomingAcknowledged) {
+                alert("Please confirm your grooming preferences before submitting.");
+                return;
+            }
+
             // Show loading state
             const submitButton = document.querySelector("#finalSubmit") || document.querySelector("#nextStep");
             if (submitButton) {

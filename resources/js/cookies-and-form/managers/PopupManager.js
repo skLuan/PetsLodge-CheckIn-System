@@ -161,13 +161,19 @@ class PopupManager {
                     groomingAcknowledged: true // Mark as acknowledged
                 });
 
-                // Hide grooming popup permanently
+                // Update grooming summary in the receipt section
+                PopupManager.updateGroomingSummary();
+
+                // Hide grooming popup
                 groomingPopup.classList.add('hidden');
 
-                // Show terms popup after grooming confirmation
-                const termsPopup = document.getElementById('termsConditionsPopup');
-                if (termsPopup) {
-                    termsPopup.classList.remove('hidden');
+                // Show terms popup after grooming confirmation (but only if not already accepted)
+                const checkinData = FormDataManager.getCheckinData();
+                if (!checkinData?.termsAccepted) {
+                    const termsPopup = document.getElementById('termsConditionsPopup');
+                    if (termsPopup) {
+                        termsPopup.classList.remove('hidden');
+                    }
                 }
             });
         }
@@ -181,10 +187,79 @@ class PopupManager {
 
         // Handle outside click to close
         document.addEventListener('click', function(e) {
-            if (groomingPopup && !groomingPopup.contains(e.target) && !e.target.closest('.btn-trigger-grooming')) {
+            if (groomingPopup && !groomingPopup.contains(e.target) && !e.target.closest('.btn-trigger-grooming') && !e.target.closest('#editGroomingBtn')) {
                 groomingPopup.classList.add('hidden');
             }
         });
+
+        // Handle edit grooming button from receipt section
+        const editGroomingBtn = document.getElementById('editGroomingBtn');
+        if (editGroomingBtn) {
+            editGroomingBtn.addEventListener('click', function() {
+                // Load existing grooming data into popup
+                const checkinData = FormDataManager.getCheckinData();
+                if (checkinData?.grooming) {
+                    // Pre-populate checkboxes
+                    groomingCheckboxes.forEach(checkbox => {
+                        checkbox.checked = checkinData.grooming[checkbox.value] || false;
+                    });
+
+                    // Pre-populate notes
+                    if (groomingNotesTextarea && checkinData.groomingDetails) {
+                        groomingNotesTextarea.value = checkinData.groomingDetails;
+                    }
+
+                    // Show/hide notes container based on selections
+                    const hasGroomingSelected = Array.from(groomingCheckboxes).some(cb =>
+                        cb.checked && cb.value !== 'no'
+                    );
+                    const notesContainer = groomingPopup.querySelector('.conditional-grooming-notes-popup');
+                    if (notesContainer) {
+                        notesContainer.style.display = hasGroomingSelected ? '' : 'none';
+                    }
+                }
+
+                // Show popup
+                groomingPopup.classList.remove('hidden');
+            });
+        }
+    }
+
+    /**
+     * Updates the grooming summary in the receipt section
+     */
+    static updateGroomingSummary() {
+        const groomingSummary = document.getElementById('groomingSummary');
+        const groomingAcknowledgedCheckbox = document.getElementById('groomingAcknowledged');
+
+        if (!groomingSummary || !groomingAcknowledgedCheckbox) return;
+
+        const checkinData = FormDataManager.getCheckinData();
+        if (!checkinData?.grooming) return;
+
+        let summaryHTML = '';
+
+        // Build summary of selected grooming options
+        const selectedServices = Object.entries(checkinData.grooming)
+            .filter(([key, value]) => value && key !== 'no')
+            .map(([key]) => key.charAt(0).toUpperCase() + key.slice(1));
+
+        if (selectedServices.length > 0) {
+            summaryHTML += `<div class="font-semibold text-green-800 mb-1">🛁 Grooming Services: ${selectedServices.join(', ')}</div>`;
+        } else {
+            summaryHTML += `<div class="font-semibold text-gray-600 mb-1">No grooming services selected</div>`;
+        }
+
+        if (checkinData.groomingDetails) {
+            summaryHTML += `<div class="pl-4 text-sm">📝 ${checkinData.groomingDetails}</div>`;
+        }
+
+        groomingSummary.innerHTML = summaryHTML;
+
+        // Auto-check the acknowledgment checkbox if grooming is acknowledged
+        if (checkinData.groomingAcknowledged) {
+            groomingAcknowledgedCheckbox.checked = true;
+        }
     }
 
     /**
@@ -197,16 +272,17 @@ class PopupManager {
         const termsContent = document.getElementById('termsContent');
         const termsAcceptedCheckbox = document.getElementById('termsAccepted');
         const closeTermsPopupBtn = document.getElementById('closeTermsPopup');
+        const continueButton = document.getElementById('continueButton');
 
         // Enable checkbox and adjust opacity when scrolled to bottom
         if (termsContent && termsAcceptedCheckbox) {
             // Set initial opacity
-            termsAcceptedCheckbox.style.opacity = '0.7';
+            termsAcceptedCheckbox.style.opacity = '0.4';
 
             termsContent.addEventListener('scroll', function() {
                 const isAtBottom = Math.abs(this.scrollHeight - this.clientHeight - this.scrollTop) < 1;
                 termsAcceptedCheckbox.disabled = !isAtBottom;
-                termsAcceptedCheckbox.style.opacity = isAtBottom ? '1.0' : '0.7';
+                termsAcceptedCheckbox.style.opacity = isAtBottom ? '1.0' : '0.4';
             });
         }
 
@@ -215,12 +291,52 @@ class PopupManager {
             termsAcceptedCheckbox.addEventListener('change', function() {
                 if (this.checked) {
                     FormDataManager.setTermsAccepted(true);
-                    // Allow closing the popup
-                    if (closeTermsPopupBtn) {
-                        closeTermsPopupBtn.style.display = '';
+                    // Show continue button
+                    if (continueButton) {
+                        continueButton.classList.remove('hidden');
                     }
                 } else {
                     FormDataManager.setTermsAccepted(false);
+                    // Hide continue button
+                    if (continueButton) {
+                        continueButton.classList.add('hidden');
+                    }
+                }
+            });
+        }
+
+        // Add initialization check for terms acceptance state on load
+        // This ensures the button state persists across page reloads
+        const checkinData = FormDataManager.getCheckinData();
+        if (checkinData?.termsAccepted) {
+            if (continueButton) {
+                continueButton.classList.remove('hidden');
+            }
+            if (termsAcceptedCheckbox) {
+                termsAcceptedCheckbox.checked = true;
+            }
+        } else {
+            if (continueButton) {
+                continueButton.classList.add('hidden');
+            }
+            if (termsAcceptedCheckbox) {
+                termsAcceptedCheckbox.checked = false;
+            }
+        }
+
+        // Handle continue button - close popup and proceed
+        if (continueButton) {
+            continueButton.addEventListener('click', function() {
+                
+                if (termsAcceptedCheckbox && termsAcceptedCheckbox.checked) {
+                    // Close popup
+                    termsPopup.classList.add('hidden');
+                    // Update tabbar to reflect terms acceptance
+                    if (typeof window.updateTabbarForStep === 'function') {
+                        window.updateTabbarForStep();
+                    }
+                } else {
+                    alert('Please read the terms and conditions and check the box to accept.');
                 }
             });
         }

@@ -65,8 +65,6 @@ class SummaryRenderer {
         // Pets information with detailed breakdown
         summaryHTML += this.renderPetsSection(cookieData.pets);
 
-        // Grooming services section
-        summaryHTML += this.renderGroomingSection(cookieData.grooming);
 
         // Grooming details section
         summaryHTML += this.renderGroomingDetailsSection(cookieData.groomingDetails);
@@ -286,30 +284,6 @@ class SummaryRenderer {
         });
 
         return html;
-    }
-
-    /**
-     * Render grooming services section
-     *
-     * @static
-     * @private
-     * @param {Object} grooming - Grooming service selections
-     * @returns {string} HTML string for grooming section
-     */
-    static renderGroomingSection(grooming) {
-        if (!grooming) return '';
-
-        const services = Object.entries(grooming)
-            .filter(([key, value]) => value)
-            .map(([key]) => key.charAt(0).toUpperCase() + key.slice(1));
-
-        if (services.length === 0) return '';
-
-        return `
-            <div class="mb-4">
-                <div class="font-semibold text-yellow-800 mb-1">✂️ Grooming Services</div>
-                <div class="pl-4 text-sm">${services.join(', ')}</div>
-            </div>`;
     }
 
     /**
