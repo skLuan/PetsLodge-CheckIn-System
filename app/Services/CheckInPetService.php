@@ -45,6 +45,7 @@ class CheckInPetService
 
         // Check if pet exists (by user and basic info)
         $pet = Pet::where('user_id', $user->id)
+                  ->where('name', $petInfo['petName'])
                   ->where('race', $petInfo['petBreed'])
                   ->where('color', $petInfo['petColor'])
                   ->first();
@@ -69,6 +70,43 @@ class CheckInPetService
             $petAttributes['user_id'] = $user->id;
             $pet = Pet::create($petAttributes);
         }
+
+        return $pet;
+    }
+
+    /**
+     * Process pet info for sequential submission (always creates new pet)
+     *
+     * @param \App\Models\User $user The user instance
+     * @param array $petInfo The pet information array
+     * @return Pet The created pet instance
+     * @throws \Exception If pet data is invalid
+     */
+    public function processPetInfo($user, array $petInfo): Pet
+    {
+        // Validate required fields
+        if (empty($petInfo['petName']) || empty($petInfo['petType']) || empty($petInfo['petBreed']) || empty($petInfo['petColor'])) {
+            throw new \Exception('Pet name, type, breed, and color are required');
+        }
+        // Get or create related entities
+        $gender = Gender::firstOrCreate(['name' => $petInfo['petGender'] ?? 'unknown']);
+        $kindOfPet = KindOfPet::firstOrCreate(['name' => $petInfo['petType']]);
+        $castrated = Castrated::firstOrCreate(['status' => $petInfo['petSpayed'] ?? 'unknown']);
+
+        // Always create a new pet for sequential submissions
+        $pet = Pet::create([
+            'user_id' => $user->id,
+            'name' => $petInfo['petName'],
+            'birth_date' => isset($petInfo['petAge']) ? date('Y-m-d', strtotime($petInfo['petAge'])) : null,
+            'race' => $petInfo['petBreed'],
+            'color' => $petInfo['petColor'],
+            'gender_id' => $gender->id,
+            'kind_of_pet_id' => $kindOfPet->id,
+            'castrated_id' => $castrated->id,
+            // Health data will be added in step 3
+            'health_conditions' => null,
+            'warnings' => null,
+        ]);
 
         return $pet;
     }

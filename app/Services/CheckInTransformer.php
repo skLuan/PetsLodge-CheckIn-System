@@ -76,7 +76,7 @@ class CheckInTransformer
         // Build inventory data
         $inventoryData = [];
         foreach ($checkIn->items as $item) {
-            $inventoryData[] = $item->name . ($item->description ? ' - ' . $item->description : '');
+            $inventoryData[] = $item->name;
         }
 
         // Build grooming data

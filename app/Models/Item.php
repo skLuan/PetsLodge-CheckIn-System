@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class Item extends Model
 {
     use HasFactory;
-    protected $fillable = ['name', 'description', 'pet_id', 'check_in_id'];
+    protected $fillable = ['name', 'pet_id', 'check_in_id'];
 
     public function checkIn()
     {

@@ -61,7 +61,6 @@ class CheckInService
             foreach ($inventoryData as $itemData) {
                 Item::create([
                     'name' => $itemData['name'] ?? 'Item',
-                    'description' => $itemData['description'] ?? null,
                     'pet_id' => $checkIn->pet_id,
                     'check_in_id' => $checkIn->id,
                 ]);

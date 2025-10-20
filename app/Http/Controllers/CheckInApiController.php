@@ -159,8 +159,8 @@ class CheckInApiController extends Controller
                 'email' => $userInfo['email']
             ]);
 
-            // Process user using service
-            $user = $this->userService->processUser(['info' => $userInfo]);
+            // Process user using service (always create new for sequential submission)
+            $user = $this->userService->processUserInfo($userInfo);
 
             // Process emergency contact if provided
             if (isset($userInfo['emergencyContact'])) {
@@ -236,7 +236,6 @@ class CheckInApiController extends Controller
 
             $userId = $request->input('user_id');
             $petInfo = $request->input('pet_info');
-
             Log::info("CheckInApiController: Step 2 - Processing pet info [{$timestamp}]", [
                 'user_id' => $userId,
                 'pet_name' => $petInfo['petName'],
@@ -247,8 +246,8 @@ class CheckInApiController extends Controller
             // Get user
             $user = \App\Models\User::findOrFail($userId);
 
-            // Process pet using service (only basic info, no health yet)
-            $pet = $this->petService->processPet($user, ['info' => $petInfo]);
+            // Process pet using service (always create new for sequential submission)
+            $pet = $this->petService->processPetInfo($user, $petInfo);
 
             Log::info("CheckInApiController: Step 2 - Pet info submitted successfully [{$timestamp}]", [
                 'pet_id' => $pet->id,
