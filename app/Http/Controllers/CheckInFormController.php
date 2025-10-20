@@ -63,18 +63,18 @@ class CheckInFormController extends Controller
     public function viewCheckIn(Request $request)
     {
         $phone = $request->input('phone');
-        $user = User::where('phone', $phone)->first();
+        $user = User::where('phone', $phone)->with('emergencyContacts')->first();
 
         if (!$user) {
             return redirect()->route('CheckIn')->with('error', 'User not found');
         }
 
         $checkIns = CheckIn::where('user_id', $user->id)
-                           ->whereNull('check_out')
-                           ->with('pet')
-                           ->get();
+                            ->whereNull('check_out')
+                            ->with('pet')
+                            ->get();
 
-        return view('view-check-in', compact('checkIns'));
+        return view('view-check-in', compact('checkIns', 'user'));
     }
 
     /**

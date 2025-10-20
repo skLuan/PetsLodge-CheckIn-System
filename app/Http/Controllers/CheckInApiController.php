@@ -99,7 +99,7 @@ class CheckInApiController extends Controller
             ]);
 
             // Submit check-in using service
-            $result = $this->checkInService->submitCheckIn($checkinData, $this->userService, $this->petService);
+            //$result = $this->checkInService->submitCheckIn($checkinData, $this->userService, $this->petService);
 
             Log::info('CheckInApiController: Check-in submitted successfully', $result);
 
@@ -163,8 +163,12 @@ class CheckInApiController extends Controller
             $user = $this->userService->processUserInfo($userInfo);
 
             // Process emergency contact if provided
-            if (isset($userInfo['emergencyContact'])) {
-                $this->userService->processEmergencyContact($user, $userInfo['emergencyContact']);
+            if (isset($userInfo['emergencyContactName']) && isset($userInfo['emergencyContactPhone'])) {
+                $emergencyContact = [
+                    'name' => $userInfo['emergencyContactName'],
+                    'phone' => $userInfo['emergencyContactPhone']
+                ];
+                $this->userService->processEmergencyContact($user, $emergencyContact);
                 Log::info("CheckInApiController: Step 1 - Emergency contact processed [{$timestamp}]", ['user_id' => $user->id]);
             }
 
@@ -426,15 +430,6 @@ class CheckInApiController extends Controller
 
             // Create or update check-in
             $checkIn = $this->checkInService->processCheckIn($user, $pet, $checkinData);
-
-            // Process inventory and grooming
-            if (isset($checkinData['inventory'])) {
-                $this->checkInService->processInventory([$checkIn], $checkinData['inventory']);
-            }
-
-            if (isset($checkinData['grooming'])) {
-                $this->checkInService->processExtraServices([$checkIn], $checkinData['grooming']);
-            }
 
             Log::info("CheckInApiController: Step 4 - Check-in data submitted successfully [{$timestamp}]", [
                 'checkin_id' => $checkIn->id,
