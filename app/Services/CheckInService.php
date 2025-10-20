@@ -56,11 +56,10 @@ class CheckInService
         if (!is_array($inventoryData)) {
             return;
         }
-
         foreach ($checkIns as $checkIn) {
             foreach ($inventoryData as $itemData) {
                 Item::create([
-                    'name' => $itemData['name'] ?? 'Item',
+                    'name' => $itemData ?? 'Item',
                     'pet_id' => $checkIn->pet_id,
                     'check_in_id' => $checkIn->id,
                 ]);
@@ -91,71 +90,5 @@ class CheckInService
                 }
             }
         }
-    }
-
-    /**
-     * Submit complete check-in data using database transaction
-     *
-     * @param array $checkinData The complete check-in data
-     * @param CheckInUserService $userService The user service instance
-     * @param CheckInPetService $petService The pet service instance
-     * @return array Response data with success status and details
-     * @throws \Exception If submission fails
-     */
-    public function submitCheckIn(array $checkinData, CheckInUserService $userService, CheckInPetService $petService): array
-    {
-        return DB::transaction(function () use ($checkinData, $userService, $petService) {
-            Log::info('CheckInService: Starting check-in submission', ['pet_count' => count($checkinData['pets'] ?? [])]);
-
-            // 1. Process User
-            $user = $userService->processUser($checkinData['user']);
-            Log::info('CheckInService: User processed', ['user_id' => $user->id]);
-
-            // 2. Process Emergency Contact
-            if (isset($checkinData['user']['emergencyContact'])) {
-                $userService->processEmergencyContact($user, $checkinData['user']['emergencyContact']);
-                Log::info('CheckInService: Emergency contact processed');
-            }
-
-            // 3. Process Pets and Check-ins
-            $checkIns = [];
-            foreach ($checkinData['pets'] as $index => $petData) {
-                Log::info('CheckInService: Processing pet', ['pet_index' => $index, 'pet_name' => $petData['info']['petName'] ?? 'unnamed']);
-
-                $pet = $petService->processPet($user, $petData);
-                Log::info('CheckInService: Pet processed', ['pet_id' => $pet->id, 'pet_name' => $pet->name]);
-
-                $checkIn = $this->processCheckIn($user, $pet, $checkinData);
-                Log::info('CheckInService: Check-in processed', ['checkin_id' => $checkIn->id]);
-
-                // 4. Process Feeding and Medication for this pet
-                $petService->processFeedingAndMedication($pet, $checkIn, $petData);
-                Log::info('CheckInService: Feeding and medication processed for pet', ['pet_id' => $pet->id]);
-
-                $checkIns[] = $checkIn;
-            }
-
-            // 5. Process Inventory Items
-            if (isset($checkinData['inventory'])) {
-                $this->processInventory($checkIns, $checkinData['inventory']);
-                Log::info('CheckInService: Inventory processed', ['inventory_count' => count($checkinData['inventory'])]);
-            }
-
-            // 6. Process Extra Services (Grooming)
-            if (isset($checkinData['grooming'])) {
-                $this->processExtraServices($checkIns, $checkinData['grooming']);
-                Log::info('CheckInService: Extra services processed');
-            }
-
-            $result = [
-                'user_id' => $user->id,
-                'checkin_ids' => collect($checkIns)->pluck('id'),
-                'pet_count' => count($checkinData['pets']),
-                'pet_ids' => collect($checkIns)->pluck('pet_id')
-            ];
-
-            Log::info('CheckInService: Check-in submission completed successfully', $result);
-            return $result;
-        });
     }
 }

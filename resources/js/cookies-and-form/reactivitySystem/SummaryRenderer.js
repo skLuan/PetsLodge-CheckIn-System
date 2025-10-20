@@ -270,17 +270,17 @@ class SummaryRenderer {
             healthNotes.push('Unusual behavior reported');
         }
         if (health.healthBehaviors) {
-            healthNotes.push(`Behavior: ${health.healthBehaviors}`);
+            healthNotes.push(`<strong>⚠️ Health:</strong> ${health.healthBehaviors}`);
         }
         if (health.warnings) {
-            healthNotes.push(`Warnings: ${health.warnings}`);
+            healthNotes.push(`<strong>⚠️ Warnings:</strong> ${health.warnings}`);
         }
 
         if (healthNotes.length === 0) return '';
 
         let html = `<div class="mt-2"><strong>🏥 Health Notes:</strong></div>`;
         healthNotes.forEach(note => {
-            html += `<div class="pl-2 text-xs text-red-600">⚠️ ${note}</div>`;
+            html += `<div class="pl-2 text-xs text-red-600 flex justify-between">${note}</div>`;
         });
 
         return html;

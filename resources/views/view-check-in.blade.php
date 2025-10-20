@@ -146,7 +146,7 @@
                                                 }
                                             @endphp
                                             @foreach ($medByTime as $time => $items)
-                                                <div class="text-sm mb-1">
+                                                <div class="text-sm mb-1 flex justify-between">
                                                     <strong>{{ ucfirst($time) }}:</strong> {{ implode(', ', $items) }}
                                                 </div>
                                             @endforeach
