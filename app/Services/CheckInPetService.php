@@ -135,7 +135,6 @@ class CheckInPetService
 
                 Food::create([
                     'name' => $feedData['feeding_med_details'] ?? 'Food',
-                    'description' => $feedData['feeding_med_details'] ?? null,
                     'pet_id' => $pet->id,
                     'moment_of_day_id' => $momentOfDay->id,
                     'check_in_id' => $checkIn->id,
@@ -148,7 +147,6 @@ class CheckInPetService
             $momentOfDay = MomentOfDay::firstOrCreate(['name' => 'morning']);
             Food::create([
                 'name' => 'Food',
-                'description' => 'Standard food',
                 'pet_id' => $pet->id,
                 'moment_of_day_id' => $momentOfDay->id,
                 'check_in_id' => $checkIn->id,

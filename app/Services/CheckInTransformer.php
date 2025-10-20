@@ -45,7 +45,7 @@ class CheckInTransformer
         foreach ($checkIn->foods as $food) {
             $petData['feeding'][] = [
                 'day_time' => $food->moment_of_day->name ?? 'morning',
-                'feeding_med_details' => $food->name . ($food->description ? ' - ' . $food->description : ''),
+                'feeding_med_details' => $food->name,
             ];
         }
 
