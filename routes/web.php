@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\CheckInController;
 use App\Http\Controllers\DropInController;
 
 /*
@@ -36,17 +35,16 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::get('/drop-in', [DropInController::class, 'show'])->name('drop-in.show');
-Route::get('/drop-in', [DropInController::class, 'show'])->name('drop-in.show');
+Route::get('/drop-in/confirmation', [DropInController::class, 'showDropConfirmation'])->name('drop-in.confirmation');
 Route::redirect('/dropin', '/drop-in');
-Route::post('/readyToPrint', [DropInController::class, 'readyToPrint']);
-
+// -----------------------
+Route::get('/drop-in/check', [DropInController::class, 'checkInfo'])->name('drop-in.check');
+// ---------------------
 // Check-in routes
-Route::post('/check-user', [App\Http\Controllers\CheckInApiController::class, 'checkUser'])->name('check-user');
 Route::get('/new-form', [App\Http\Controllers\CheckInFormController::class, 'newForm'])->name('new-form');
 Route::get('/new-form-pre-filled', [App\Http\Controllers\CheckInFormController::class, 'newFormPreFilled'])->name('new-form-pre-filled');
 Route::get('/view-check-in', [App\Http\Controllers\CheckInFormController::class, 'viewCheckIn'])->name('view-check-in');
 Route::get('/edit-check-in/{checkInId}', [App\Http\Controllers\CheckInFormController::class, 'editCheckIn'])->name('edit-check-in');
 require __DIR__.'/auth.php';
 
-Route::get('/drop-in/check', [DropInController::class, 'checkInfo'])->name('drop-in.check');
 Route::post('/drop-in/check-user', [DropInController::class, 'checkUser'])->name('drop-in.check-user');

@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use App\Services\PdfService;
 use App\Services\PrintNodeService;
+use App\Services\CheckInTransformer;
 
 class DropInController extends Controller
 {
@@ -16,6 +17,22 @@ class DropInController extends Controller
         // Carga datos prellenados (e.g., de sesión o BD)
         $data = $request->user()->dropInData ?? [];  // Asumiendo modelo User con datos
         return view('drop-in', compact('data'));
+    }
+    public function showDropConfirmation(Request $request)
+    {
+        // Load check-in data from session or database
+        $checkinData = session('checkin_data', []);
+
+        // If no session data, try to get from user's latest check-in
+        if (empty($checkinData) && $request->user()) {
+            $latestCheckIn = $request->user()->checkIns()->latest()->first();
+            if ($latestCheckIn) {
+                $transformer = new CheckInTransformer();
+                $checkinData = $transformer->transformCheckInToCookieFormat($latestCheckIn);
+            }
+        }
+
+        return view('drop-in-confirmation', compact('checkinData'));
     }
     public function checkInfo(Request $request)
     {

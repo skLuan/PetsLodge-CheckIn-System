@@ -57,9 +57,7 @@
                     </p>
                     <div class="bg-white p-4 rounded-lg mb-6 border border-green border-opacity-40">
                         <h3 class="font-bold text-lg">Check-in Receipt</h3>
-                        <div id="checkinSummary" class="text-left text-sm text-gray-600">
-                            <!-- Summary will be populated by JavaScript -->
-                        </div>
+                        <x-check-in-summary :checkinData="session('checkin_data', [])" />
                     </div>
 
                     <div class="grooming bg-white p-4 rounded-lg border border-gray-300 mb-6">

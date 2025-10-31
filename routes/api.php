@@ -2,6 +2,8 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\DropInController;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -21,6 +23,9 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 // Check-in API routes
 Route::post('/checkin/submit', [App\Http\Controllers\CheckInApiController::class, 'submitCheckIn']);
 Route::post('/checkin/autosave', [App\Http\Controllers\CheckInApiController::class, 'autoSaveCheckIn']);
+
+Route::post('/check-user', [App\Http\Controllers\CheckInApiController::class, 'checkUser'])->name('check-user');
+Route::post('/readyToPrint', [DropInController::class, 'readyToPrint']);
 
 // Sequential submission routes
 Route::post('/checkin/step1/user-info', [App\Http\Controllers\CheckInApiController::class, 'submitUserInfo']);
