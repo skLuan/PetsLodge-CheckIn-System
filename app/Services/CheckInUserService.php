@@ -30,27 +30,39 @@ class CheckInUserService
             throw new \Exception('User phone is required');
         }
 
-        // For sequential submission, we want to ALWAYS create a new user
-        // to avoid conflicts with existing records
-        $user = User::create([
-            'name' => $userInfo['name'] ?? '',
-            'email' => $userInfo['email'] ?? '',
-            'phone' => $userInfo['phone'],
-            'address' => $userInfo['address'] ?? '',
-            'password' => bcrypt('default_password'), // Should be changed later
-            'email_verified_at' => null,
-            'remember_token' => null,
-            'role' => 'CLIENT',
-        ]);
+        // Check if user with this email already exists
+        $user = User::where('email', $userInfo['email'] ?? null)->first();
+
+        if ($user) {
+            // Update existing user with new information
+            $user->update([
+                'name' => $userInfo['name'] ?? $user->name,
+                'phone' => $userInfo['phone'],
+                'address' => $userInfo['address'] ?? $user->address,
+                'role' => $user->role ?? 'CLIENT',
+            ]);
+        } else {
+            // Create a new user if it doesn't exist
+            $user = User::create([
+                'name' => $userInfo['name'] ?? '',
+                'email' => $userInfo['email'] ?? '',
+                'phone' => $userInfo['phone'],
+                'address' => $userInfo['address'] ?? '',
+                'password' => bcrypt('default_password'), // Should be changed later
+                'email_verified_at' => null,
+                'remember_token' => null,
+                'role' => 'CLIENT',
+            ]);
+        }
 
         return $user;
     }
 
     /**
-     * Process user info for sequential submission (always creates new user)
+     * Process user info for sequential submission (creates new or updates existing user)
      *
      * @param array $userInfo The user information array
-     * @return User The created user instance
+     * @return User The created or updated user instance
      * @throws \Exception If user data is invalid
      */
     public function processUserInfo(array $userInfo): User
@@ -60,17 +72,30 @@ class CheckInUserService
             throw new \Exception('User phone, name, and email are required');
         }
 
-        // Always create a new user for sequential submissions
-        $user = User::create([
-            'name' => $userInfo['name'],
-            'email' => $userInfo['email'],
-            'phone' => $userInfo['phone'],
-            'address' => $userInfo['address'] ?? '',
-            'password' => bcrypt('default_password'), // Should be changed later
-            'email_verified_at' => null,
-            'remember_token' => null,
-            'role' => 'CLIENT',
-        ]);
+        // Check if user with this email already exists
+        $user = User::where('email', $userInfo['email'])->first();
+
+        if ($user) {
+            // Update existing user with new information
+            $user->update([
+                'name' => $userInfo['name'],
+                'phone' => $userInfo['phone'],
+                'address' => $userInfo['address'] ?? $user->address,
+                'role' => $user->role ?? 'CLIENT', // Preserve existing role or set to CLIENT
+            ]);
+        } else {
+            // Create a new user if it doesn't exist
+            $user = User::create([
+                'name' => $userInfo['name'],
+                'email' => $userInfo['email'],
+                'phone' => $userInfo['phone'],
+                'address' => $userInfo['address'] ?? '',
+                'password' => bcrypt('default_password'), // Should be changed later
+                'email_verified_at' => null,
+                'remember_token' => null,
+                'role' => 'CLIENT',
+            ]);
+        }
 
         return $user;
     }
