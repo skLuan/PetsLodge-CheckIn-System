@@ -20,7 +20,7 @@
     </div>
 
     <div class="pl-input-container">
-        <label for="warnings">Warnings</label>
+        <label for="warnings"><span class="!text-red-700">Warnings</span></label>
         <p class="text-sm text-gray mb-2">Health Matters, Special Care, Behavioral (Friendly with other dogs, Food Aggressive, Anxiety, Others)</p>
         <textarea class="w-full" id="warnings" name="warnings" rows="3" placeholder="Enter any warnings or special notes"></textarea>
     </div>

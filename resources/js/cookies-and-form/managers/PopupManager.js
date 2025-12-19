@@ -372,6 +372,31 @@ class PopupManager {
                 }
             });
         }
+
+        // Handle "Read Terms Again" button from receipt section
+        const readTermsAgainBtn = document.getElementById('readTermsAgainBtn');
+        if (readTermsAgainBtn) {
+            readTermsAgainBtn.addEventListener('click', function() {
+                // Show popup
+                termsPopup.classList.remove('hidden');
+                
+                // Reset scroll position to top
+                if (termsContent) {
+                    termsContent.scrollTop = 0;
+                }
+                
+                // Reset checkbox and button states
+                if (termsAcceptedCheckbox) {
+                    termsAcceptedCheckbox.checked = false;
+                    termsAcceptedCheckbox.disabled = true;
+                    termsAcceptedCheckbox.style.opacity = '0.4';
+                }
+                
+                if (continueButton) {
+                    continueButton.classList.add('hidden');
+                }
+            });
+        }
     }
 }
 

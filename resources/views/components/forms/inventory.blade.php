@@ -3,7 +3,7 @@
         <div class="mb-4">
             <h3 class="text-lg font-bold text-gray">Inventory Items</h3>
             <p>List and describe all the items you bring, for example: Blue leash with bones.</p>
-            <p>(We won’t be responsible for items not listed)</p>
+            <p class="font-bold">(We won’t be responsible for items not listed)</p>
         </div>
         <!-- Inventory Items List -->
         <div id="inventoryItemsList" class="space-y-2 h-full min-h-44 border-y border-green py-2 mb-4 overflow-y-auto flex flex-col justify-end">
