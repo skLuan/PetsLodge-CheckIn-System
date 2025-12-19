@@ -40,6 +40,7 @@ class CheckInUserService
             'password' => bcrypt('default_password'), // Should be changed later
             'email_verified_at' => null,
             'remember_token' => null,
+            'role' => 'CLIENT',
         ]);
 
         return $user;
@@ -68,6 +69,7 @@ class CheckInUserService
             'password' => bcrypt('default_password'), // Should be changed later
             'email_verified_at' => null,
             'remember_token' => null,
+            'role' => 'CLIENT',
         ]);
 
         return $user;
