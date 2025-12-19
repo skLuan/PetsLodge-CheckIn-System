@@ -32,7 +32,7 @@ class DropInController extends Controller
             }
         }
 
-        return view('drop-in-confirmation', compact('checkinData'));
+        return view('Drop-in-confirmation', compact('checkinData'));
     }
     public function checkInfo(Request $request)
     {
