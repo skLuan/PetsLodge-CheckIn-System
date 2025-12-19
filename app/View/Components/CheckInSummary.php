@@ -23,6 +23,6 @@ class CheckInSummary extends Component
      */
     public function render(): View|Closure|string
     {
-        return view('components.check-in-summary');
+        return view('components.CheckInSummary');
     }
 }

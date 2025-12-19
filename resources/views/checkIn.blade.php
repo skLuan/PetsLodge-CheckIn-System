@@ -21,17 +21,4 @@
         <img src="{{ asset('images/dog-bg@2x.jpg') }}" alt="Check In" class="w-full lg:w-1/3 mx-auto">
     </picture>
  </figure>
-
- <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
- <script src="{{ asset('js/components/CheckInHandler.js') }}"></script>
- <script>
-     const checkInHandler = new CheckInHandler({
-         formSelector: '#checkInForm',
-         apiEndpoint: '{{ route('check-user') }}',
-         csrfToken: '{{ csrf_token() }}',
-         newFormRoute: '{{ route('new-form') }}',
-         newFormPreFilledRoute: '{{ route('new-form-pre-filled') }}',
-         viewCheckInRoute: '{{ route('view-check-in') }}'
-     });
- </script>
  </x-app-layout>
