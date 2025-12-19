@@ -6,7 +6,7 @@
             value="{{ $user?->phone ?? request()->get('phone') }}" pattern="[0-9]{10}" required>
     </div>
     <div class="pl-input-container">
-        <label class="" for="name">Name</label>
+        <label class="" for="name">Name and Last name</label>
         <input type="text" id="name" name="name" placeholder="Your Name" value="{{ $user?->name ?? old('name') }}" required>
     </div>
     <div class="pl-input-container">
