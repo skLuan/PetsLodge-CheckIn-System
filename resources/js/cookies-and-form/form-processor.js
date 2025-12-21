@@ -15,12 +15,38 @@ import {
     NavigationManager,
     SubmissionManager
 } from "./managers/index.js";
+import { CoreDataManager } from "./managers/CoreDataManager.js";
 import { FormDataManager } from "./FormDataManager.js";
 import config from "./config.js";
 
 const { FORM_CONFIG } = config;
 
 document.addEventListener("DOMContentLoaded", function () {
+    // Extract and set session data from DOM data attribute (for editing existing check-ins)
+    const stepContainer = document.querySelector('[data-session-checkin]');
+    if (stepContainer) {
+        const sessionDataStr = stepContainer.getAttribute('data-session-checkin');
+        if (sessionDataStr && sessionDataStr !== 'null' && sessionDataStr.trim() !== '') {
+            try {
+                // Decode HTML entities that may have been escaped
+                const decodedStr = sessionDataStr
+                    .replace(/&quot;/g, '"')
+                    .replace(/&#039;/g, "'")
+                    .replace(/&amp;/g, '&')
+                    .replace(/&lt;/g, '<')
+                    .replace(/&gt;/g, '>');
+                
+                const sessionData = JSON.parse(decodedStr);
+                if (sessionData && Object.keys(sessionData).length > 0) {
+                    CoreDataManager.setSessionData(sessionData);
+                    console.log('Session data loaded from DOM attribute for pre-population:', sessionData);
+                }
+            } catch (e) {
+                console.warn('Session data not available or invalid:', e.message);
+            }
+        }
+    }
+
     // Check if phone number from URL differs from stored cookie data
     const urlParams = new URLSearchParams(window.location.search);
     const phoneFromUrl = urlParams.get('phone');

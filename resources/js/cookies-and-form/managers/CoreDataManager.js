@@ -8,16 +8,51 @@ const { FORM_CONFIG, DEFAULT_CHECKIN_STRUCTURE } = config;
  */
 class CoreDataManager {
     static CHECKIN_COOKIE_NAME = "pl_checkin_data";
+    static sessionData = null;
+    static sessionDataPromise = Promise.resolve(); // Promise that resolves when session data is set
 
     /**
-     * Crea el cookie checkin inicial con la estructura completa
+     * Sets session data to be merged during initialization
+     * Called from form-processor.js with data from the DOM data attribute
+     * Also stores in browser sessionStorage for persistence across page navigation
+     * Resolves the sessionDataPromise to signal that data is ready
      */
-    static createInitialCheckin() {
-        const initialCheckin = {
+    static setSessionData(data) {
+        this.sessionData = data;
+        // Store in browser sessionStorage for persistence
+        if (data) {
+            try {
+                sessionStorage.setItem('pl_session_checkin_data', JSON.stringify(data));
+                console.log('Session data set for pre-population and stored in sessionStorage:', data);
+            } catch (e) {
+                console.warn('Failed to store session data in sessionStorage:', e);
+            }
+        }
+        // Signal that session data has been processed
+        this.sessionDataPromise = Promise.resolve();
+    }
+
+    /**
+      * Creates the initial checkin cookie with complete structure
+      * Waits for session data to be available before creating the cookie
+      * Returns a Promise that resolves when the cookie is successfully created
+      */
+    static async createInitialCheckin() {
+        // Wait for session data to be set (if any)
+        await this.sessionDataPromise;
+
+        let initialCheckin = {
             ...DEFAULT_CHECKIN_STRUCTURE,
             date: new Date().toISOString(),
             id: this.generateCheckinId(),
         };
+
+        // Check for session data to pre-populate (for editing existing check-ins)
+        if (this.sessionData) {
+            console.log('Pre-populating form with session data for editing:', this.sessionData);
+            // Merge session data into the initial checkin structure
+            initialCheckin = this.deepMerge(initialCheckin, this.sessionData);
+        }
 
         const success = CookieManager.setCookie(
             this.CHECKIN_COOKIE_NAME,
@@ -44,12 +79,26 @@ class CoreDataManager {
     /**
      * Actualiza los datos del checkin en la cookie
      */
-    static updateCheckinData(updates) {
-        const currentData = this.getCheckinData();
+    static updateCheckinData(updates, _isRetry = false) {
+        let currentData = this.getCheckinData();
+        
         if (!currentData) {
+            if (_isRetry) {
+                // Prevent infinite loop - if we've already tried once, log error and return false
+                console.error("Failed to create initial checkin data after retry. Cookie may not be persisting.");
+                return false;
+            }
+            
             console.warn("No checkin data found, creating initial data");
-            this.createInitialCheckin();
-            return this.updateCheckinData(updates);
+            const created = this.createInitialCheckin();
+            
+            if (!created) {
+                console.error("Failed to create initial checkin data");
+                return false;
+            }
+            
+            // Retry once with the flag set to prevent infinite recursion
+            return this.updateCheckinData(updates, true);
         }
 
         const updatedData = this.deepMerge(currentData, updates);

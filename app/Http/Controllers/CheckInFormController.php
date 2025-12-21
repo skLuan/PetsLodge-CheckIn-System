@@ -90,14 +90,14 @@ class CheckInFormController extends Controller
             'pet.gender',
             'pet.kindOfPet',
             'pet.castrated',
-            'user.emergencyContact',
-            'foods.moment_of_day',
-            'medicines.moment_of_day',
+            'user.emergencyContacts',
+            'foods.momentOfDay',
+            'medicines.momentOfDay',
             'items',
             'extraServices'
         ])->findOrFail($checkInId);
-
         $cookieData = $this->transformer->transformCheckInToCookieFormat($checkIn);
+        dd($cookieData);
 
         // Store in session for pre-population
         session(['checkin_data' => $cookieData]);

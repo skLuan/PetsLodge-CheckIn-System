@@ -128,10 +128,10 @@ class FormDataManager {
      * - Updates DOM elements to reflect current data state
      * - Logs initialization status to console
      */
-    static initialize() {
+    static async initialize() {
         // Crear cookie checkin si no existe
         if (!CoreDataManager.getCheckinData()) {
-            CoreDataManager.createInitialCheckin();
+            await CoreDataManager.createInitialCheckin();
         }
 
         // Iniciar sistema de reactividad de cookies
@@ -1322,8 +1322,8 @@ class FormDataManager {
  */
 
 // Initialize automatically when module loads
-document.addEventListener("DOMContentLoaded", () => {
-    FormDataManager.initialize();
+document.addEventListener("DOMContentLoaded", async () => {
+    await FormDataManager.initialize();
 });
 
 /**

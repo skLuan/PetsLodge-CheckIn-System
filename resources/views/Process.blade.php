@@ -1,14 +1,6 @@
 <x-app-layout>
     <x-slot name="scripts">
         @vite(['resources/js/cookies-and-form/form-processor.js', 'resources/js/tabbar.js'])
-        <script>
-            // Check for session data to pre-populate (for editing existing check-ins)
-            const sessionData = @json(session('checkin_data', null));
-            if (sessionData) {
-                console.log('Pre-populating form with session data for editing:', sessionData);
-                // The FormDataManager will handle this in the DOMContentLoaded event
-            }
-        </script>
     </x-slot>
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-white leading-tight">
@@ -23,7 +15,7 @@
             <h2 id="thankYouTitle" class="text-2xl text-center font-bold mb-4 hidden">Thank You!</h2>
 
         </div>
-        <div id="stepContainer" class="py-4 overflow-hidden relative min-h-[568px]">
+        <div id="stepContainer" class="py-4 overflow-hidden relative min-h-[568px]" data-session-checkin="{{ htmlspecialchars(json_encode(session('checkin_data', null)), ENT_QUOTES, 'UTF-8') }}">
             <div id="step1" class="step w-full active">
                 <h1 class="text-center">Your Information</h1>
                 <p class="text-lg text-center">Please follow the instructions to complete your process</p>
