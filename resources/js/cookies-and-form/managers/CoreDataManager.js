@@ -22,7 +22,7 @@ class CoreDataManager {
         // Store in browser sessionStorage for persistence
         if (data) {
             try {
-                sessionStorage.setItem('pl_session_checkin_data', JSON.stringify(data));
+                sessionStorage.setItem('pl_temp_checkin_data', JSON.stringify(data));
                 console.log('Session data set for pre-population and stored in sessionStorage:', data);
             } catch (e) {
                 console.warn('Failed to store session data in sessionStorage:', e);

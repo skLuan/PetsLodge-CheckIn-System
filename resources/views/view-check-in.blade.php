@@ -4,13 +4,15 @@
     </x-slot>
     <x-slot name="header">
         <div class="flex flex-row gap-6 items-center">
-            <figure>
-                <picture><img height="48" width="48" src="/images/logo-pets-lodge.png" alt="Pets lodge Logo">
-                </picture>
-            </figure>
-            <h2 class="font-semibold text-xl text-white leading-tight">
-                {{ __('Pets Lodge') }}
-            </h2>
+            <a href="/" class="flex flex-row items-center gap-4">
+                <figure>
+                    <picture><img height="48" width="48" src="/images/logo-pets-lodge.png" alt="Pets lodge Logo">
+                    </picture>
+                </figure>
+                <h2 class="font-semibold text-xl text-white leading-tight">
+                    {{ __('Pets Lodge') }}
+                </h2>
+            </a>
         </div>
     </x-slot>
 
@@ -96,7 +98,7 @@
                                 <div class="flex justify-between items-center">
                                     <div>
                                         <h4 class="text-lg font-semibold">
-                                            Check-in #{{ $checkIn->id }} for:
+                                            Check-in ID# {{ str_pad($checkIn->id, 4, '0', STR_PAD_LEFT) }} for:
                                         </h4>
                                         <h2 class="text-xl font-bold text-green-dark">
                                             {{ $checkIn->pet->name ?? 'Unnamed Pet' }}

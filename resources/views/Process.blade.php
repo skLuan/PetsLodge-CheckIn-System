@@ -16,7 +16,7 @@
 
         </div>
         <div id="stepContainer" class="py-4 overflow-hidden relative min-h-[568px]" data-session-checkin="{{ htmlspecialchars(json_encode(session('checkin_data', null)), ENT_QUOTES, 'UTF-8') }}">
-            <div id="step1" class="step w-full active">
+            <div id="step1" class="step w-full active z-10 bg-green-lightest">
                 <h1 class="text-center">Your Information</h1>
                 <p class="text-lg text-center">Please follow the instructions to complete your process</p>
                 <x-forms.owner-info :user="$user ?? null" />
