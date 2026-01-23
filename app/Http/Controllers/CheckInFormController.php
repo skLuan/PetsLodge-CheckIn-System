@@ -97,7 +97,7 @@ class CheckInFormController extends Controller
             'extraServices'
         ])->findOrFail($checkInId);
         $cookieData = $this->transformer->transformCheckInToCookieFormat($checkIn);
-        dd($cookieData);
+        //dd($cookieData);
 
         // Store in session for pre-population
         session(['checkin_data' => $cookieData]);

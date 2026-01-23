@@ -1,3 +1,9 @@
+@php
+$checkinData = session('checkin_data', null);
+$healInfo = $checkinData["pets"][0]['health'];
+
+print_r($healInfo['warnings']);
+@endphp
 <form id="healthInfoForm" action="">
     <div class="pl-input-container">
         <h3 class="text-lg font-bold text-gray mb-2">Did you notice unusual health behavior such as Vomiting, Diarrhea, Heart Conditions, Physical Condition, Seizure, others?</h3>
@@ -22,6 +28,6 @@
     <div class="pl-input-container">
         <label for="warnings"><span class="!text-red-700">Warnings</span></label>
         <p class="text-sm text-gray mb-2">Health Matters, Special Care, Behavioral (Friendly with other dogs, Food Aggressive, Anxiety, Others)</p>
-        <textarea class="w-full" id="warnings" name="warnings" rows="3" placeholder="Enter any warnings or special notes"></textarea>
+        <textarea value="{{$healthInfo['warnings'] ?? old('warnings')}}" class="w-full" id="warnings" name="warnings" rows="3" placeholder="Enter any warnings or special notes"></textarea>
     </div>
 </form>
