@@ -81,8 +81,20 @@ class CheckInTransformer
 
         // Build grooming data
         $groomingData = [];
+        $appointmentDay = null;
+        
         foreach ($checkIn->extraServices as $service) {
             $groomingData[$service->name] = true;
+            
+            // Get appointment day from pivot table if available
+            if ($service->pivot && $service->pivot->grooming_appointment_day) {
+                $appointmentDay = $service->pivot->grooming_appointment_day;
+            }
+        }
+        
+        // Add appointment day to grooming data if it exists
+        if ($appointmentDay) {
+            $groomingData['appointmentDay'] = $appointmentDay;
         }
 
         return [

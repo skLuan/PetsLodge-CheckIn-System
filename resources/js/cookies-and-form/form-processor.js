@@ -62,14 +62,15 @@ document.addEventListener("DOMContentLoaded", function () {
     // Check for session data to pre-populate (for editing existing check-ins)
     // Note: This is handled server-side in the Blade template, so no client-side logic needed here
 
-    // Initialize all form managers
-    PetPillManager.addPetPillsToContainer();
-    FormHandler.populateFormWithCookies();
-
-    // Initialize popup handlers
+    // Initialize popup handlers FIRST (before form managers)
+    // This ensures popups are ready before any form initialization
     PopupManager.initializeFeedingMedicationPopup();
     PopupManager.initializeGroomingPopup();
     PopupManager.initializeTermsPopup();
+
+    // Initialize all form managers
+    PetPillManager.addPetPillsToContainer();
+    FormHandler.populateFormWithCookies();
 
     // Initialize form-specific handlers
     InventoryFormManager.initializeInventoryForm();

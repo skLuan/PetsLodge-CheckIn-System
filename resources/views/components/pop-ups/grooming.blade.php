@@ -33,6 +33,27 @@
                     </div>
                 </div>
 
+                <!-- Conditional grooming appointment day -->
+                <div class="conditional-grooming-appointment-popup" style="display: none;">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        Preferred appointment day:
+                    </label>
+                    <div class="flex flex-col gap-3">
+                        <label class="flex items-center">
+                            <input type="radio" name="groomingAppointmentDay" value="Monday" class="mr-3 w-5 h-5">
+                            <span class="text-sm font-medium">Monday</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="groomingAppointmentDay" value="Wednesday" class="mr-3 w-5 h-5">
+                            <span class="text-sm font-medium">Wednesday</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="groomingAppointmentDay" value="Friday" class="mr-3 w-5 h-5">
+                            <span class="text-sm font-medium">Friday</span>
+                        </label>
+                    </div>
+                </div>
+
                 <!-- Conditional grooming notes textarea -->
                 <div class="conditional-grooming-notes-popup" style="display: none;">
                     <label for="groomingNotes" class="block text-sm font-medium text-gray-700 mb-2">

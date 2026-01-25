@@ -157,6 +157,41 @@
         @endif
 
         {{-- Grooming Details --}}
+        @if (isset($checkinData['grooming']) && is_array($checkinData['grooming']))
+            @php
+                $hasGroomingServices = false;
+                foreach ($checkinData['grooming'] as $key => $value) {
+                    if ($value && $key !== 'no' && $key !== 'appointmentDay') {
+                        $hasGroomingServices = true;
+                        break;
+                    }
+                }
+            @endphp
+            
+            @if ($hasGroomingServices)
+                <div class="mb-4">
+                    <div class="font-semibold text-yellow-800 mb-1">🛁 Grooming Services</div>
+                    <div class="pl-4 text-sm">
+                        @php
+                            $services = [];
+                            foreach ($checkinData['grooming'] as $key => $value) {
+                                if ($value && $key !== 'no' && $key !== 'appointmentDay') {
+                                    $services[] = ucfirst($key);
+                                }
+                            }
+                        @endphp
+                        {{ implode(', ', $services) }}
+                    </div>
+                    
+                    @if (isset($checkinData['grooming']['appointmentDay']) && $checkinData['grooming']['appointmentDay'])
+                        <div class="pl-4 text-sm mt-1">
+                            <strong>📅 Appointment Day:</strong> {{ $checkinData['grooming']['appointmentDay'] }}
+                        </div>
+                    @endif
+                </div>
+            @endif
+        @endif
+
         @if (isset($checkinData['groomingDetails']))
             <div class="mb-4">
                 <div class="font-semibold text-yellow-800 mb-1">📝 Grooming Instructions</div>

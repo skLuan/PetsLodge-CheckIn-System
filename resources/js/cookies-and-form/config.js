@@ -53,6 +53,7 @@ const DEFAULT_CHECKIN_STRUCTURE = {
         bath: false,
         nails: false,
         grooming: false,
+        appointmentDay: "",
     },
     groomingDetails: "",
     inventory: [],

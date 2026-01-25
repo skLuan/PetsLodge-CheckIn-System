@@ -118,7 +118,7 @@ class NavigationManager {
                         if (groomingPopup) {
                             groomingPopup.classList.remove('hidden');
                         }
-                    }, 100); // Small delay
+                    }, 50); // Reduced delay for faster popup display
                 }
                 // Show terms popup only after grooming is acknowledged but terms not accepted
                 else if (inventoryReady && groomingAcknowledged && !termsAccepted) {
@@ -127,7 +127,7 @@ class NavigationManager {
                         if (termsPopup) {
                             termsPopup.classList.remove('hidden');
                         }
-                    }, 100); // Small delay
+                    }, 50); // Reduced delay for faster popup display
                 }
 
                 nextButton.disabled = !shouldEnable;
@@ -137,14 +137,15 @@ class NavigationManager {
                     nextButton.classList.remove('opacity-50', 'cursor-not-allowed');
                 }
             } else if (currentStep === FORM_CONFIG.STEPS.INVENTORY) { // Step 6 - Final step
-                // In final step, check grooming acknowledgment
+                // In final step, check grooming acknowledgment and terms acceptance
                 const checkinData = FormDataManager.getCheckinData();
                 const groomingAcknowledged = checkinData?.groomingAcknowledged;
+                const termsAccepted = checkinData?.termsAccepted;
 
-                // Update submit button state based on grooming acknowledgment
+                // Update submit button state based on grooming acknowledgment AND terms acceptance
                 const finalSubmitButton = document.querySelector("#finalSubmit");
                 if (finalSubmitButton) {
-                    finalSubmitButton.disabled = !groomingAcknowledged;
+                    finalSubmitButton.disabled = !groomingAcknowledged || !termsAccepted;
                     if (finalSubmitButton.disabled) {
                         finalSubmitButton.classList.add('opacity-50', 'cursor-not-allowed');
                     } else {
