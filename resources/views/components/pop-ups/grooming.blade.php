@@ -12,7 +12,10 @@
             <!-- Content -->
             <div class="p-6">
                 <div class="mb-6">
-                    <h4 class="text-lg font-semibold text-gray-700 mb-4">Want grooming before picking up?</h4>
+                    <div>
+                        <h4 class="text-lg font-semibold text-gray-700">Want grooming before picking up?</h4>
+                        <h3 class="mt-2 mb-4">Take the service with 10% discount!</h3>
+                    </div>
                     <div class="flex flex-col gap-4">
                         <label class="flex items-center">
                             <input type="checkbox" name="groomingOptions[]" value="bath" class="mr-3 w-5 h-5">

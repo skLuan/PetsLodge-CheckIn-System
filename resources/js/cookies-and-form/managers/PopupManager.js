@@ -116,7 +116,11 @@ class PopupManager {
      */
     static initializeGroomingPopup() {
         const groomingPopup = document.getElementById('groomingPopup');
-        if (!groomingPopup) return;
+        console.log('🔧 [PopupManager] Initializing grooming popup:', groomingPopup ? 'FOUND' : 'NOT FOUND');
+        if (!groomingPopup) {
+            console.error('❌ [PopupManager] Grooming popup element not found in DOM');
+            return;
+        }
 
         const groomingCheckboxes = groomingPopup.querySelectorAll('input[name="groomingOptions[]"]');
         const groomingNotesTextarea = document.getElementById('groomingNotes');
@@ -339,7 +343,11 @@ class PopupManager {
      */
     static initializeTermsPopup() {
         const termsPopup = document.getElementById('termsConditionsPopup');
-        if (!termsPopup) return;
+        console.log('🔧 [PopupManager] Initializing terms popup:', termsPopup ? 'FOUND' : 'NOT FOUND');
+        if (!termsPopup) {
+            console.error('❌ [PopupManager] Terms popup element not found in DOM');
+            return;
+        }
 
         const termsContent = document.getElementById('termsContent');
         const termsAcceptedCheckbox = document.getElementById('termsAccepted');
