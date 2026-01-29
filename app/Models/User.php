@@ -50,6 +50,11 @@ class User extends Authenticatable
     ];
 
     
+    public function emergencyContact()
+    {
+        return $this->hasOne(EmergencyContact::class);
+    }
+
     public function emergencyContacts()
     {
         return $this->hasMany(EmergencyContact::class);

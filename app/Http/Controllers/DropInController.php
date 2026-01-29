@@ -30,6 +30,18 @@ class DropInController extends Controller
         if (empty($checkinData) && $request->user()) {
             $latestCheckIn = $request->user()->checkIns()->latest()->first();
             if ($latestCheckIn) {
+                // Eager load all relationships needed by the transformer
+                $latestCheckIn->load([
+                    'pet.kindOfPet',
+                    'pet.gender',
+                    'pet.castrated',
+                    'user.emergencyContacts',
+                    'foods.moment_of_day',
+                    'medicines.moment_of_day',
+                    'items',
+                    'extraServices'
+                ]);
+                
                 $transformer = new CheckInTransformer();
                 $checkinData = $transformer->transformCheckInToCookieFormat($latestCheckIn);
             }
@@ -66,6 +78,29 @@ class DropInController extends Controller
         }
         
         if ($responseData->userExists === true && $responseData->hasCheckIn === true) {
+            // Get the user and their latest check-in to populate session data
+            $user = User::findOrFail($responseData->userId);
+            $latestCheckIn = $user->checkIns()->latest()->first();
+            
+            if ($latestCheckIn) {
+                // Eager load all relationships needed by the transformer
+                $latestCheckIn->load([
+                    'pet.kindOfPet',
+                    'pet.gender',
+                    'pet.castrated',
+                    'user.emergencyContacts',
+                    'foods.moment_of_day',
+                    'medicines.moment_of_day',
+                    'items',
+                    'extraServices'
+                ]);
+                
+                // Transform and store in session
+                $transformer = new CheckInTransformer();
+                $checkinData = $transformer->transformCheckInToCookieFormat($latestCheckIn);
+                session(['checkin_data' => $checkinData]);
+            }
+            
             return response()->json([
                 'userExists' => true,
                 'hasCheckIn' => true,
