@@ -7,6 +7,9 @@ use Illuminate\Http\Request;
 use App\Services\PdfService;
 use App\Services\PrintNodeService;
 use App\Services\CheckInTransformer;
+use App\Services\CheckInService;
+use App\Services\CheckInUserService;
+use App\Services\CheckInPetService;
 
 class DropInController extends Controller
 {
@@ -40,43 +43,42 @@ class DropInController extends Controller
     }
     public function checkUser(Request $request)
     {
-        $checkInController = new CheckInController();
-        $userExists = $checkInController->checkUser($request)->getData()->userExists;
-        if ($userExists === true) {
-
-            // Preparar datos para el frontend/modal
-            $data = [
-                'client_name' => $dropIn->client_name ?? 'N/A',
-                'dog_name' => $dropIn->dog_name ?? 'N/A',
-                'breed' => $dropIn->breed ?? 'N/A',
-            ];
-
+        $checkInApiController = app(CheckInApiController::class);
+        $response = $checkInApiController->checkUser($request);
+        $responseData = $response->getData();
+        
+        if ($responseData->userExists === false) {
             return response()->json([
-                'status' => 'found',
-                'data' => $data,
-                'message' => 'Registro encontrado. Redirigiendo en 3...',
-                'redirect_url' => route('drop-in.check'), // Asumiendo ruta /check-info
-            ], 200);
-        } else {
-            return response()->json([
-                'status' => 'not_found',
-                'message' => 'Lo siento, no tenemos registro',
+                'userExists' => false,
+                'message' => 'User not found'
             ], 404);
         }
-
-        // Preparar datos para el frontend/modal
-        $data = [
-            'client_name' => $dropIn->client_name ?? 'N/A',
-            'dog_name' => $dropIn->dog_name ?? 'N/A',
-            'breed' => $dropIn->breed ?? 'N/A',
-        ];
-
+        
+        if ($responseData->userExists === true && $responseData->hasCheckIn === false) {
+            return response()->json([
+                'userExists' => true,
+                'hasCheckIn' => false,
+                'userId' => $responseData->userId,
+                'userName' => $responseData->userName,
+                'userEmail' => $responseData->userEmail,
+                'userAddress' => $responseData->userAddress,
+            ], 200);
+        }
+        
+        if ($responseData->userExists === true && $responseData->hasCheckIn === true) {
+            return response()->json([
+                'userExists' => true,
+                'hasCheckIn' => true,
+                'userId' => $responseData->userId,
+                'userName' => $responseData->userName,
+                'userEmail' => $responseData->userEmail,
+                'userAddress' => $responseData->userAddress,
+            ], 200);
+        }
+        
         return response()->json([
-            'status' => 'found',
-            'data' => $data,
-            'message' => 'Registro encontrado. Redirigiendo en 3...',
-            'redirect_url' => route('check-info'), // Asumiendo ruta /check-info
-        ], 200);
+            'error' => 'Unexpected error'
+        ], 500);
     }
 
     public function readyToPrint(Request $request)
@@ -86,25 +88,36 @@ class DropInController extends Controller
             'info' => 'required|array',  // Datos confirmados
         ]);
 
-        // Genera PDF via service
-        $pdfService = new PdfService();
-        $pdfUri = $pdfService->generatePdf($validated['info']);  // Devuelve URI (e.g., S3 URL)
+        try {
+            // Genera PDF via service
+            $pdfService = new PdfService();
+            $pdfUri = $pdfService->generatePdf($validated['info']);  // Devuelve URI (e.g., S3 URL)
 
-        // Llama a PrintNode via service
-        // $printService = new PrintNodeService();
-        // $response = $printService->sendPrintJob($pdfUri, $validated['info']);
+            if (!$pdfUri) {
+                return response()->json(['error' => 'Error generating PDF'], 500);
+            }
 
-        // // Respuesta JSON para frontend (éxito/error)
-        // if ($response['success']) {
-        //     return response()->json(['message' => 'Impresión enviada!'], 200);
-        // } else {
-        //     return response()->json(['error' => 'Error en impresión'], 500);
-        // }
-        // Respuesta JSON para frontend (éxito/error)
-        if ($pdfUri) {
-            return response()->json(['message' => 'PDF Creado! -> ' . $pdfUri], 200);
-        } else {
-            return response()->json(['error' => 'Error en impresión'], 500);
+            // Llama a PrintNode via service
+            $printService = new PrintNodeService();
+            $response = $printService->sendPrintJob($pdfUri, $validated['info']);
+
+            // Respuesta JSON para frontend (éxito/error)
+            if ($response['success']) {
+                return response()->json([
+                    'message' => 'Print job sent successfully!',
+                    'pdfUri' => $pdfUri,
+                    'printResponse' => $response['data'] ?? null
+                ], 200);
+            } else {
+                return response()->json([
+                    'error' => $response['message'] ?? 'Error sending print job',
+                    'pdfUri' => $pdfUri
+                ], 500);
+            }
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Unexpected error: ' . $e->getMessage()
+            ], 500);
         }
     }
 }
