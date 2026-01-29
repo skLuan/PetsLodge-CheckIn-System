@@ -2,6 +2,7 @@
 
 // Core functionality
 export { CoreDataManager } from './CoreDataManager.js';
+export { EditingModeManager } from './EditingModeManager.js';
 
 // Validation and form handling
 export { ValidationManager } from './ValidationManager.js';

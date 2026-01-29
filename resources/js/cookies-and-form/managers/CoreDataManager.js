@@ -1,5 +1,6 @@
 import { CookieManager } from "../CookieManager.js";
 import config from "../config.js";
+import { EditingModeManager } from "./EditingModeManager.js";
 
 const { FORM_CONFIG, DEFAULT_CHECKIN_STRUCTURE } = config;
 
@@ -178,6 +179,122 @@ class CoreDataManager {
         }
 
         return result;
+    }
+
+    /**
+     * Merges session data into the cookie one time only
+     * 
+     * This method is called during initialization when editing an existing check-in.
+     * It merges the pre-populated session data into the cookie structure, but only
+     * once. Subsequent updates should use updateCheckinData() directly.
+     * 
+     * @static
+     * @param {Object} sessionData - The session data to merge into the cookie
+     * @returns {boolean} True if merge was successful
+     * 
+     * @example
+     * const sessionData = { user: {...}, pets: [...] };
+     * CoreDataManager.mergeSessionDataIntoCookie(sessionData);
+     * 
+     * @sideEffects
+     * - Updates cookie with merged data
+     * - Triggers cookie reactivity
+     */
+    static mergeSessionDataIntoCookie(sessionData) {
+        try {
+            if (!sessionData || Object.keys(sessionData).length === 0) {
+                console.warn("No session data to merge");
+                return false;
+            }
+
+            const currentData = this.getCheckinData();
+            if (!currentData) {
+                console.error("No current check-in data found to merge into");
+                return false;
+            }
+
+            // Merge session data into current data
+            const mergedData = this.deepMerge(currentData, sessionData);
+            
+            // Preserve the editing mode flag if it was already set
+            if (currentData.editingMode && currentData.editingMode.enabled) {
+                mergedData.editingMode = currentData.editingMode;
+            }
+
+            // Update the cookie with merged data
+            const success = this.updateCheckinData(mergedData);
+            if (success) {
+                console.log("✅ Session data merged into cookie");
+            }
+            return success;
+        } catch (error) {
+            console.error("Error merging session data into cookie:", error);
+            return false;
+        }
+    }
+
+    /**
+     * Sets editing mode for the current check-in
+     * 
+     * Delegates to EditingModeManager to enable editing mode with the given
+     * check-in ID and original data snapshot.
+     * 
+     * @static
+     * @param {number} checkInId - The ID of the check-in being edited
+     * @param {Object} originalData - Snapshot of the original check-in data
+     * @returns {boolean} True if editing mode was successfully enabled
+     * 
+     * @example
+     * CoreDataManager.setEditingMode(123, originalCheckInData);
+     * 
+     * @see EditingModeManager.enableEditingMode
+     */
+    static setEditingMode(checkInId, originalData) {
+        return EditingModeManager.enableEditingMode(checkInId, originalData);
+    }
+
+    /**
+     * Gets the current editing mode state
+     * 
+     * Delegates to EditingModeManager to retrieve the editing mode object.
+     * 
+     * @static
+     * @returns {Object|null} The editing mode object if editing, null otherwise
+     * 
+     * @example
+     * const editingMode = CoreDataManager.getEditingMode();
+     * if (editingMode && editingMode.enabled) {
+     *     console.log('Editing check-in:', editingMode.checkInId);
+     * }
+     * 
+     * @see EditingModeManager.isEditingMode
+     */
+    static getEditingMode() {
+        try {
+            const checkinData = this.getCheckinData();
+            return checkinData?.editingMode || null;
+        } catch (error) {
+            console.error("Error getting editing mode:", error);
+            return null;
+        }
+    }
+
+    /**
+     * Clears editing mode
+     * 
+     * Delegates to EditingModeManager to disable editing mode and clear
+     * the original data snapshot.
+     * 
+     * @static
+     * @returns {boolean} True if editing mode was successfully cleared
+     * 
+     * @example
+     * CoreDataManager.clearEditingMode();
+     * 
+     * @see EditingModeManager.disableEditingMode
+     */
+    static clearEditingMode() {
+        return EditingModeManager.disableEditingMode();
     }
 }
 

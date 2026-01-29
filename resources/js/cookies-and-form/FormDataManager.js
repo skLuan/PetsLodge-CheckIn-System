@@ -31,6 +31,7 @@
 
 import {
     CoreDataManager,
+    EditingModeManager,
     ValidationManager,
     InventoryManager,
     PetManager,
@@ -1291,27 +1292,274 @@ class FormDataManager {
         return UtilitiesManager.clearCookiesByPattern(pattern);
     }
 
-    /**
-     * Checks if a specific cookie exists
-     *
-     * Determines whether a cookie with the given name is currently set
-     * in the browser's cookie storage.
-     *
-     * @static
-     * @param {string} name - Name of the cookie to check
-     * @returns {boolean} True if cookie exists, false otherwise
-     *
-     * @example
-     * if (FormDataManager.hasCookie("pl_checkin_data")) {
-     *     console.log("Check-in data exists");
-     * }
-     *
-     * @see UtilitiesManager.hasCookie
-     */
-    static hasCookie(name) {
-        return UtilitiesManager.hasCookie(name);
-    }
-}
+     /**
+      * Checks if a specific cookie exists
+      *
+      * Determines whether a cookie with the given name is currently set
+      * in the browser's cookie storage.
+      *
+      * @static
+      * @param {string} name - Name of the cookie to check
+      * @returns {boolean} True if cookie exists, false otherwise
+      *
+      * @example
+      * if (FormDataManager.hasCookie("pl_checkin_data")) {
+      *     console.log("Check-in data exists");
+      * }
+      *
+      * @see UtilitiesManager.hasCookie
+      */
+     static hasCookie(name) {
+         return UtilitiesManager.hasCookie(name);
+     }
+
+     /**
+      * Merges session data into the check-in cookie (one-time operation)
+      *
+      * Takes pre-populated data from Laravel session (used when editing existing check-ins)
+      * and merges it into the cookie data structure. This is a one-time operation that
+      * happens during initialization to pre-fill the form with existing data.
+      *
+      * The merge is conservative - it only fills in empty fields to avoid overwriting
+      * any data that may have already been entered in the form.
+      *
+      * @static
+      * @param {Object} sessionData - Pre-populated data from Laravel session
+      * @returns {boolean} True if merge was successful, false otherwise
+      *
+      * @example
+      * // Merge session data when editing an existing check-in
+      * const sessionData = {
+      *     user: { info: { name: "John Doe", phone: "555-0123" } },
+      *     pets: [{ info: { petName: "Max", petType: "dog" } }]
+      * };
+      * FormDataManager.mergeSessionDataIntoCookie(sessionData);
+      *
+      * @sideEffects
+      * - Updates check-in data in cookie with session data
+      * - Triggers reactivity for UI updates
+      * - Logs merge operation to console
+      *
+      * @see CoreDataManager.mergeSessionDataIntoCookie
+      */
+     static mergeSessionDataIntoCookie(sessionData) {
+         return CoreDataManager.mergeSessionDataIntoCookie(sessionData);
+     }
+
+     /**
+      * Enables editing mode for an existing check-in
+      *
+      * Sets the editing mode flag and stores a snapshot of the original data
+      * for comparison and change detection. Used when user is editing an
+      * existing check-in from the database.
+      *
+      * @static
+      * @param {string} checkInId - ID of the check-in being edited
+      * @param {Object} originalData - Original data snapshot from database
+      * @returns {boolean} True if editing mode was enabled successfully
+      *
+      * @example
+      * // Enable editing mode for check-in #123
+      * FormDataManager.setEditingMode(123, originalCheckInData);
+      *
+      * @sideEffects
+      * - Sets editingMode.enabled flag to true
+      * - Stores original data snapshot in cookie
+      * - Updates browser cookie
+      * - Triggers reactivity for UI updates
+      *
+      * @see EditingModeManager.enableEditingMode
+      */
+     static setEditingMode(checkInId, originalData) {
+         return EditingModeManager.enableEditingMode(checkInId, originalData);
+     }
+
+     /**
+      * Retrieves the current editing mode state
+      *
+      * Returns an object containing the editing mode flag, check-in ID being edited,
+      * and the original data snapshot. Useful for determining if the user is editing
+      * an existing check-in or creating a new one.
+      *
+      * @static
+      * @returns {Object|null} Editing mode state object or null if not in editing mode
+      * @returns {boolean} return.enabled - Whether editing mode is active
+      * @returns {string} return.checkInId - ID of check-in being edited
+      * @returns {Object} return.originalData - Snapshot of original data
+      *
+      * @example
+      * const editingMode = FormDataManager.getEditingMode();
+      * if (editingMode && editingMode.enabled) {
+      *     console.log(`Editing check-in #${editingMode.checkInId}`);
+      * }
+      *
+      * @see EditingModeManager.getEditingMode
+      */
+     static getEditingMode() {
+         return EditingModeManager.getEditingMode();
+     }
+
+     /**
+      * Disables editing mode and clears original data snapshot
+      *
+      * Removes the editing mode flag and clears the stored original data.
+      * Used when user completes editing or cancels the edit operation.
+      *
+      * @static
+      * @returns {boolean} True if editing mode was disabled successfully
+      *
+      * @example
+      * // Disable editing mode after successful submission
+      * FormDataManager.clearEditingMode();
+      *
+      * @sideEffects
+      * - Sets editingMode.enabled flag to false
+      * - Clears original data snapshot
+      * - Updates browser cookie
+      * - Triggers reactivity for UI updates
+      *
+      * @see EditingModeManager.disableEditingMode
+      */
+     static clearEditingMode() {
+         return EditingModeManager.disableEditingMode();
+     }
+
+     /**
+      * Checks if currently in editing mode
+      *
+      * Determines whether the user is editing an existing check-in or creating a new one.
+      *
+      * @static
+      * @returns {boolean} True if in editing mode, false otherwise
+      *
+      * @example
+      * if (FormDataManager.isEditingMode()) {
+      *     console.log("User is editing an existing check-in");
+      * } else {
+      *     console.log("User is creating a new check-in");
+      * }
+      *
+      * @see EditingModeManager.isEditingMode
+      */
+     static isEditingMode() {
+         return EditingModeManager.isEditingMode();
+     }
+
+     /**
+      * Gets the ID of the check-in currently being edited
+      *
+      * Returns the check-in ID if in editing mode, null otherwise.
+      *
+      * @static
+      * @returns {string|null} Check-in ID if editing, null otherwise
+      *
+      * @example
+      * const checkInId = FormDataManager.getEditingCheckInId();
+      * if (checkInId) {
+      *     console.log(`Editing check-in #${checkInId}`);
+      * }
+      *
+      * @see EditingModeManager.getEditingCheckInId
+      */
+     static getEditingCheckInId() {
+         return EditingModeManager.getEditingCheckInId();
+     }
+
+     /**
+      * Gets a deep copy of the original data snapshot
+      *
+      * Returns the original data from when editing mode was enabled.
+      * Useful for comparing current data with original to detect changes.
+      *
+      * @static
+      * @returns {Object|null} Deep copy of original data or null if not editing
+      *
+      * @example
+      * const originalData = FormDataManager.getOriginalData();
+      * if (originalData) {
+      *     console.log("Original pet name:", originalData.pets[0].info.petName);
+      * }
+      *
+      * @see EditingModeManager.getOriginalData
+      */
+     static getOriginalData() {
+         return EditingModeManager.getOriginalData();
+     }
+
+     /**
+      * Detects if any data has changed since editing mode was enabled
+      *
+      * Performs a deep comparison between current check-in data and the original
+      * data snapshot to determine if any changes have been made.
+      *
+      * @static
+      * @returns {boolean} True if data has changed, false if unchanged
+      *
+      * @example
+      * if (FormDataManager.hasDataChanged()) {
+      *     console.log("User has made changes");
+      *     // Show save/discard options
+      * }
+      *
+      * @see EditingModeManager.hasDataChanged
+      */
+     static hasDataChanged() {
+         return EditingModeManager.hasDataChanged();
+     }
+
+     /**
+      * Gets a summary of which sections have changed
+      *
+      * Returns an object indicating which major sections (userInfo, pets, grooming,
+      * inventory, groomingDetails) have been modified since editing mode was enabled.
+      *
+      * @static
+      * @returns {Object|null} Change summary object or null if not editing
+      * @returns {boolean} return.userInfo - Whether user info changed
+      * @returns {boolean} return.pets - Whether pet data changed
+      * @returns {boolean} return.grooming - Whether grooming changed
+      * @returns {boolean} return.inventory - Whether inventory changed
+      * @returns {boolean} return.groomingDetails - Whether grooming details changed
+      *
+      * @example
+      * const changes = FormDataManager.getChangeSummary();
+      * if (changes) {
+      *     if (changes.pets) console.log("Pet data was modified");
+      *     if (changes.inventory) console.log("Inventory was modified");
+      * }
+      *
+      * @see EditingModeManager.getChangeSummary
+      */
+     static getChangeSummary() {
+         return EditingModeManager.getChangeSummary();
+     }
+
+     /**
+      * Reverts all changes and restores original data
+      *
+      * Replaces current check-in data with the original data snapshot,
+      * effectively undoing all changes made during editing.
+      *
+      * @static
+      * @returns {boolean} True if reset was successful, false if not in editing mode
+      *
+      * @example
+      * // User clicks "Discard Changes" button
+      * FormDataManager.resetToOriginal();
+      * // Form is now populated with original data
+      *
+      * @sideEffects
+      * - Replaces current check-in data with original snapshot
+      * - Updates browser cookie
+      * - Triggers reactivity for UI updates (form fields reset)
+      * - Logs reset operation to console
+      *
+      * @see EditingModeManager.resetToOriginal
+      */
+     static resetToOriginal() {
+         return EditingModeManager.resetToOriginal();
+     }
+ }
 
 /**
  * Module initialization and global exports

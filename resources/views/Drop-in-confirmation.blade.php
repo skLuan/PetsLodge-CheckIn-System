@@ -73,7 +73,7 @@
                         const checkinData = @json($checkinData);
 
                         // Send to backend
-                        const response = await fetch('{{ route("drop-in.ready-to-print") }}', {
+                        const response = await fetch('/api/readyToPrint', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',

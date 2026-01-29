@@ -22,45 +22,65 @@ import config from "./config.js";
 const { FORM_CONFIG } = config;
 
 document.addEventListener("DOMContentLoaded", function () {
-    // Extract and set session data from DOM data attribute (for editing existing check-ins)
-    const stepContainer = document.querySelector('[data-session-checkin]');
-    if (stepContainer) {
-        const sessionDataStr = stepContainer.getAttribute('data-session-checkin');
-        if (sessionDataStr && sessionDataStr !== 'null' && sessionDataStr.trim() !== '') {
-            try {
-                // Decode HTML entities that may have been escaped
-                const decodedStr = sessionDataStr
-                    .replace(/&quot;/g, '"')
-                    .replace(/&#039;/g, "'")
-                    .replace(/&amp;/g, '&')
-                    .replace(/&lt;/g, '<')
-                    .replace(/&gt;/g, '>');
-                
-                const sessionData = JSON.parse(decodedStr);
-                if (sessionData && Object.keys(sessionData).length > 0) {
-                    CoreDataManager.setSessionData(sessionData);
-                    console.log('Session data loaded from DOM attribute for pre-population:', sessionData);
-                }
-            } catch (e) {
-                console.warn('Session data not available or invalid:', e.message);
-            }
-        }
-    }
+     // ========================================
+     // PHASE 2.1: EDITING MODE INITIALIZATION
+     // ========================================
+     // Extract editing mode flags from DOM attributes
+     const stepContainer = document.querySelector('[data-session-checkin]');
+     let isEditingMode = false;
+     let editingCheckInId = null;
 
-    // Check if phone number from URL differs from stored cookie data
-    const urlParams = new URLSearchParams(window.location.search);
-    const phoneFromUrl = urlParams.get('phone');
-    const existingData = FormDataManager.getCheckinData();
+     if (stepContainer) {
+         // Check for editing mode flags
+         const editingModeAttr = stepContainer.getAttribute('data-editing-mode');
+         const editingCheckInIdAttr = stepContainer.getAttribute('data-editing-check-in-id');
+         
+         isEditingMode = editingModeAttr === 'true' || editingModeAttr === '1';
+         editingCheckInId = editingCheckInIdAttr;
 
-    // If phone from URL differs from phone in cookie (if cookie exists), clear the form data
-    if (phoneFromUrl && existingData && existingData.user && existingData.user.info &&
-        existingData.user.info.phone !== phoneFromUrl) {
-            console.log(existingData);
-        FormDataManager.clearCheckinData();
-    }
+         // Extract and merge session data from DOM data attribute (for editing existing check-ins)
+         const sessionDataStr = stepContainer.getAttribute('data-session-checkin');
+         if (sessionDataStr && sessionDataStr !== 'null' && sessionDataStr.trim() !== '') {
+             try {
+                 // Decode HTML entities that may have been escaped
+                 const decodedStr = sessionDataStr
+                     .replace(/&quot;/g, '"')
+                     .replace(/&#039;/g, "'")
+                     .replace(/&amp;/g, '&')
+                     .replace(/&lt;/g, '<')
+                     .replace(/&gt;/g, '>');
+                 
+                 const sessionData = JSON.parse(decodedStr);
+                 if (sessionData && Object.keys(sessionData).length > 0) {
+                     // NEW: Merge session data into cookie (one-time operation)
+                     // This replaces the old CoreDataManager.setSessionData() approach
+                     FormDataManager.mergeSessionDataIntoCookie(sessionData);
+                     console.log('Session data merged into cookie for pre-population:', sessionData);
 
-    // Check for session data to pre-populate (for editing existing check-ins)
-    // Note: This is handled server-side in the Blade template, so no client-side logic needed here
+                     // NEW: If in editing mode, enable editing mode tracking
+                     if (isEditingMode && editingCheckInId) {
+                         FormDataManager.setEditingMode(editingCheckInId, sessionData);
+                         console.log(`Editing mode enabled for check-in #${editingCheckInId}`);
+                     }
+                 }
+             } catch (e) {
+                 console.warn('Session data not available or invalid:', e.message);
+             }
+         }
+     }
+
+     // Check if phone number from URL differs from stored cookie data
+     const urlParams = new URLSearchParams(window.location.search);
+     const phoneFromUrl = urlParams.get('phone');
+     const existingData = FormDataManager.getCheckinData();
+
+     // If phone from URL differs from phone in cookie (if cookie exists), clear the form data
+     // UNLESS we're in editing mode (in which case we want to keep the pre-populated data)
+     if (phoneFromUrl && existingData && existingData.user && existingData.user.info &&
+         existingData.user.info.phone !== phoneFromUrl && !isEditingMode) {
+             console.log(existingData);
+         FormDataManager.clearCheckinData();
+     }
 
     // Initialize popup handlers FIRST (before form managers)
     // This ensures popups are ready before any form initialization
