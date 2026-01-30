@@ -130,25 +130,30 @@ class FormDataManager {
      * - Logs initialization status to console
      */
     static async initialize() {
-        // Crear cookie checkin si no existe
-        if (!CoreDataManager.getCheckinData()) {
-            await CoreDataManager.createInitialCheckin();
-        }
+         // CRITICAL FIX #2: Check if editing mode is already set before creating new cookie
+         // This prevents overwriting editing mode during initialization
+         const existingData = CoreDataManager.getCheckinData();
+         const hasEditingMode = existingData?.editingMode?.enabled === true;
 
-        // Iniciar sistema de reactividad de cookies
-        CookieReactivityManager.startListening();
+         // Only create initial cookie if none exists AND we're not in editing mode
+         if (!existingData && !hasEditingMode) {
+             await CoreDataManager.createInitialCheckin();
+         }
 
-        // Registrar listener para actualizar UI automáticamente
-        UIManager.registerUIUpdateListener();
+         // Iniciar sistema de reactividad de cookies
+         CookieReactivityManager.startListening();
 
-        // Trigger initial UI update with existing data
-        UIManager.updateUIFromCookieData(CoreDataManager.getCheckinData());
+         // Registrar listener para actualizar UI automáticamente
+         UIManager.registerUIUpdateListener();
 
-        console.log(
-            "FormDataManager initialized with checkin data:",
-            CoreDataManager.getCheckinData()
-        );
-    }
+         // Trigger initial UI update with existing data
+         UIManager.updateUIFromCookieData(CoreDataManager.getCheckinData());
+
+         console.log(
+             "FormDataManager initialized with checkin data:",
+             CoreDataManager.getCheckinData()
+         );
+     }
 
     /**
      * Registers a listener for automatic UI updates when cookie data changes

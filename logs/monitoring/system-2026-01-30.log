@@ -1,0 +1,1 @@
+{"timestamp":"2026-01-30T01:20:59.501Z","type":"system","data":{"message":"Monitoring system started","config":{"logDir":"./logs/monitoring","reportDir":"./reports/monitoring","checkInterval":5000,"alertThreshold":{"errorRate":0.05,"transformationFailure":0.1,"responseTime":5000},"metricsWindow":3600000}}}

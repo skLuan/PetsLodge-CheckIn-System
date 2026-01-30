@@ -62,22 +62,23 @@ class CheckInTransformer
             ];
         }
 
-        // Build user data structure
-        // PHASE 2.4: Added city and zip fields
-        $userData = [
-            'info' => [
-                'name' => $user->name ?? '',
-                'phone' => $user->phone ?? '',
-                'email' => $user->email ?? '',
-                'address' => $user->address ?? '',
-                'city' => $user->city ?? '', // PHASE 2.4: Added
-                'zip' => $user->zip ?? '', // PHASE 2.4: Added
-            ],
-            'emergencyContact' => [
-                'name' => $user->emergencyContacts->first()->name ?? '',
-                'phone' => $user->emergencyContacts->first()->phone ?? '',
-            ],
-        ];
+         // Build user data structure
+         // PHASE 2.4: Added city and zip fields
+         // CRITICAL FIX #5: Added null checks for emergency contact
+         $userData = [
+             'info' => [
+                 'name' => $user->name ?? '',
+                 'phone' => $user->phone ?? '',
+                 'email' => $user->email ?? '',
+                 'address' => $user->address ?? '',
+                 'city' => $user->city ?? '', // PHASE 2.4: Added
+                 'zip' => $user->zip ?? '', // PHASE 2.4: Added
+             ],
+             'emergencyContact' => [
+                 'name' => $user->emergencyContacts?->first()?->name ?? '',
+                 'phone' => $user->emergencyContacts?->first()?->phone ?? '',
+             ],
+         ];
 
         // Build inventory data
         $inventoryData = [];

@@ -110,7 +110,7 @@
                                         </p>
                                     </div>
                                     <button type="button" onclick="editCheckIn({{ $checkIn->id }})"
-                                        class="bg-yellow-second hover:bg-yellow text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200">
+                                        class="edit-button bg-yellow-second hover:bg-yellow text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200">
                                         Edit
                                     </button>
                                 </div>

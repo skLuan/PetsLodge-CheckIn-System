@@ -10,38 +10,12 @@ const { FORM_CONFIG, DEFAULT_CHECKIN_STRUCTURE } = config;
 class CoreDataManager {
     static CHECKIN_COOKIE_NAME = "pl_checkin_data";
     static sessionData = null;
-    static sessionDataPromise = Promise.resolve(); // Promise that resolves when session data is set
-
-    /**
-     * Sets session data to be merged during initialization
-     * Called from form-processor.js with data from the DOM data attribute
-     * Also stores in browser sessionStorage for persistence across page navigation
-     * Resolves the sessionDataPromise to signal that data is ready
-     */
-    static setSessionData(data) {
-        this.sessionData = data;
-        // Store in browser sessionStorage for persistence
-        if (data) {
-            try {
-                sessionStorage.setItem('pl_temp_checkin_data', JSON.stringify(data));
-                console.log('Session data set for pre-population and stored in sessionStorage:', data);
-            } catch (e) {
-                console.warn('Failed to store session data in sessionStorage:', e);
-            }
-        }
-        // Signal that session data has been processed
-        this.sessionDataPromise = Promise.resolve();
-    }
 
     /**
       * Creates the initial checkin cookie with complete structure
-      * Waits for session data to be available before creating the cookie
       * Returns a Promise that resolves when the cookie is successfully created
       */
     static async createInitialCheckin() {
-        // Wait for session data to be set (if any)
-        await this.sessionDataPromise;
-
         let initialCheckin = {
             ...DEFAULT_CHECKIN_STRUCTURE,
             date: new Date().toISOString(),
@@ -200,38 +174,44 @@ class CoreDataManager {
      * - Updates cookie with merged data
      * - Triggers cookie reactivity
      */
-    static mergeSessionDataIntoCookie(sessionData) {
-        try {
-            if (!sessionData || Object.keys(sessionData).length === 0) {
-                console.warn("No session data to merge");
-                return false;
-            }
+     static mergeSessionDataIntoCookie(sessionData) {
+         try {
+             if (!sessionData || Object.keys(sessionData).length === 0) {
+                 console.warn("No session data to merge");
+                 return false;
+             }
 
-            const currentData = this.getCheckinData();
-            if (!currentData) {
-                console.error("No current check-in data found to merge into");
-                return false;
-            }
+             const currentData = this.getCheckinData();
+             if (!currentData) {
+                 console.error("No current check-in data found to merge into");
+                 return false;
+             }
 
-            // Merge session data into current data
-            const mergedData = this.deepMerge(currentData, sessionData);
-            
-            // Preserve the editing mode flag if it was already set
-            if (currentData.editingMode && currentData.editingMode.enabled) {
-                mergedData.editingMode = currentData.editingMode;
-            }
+             // CRITICAL FIX #4: Preserve editing mode flag during merge
+             // Store the editing mode before merge so it's not lost
+             const existingEditingMode = currentData.editingMode ? 
+                 JSON.parse(JSON.stringify(currentData.editingMode)) : null;
 
-            // Update the cookie with merged data
-            const success = this.updateCheckinData(mergedData);
-            if (success) {
-                console.log("✅ Session data merged into cookie");
-            }
-            return success;
-        } catch (error) {
-            console.error("Error merging session data into cookie:", error);
-            return false;
-        }
-    }
+             // Merge session data into current data
+             const mergedData = this.deepMerge(currentData, sessionData);
+             
+             // CRITICAL FIX #4: Restore the editing mode flag after merge
+             // This ensures editing mode is not overwritten by session data
+             if (existingEditingMode) {
+                 mergedData.editingMode = existingEditingMode;
+             }
+
+             // Update the cookie with merged data
+             const success = this.updateCheckinData(mergedData);
+             if (success) {
+                 console.log("✅ Session data merged into cookie");
+             }
+             return success;
+         } catch (error) {
+             console.error("Error merging session data into cookie:", error);
+             return false;
+         }
+     }
 
     /**
      * Sets editing mode for the current check-in

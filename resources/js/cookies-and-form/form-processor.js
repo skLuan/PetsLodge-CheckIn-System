@@ -21,14 +21,17 @@ import config from "./config.js";
 
 const { FORM_CONFIG } = config;
 
-document.addEventListener("DOMContentLoaded", function () {
+document.addEventListener("DOMContentLoaded", async function () {
      // ========================================
      // PHASE 2.1: EDITING MODE INITIALIZATION
      // ========================================
-     // Extract editing mode flags from DOM attributes
+     // CRITICAL FIX #1: Extract editing mode flags BEFORE FormDataManager.initialize()
+     // This ensures editing mode is preserved during cookie initialization
+     
      const stepContainer = document.querySelector('[data-session-checkin]');
      let isEditingMode = false;
      let editingCheckInId = null;
+     let sessionData = null;
 
      if (stepContainer) {
          // Check for editing mode flags
@@ -38,7 +41,7 @@ document.addEventListener("DOMContentLoaded", function () {
          isEditingMode = editingModeAttr === 'true' || editingModeAttr === '1';
          editingCheckInId = editingCheckInIdAttr;
 
-         // Extract and merge session data from DOM data attribute (for editing existing check-ins)
+         // Extract session data from DOM data attribute (for editing existing check-ins)
          const sessionDataStr = stepContainer.getAttribute('data-session-checkin');
          if (sessionDataStr && sessionDataStr !== 'null' && sessionDataStr.trim() !== '') {
              try {
@@ -50,22 +53,27 @@ document.addEventListener("DOMContentLoaded", function () {
                      .replace(/&lt;/g, '<')
                      .replace(/&gt;/g, '>');
                  
-                 const sessionData = JSON.parse(decodedStr);
-                 if (sessionData && Object.keys(sessionData).length > 0) {
-                     // NEW: Merge session data into cookie (one-time operation)
-                     // This replaces the old CoreDataManager.setSessionData() approach
-                     FormDataManager.mergeSessionDataIntoCookie(sessionData);
-                     console.log('Session data merged into cookie for pre-population:', sessionData);
-
-                     // NEW: If in editing mode, enable editing mode tracking
-                     if (isEditingMode && editingCheckInId) {
-                         FormDataManager.setEditingMode(editingCheckInId, sessionData);
-                         console.log(`Editing mode enabled for check-in #${editingCheckInId}`);
-                     }
-                 }
+                 sessionData = JSON.parse(decodedStr);
              } catch (e) {
                  console.warn('Session data not available or invalid:', e.message);
              }
+         }
+     }
+
+     // CRITICAL FIX #1: Initialize FormDataManager FIRST (creates cookie if needed)
+     // This must happen before merging session data or setting editing mode
+     await FormDataManager.initialize();
+
+     // CRITICAL FIX #1: THEN merge session data and set editing mode
+     // This ensures editing mode is preserved after initialization
+     if (sessionData && Object.keys(sessionData).length > 0) {
+         FormDataManager.mergeSessionDataIntoCookie(sessionData);
+         console.log('Session data merged into cookie for pre-population:', sessionData);
+
+         // If in editing mode, enable editing mode tracking
+         if (isEditingMode && editingCheckInId) {
+             FormDataManager.setEditingMode(editingCheckInId, sessionData);
+             console.log(`✏️ Editing mode enabled for check-in #${editingCheckInId}`);
          }
      }
 
