@@ -101,6 +101,85 @@ class FormUpdater {
     }
 
     /**
+     * Update health information form fields with pre-population from cookie
+     *
+     * Populates health-related form elements including unusual behavior toggles,
+     * conditional detail fields, grooming checkboxes, and grooming notes.
+     * This method is called during UI updates to ensure form fields reflect
+     * the current state of the check-in data.
+     *
+     * @static
+     * @param {Array} pets - Array of pet objects
+     * @param {Object} grooming - Grooming service selections
+     * @param {string} groomingDetails - Additional grooming notes
+     * @returns {void}
+     *
+     * @sideEffects
+     * - Updates health form fields and conditional sections
+     * - Shows/hides grooming details based on selections
+     * - Manages form field visibility and state
+     */
+    static populateHealthInfoFromCookie(pets, grooming, groomingDetails) {
+        if (!pets || !Array.isArray(pets) || pets.length === 0) return;
+
+        // Get the currently selected pet
+        const currentPetIndex = this.getCurrentSelectedPetIndex();
+        if (currentPetIndex === null || !pets[currentPetIndex]) return;
+
+        const currentPet = pets[currentPetIndex];
+        
+        // Update unusual health behavior radio buttons
+        if (currentPet.health?.unusualHealthBehavior !== undefined) {
+            const healthBehaviorRadios = document.querySelectorAll('input[name="unusualHealthBehavior"]');
+            healthBehaviorRadios.forEach(radio => {
+                if (currentPet.health.unusualHealthBehavior && radio.value === 'yes') {
+                    radio.checked = true;
+                } else if (!currentPet.health.unusualHealthBehavior && radio.value === 'no') {
+                    radio.checked = true;
+                }
+            });
+        }
+
+        // Update health behavior details field
+        if (currentPet.health?.healthBehaviors) {
+            const detailsField = document.getElementById('healthBehaviorDetails') || document.querySelector('[name="healthBehaviorDetails"]');
+            if (detailsField) {
+                detailsField.value = currentPet.health.healthBehaviors;
+            }
+        }
+
+        // Update warnings field
+        if (currentPet.health?.warnings) {
+            const warningsField = document.getElementById('warnings') || document.querySelector('[name="warnings"]');
+            if (warningsField) {
+                warningsField.value = currentPet.health.warnings;
+            }
+        }
+
+        // Update grooming checkboxes
+        if (grooming && typeof grooming === 'object') {
+            Object.entries(grooming).forEach(([key, value]) => {
+                if (key !== 'appointmentDay' && key !== 'no') {
+                    const checkbox = document.querySelector(`input[name="grooming[]"][value="${key}"]`);
+                    if (checkbox) {
+                        checkbox.checked = value === true;
+                    }
+                }
+            });
+        }
+
+        // Update grooming details field
+        if (groomingDetails) {
+            const groomingDetailsField = document.getElementById('groomingDetails') || document.querySelector('[name="groomingDetails"]');
+            if (groomingDetailsField) {
+                groomingDetailsField.value = groomingDetails;
+            }
+        }
+
+        console.log("Populated health info form from cookie");
+    }
+
+    /**
      * Update pet form fields for a specific pet
      *
      * Populates the pet information form with data for the specified pet.
