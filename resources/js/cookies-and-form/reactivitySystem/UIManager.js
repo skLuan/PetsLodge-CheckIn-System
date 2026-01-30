@@ -5,6 +5,7 @@ import { InventoryManager } from "../managers/InventoryManager.js";
 import { UtilitiesManager } from "../managers/UtilitiesManager.js";
 import { NavigationManager } from "../managers/NavigationManager.js";
 import config from "../config.js";
+import Utils from "../../Utils.js";
 
 const { FORM_CONFIG } = config;
 
@@ -75,32 +76,44 @@ class UIManager {
     static updateUIFromCookieData(cookieData) {
         if (!cookieData) return;
 
-        console.log("🔄 Updating UI from cookie data (conservative mode)");
+        const currentStep = Utils.actualStep();
+        console.log("🔄 Updating UI from cookie data (conservative mode) - Step:", currentStep);
 
         try {
-            // Update owner info form globally
-            FormUpdater.updateOwnerInfoForm(cookieData.user?.info);
+            // STEP 0: Owner Info - Only update owner form
+            if (currentStep === FORM_CONFIG.STEPS.OWNER_INFO - 1) {
+                console.log("📝 Step 0 (Owner Info): Updating owner form only");
+                FormUpdater.updateOwnerInfoForm(cookieData.user?.info);
+            }
+            // STEP 1: Pet Info - Only update pet pills and pet form
+            else if (currentStep === FORM_CONFIG.STEPS.PET_INFO - 1) {
+                console.log("🐾 Step 1 (Pet Info): Updating pet pills and forms only");
+                this.updatePetPillsAndForms(cookieData.pets);
+            }
+            // STEP 2: Feeding/Medication - Only update feeding/medication displays
+            else if (currentStep === FORM_CONFIG.STEPS.FEEDING_MEDICATION - 1) {
+                console.log("🍽️ Step 2 (Feeding/Medication): Updating feeding/medication UI only");
+                this.updateFeedingMedicationUI(cookieData.pets);
+            }
+            // STEP 3: Health Info - Only update health info and grooming
+            else if (currentStep === FORM_CONFIG.STEPS.HEALTH_INFO - 1) {
+                console.log("🏥 Step 3 (Health Info): Updating health info and grooming only");
+                this.updateHealthInfoUI(cookieData.pets, cookieData.grooming, cookieData.groomingDetails);
+                this.updateGroomingAndInventoryUI(cookieData.grooming, cookieData.inventory, cookieData.groomingDetails);
+            }
+            // STEP 4: Inventory - Only update inventory UI
+            else if (currentStep === FORM_CONFIG.STEPS.INVENTORY - 1) {
+                console.log("📦 Step 4 (Inventory): Updating inventory UI only");
+                InventoryManager.updateInventoryUI(cookieData.inventory, cookieData.inventoryComplete);
+            }
+            // STEP 5: Thanks/Summary - Update summary
+            else if (currentStep === FORM_CONFIG.STEPS.THANKS - 1) {
+                console.log("✅ Step 5 (Thanks): Updating check-in summary only");
+                SummaryRenderer.updateCheckinSummary(cookieData);
+            }
 
-            // Update pet pills and forms
-            this.updatePetPillsAndForms(cookieData.pets);
-
-            // Update feeding/medication displays
-            this.updateFeedingMedicationUI(cookieData.pets);
-
-            // Update health info UI
-            this.updateHealthInfoUI(cookieData.pets, cookieData.grooming, cookieData.groomingDetails);
-
-            // Update inventory UI
-            InventoryManager.updateInventoryUI(cookieData.inventory, cookieData.inventoryComplete);
-
-            // Update same feeding checkbox visibility
+            // Always update same feeding checkbox visibility (multi-step relevant)
             this.updateSameFeedingCheckbox(cookieData.pets);
-
-            // Update grooming checkboxes
-            this.updateGroomingAndInventoryUI(cookieData.grooming, cookieData.inventory, cookieData.groomingDetails);
-
-            // Update check-in summary in THANKS step
-            SummaryRenderer.updateCheckinSummary(cookieData);
 
         } catch (error) {
             console.error("Error updating UI from cookie:", error);

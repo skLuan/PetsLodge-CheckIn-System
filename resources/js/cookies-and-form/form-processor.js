@@ -17,6 +17,7 @@ import {
 } from "./managers/index.js";
 import { CoreDataManager } from "./managers/CoreDataManager.js";
 import { FormDataManager } from "./FormDataManager.js";
+import { CheckInSummaryUpdater } from "./managers/CheckInSummaryUpdater.js";
 import config from "./config.js";
 
 const { FORM_CONFIG } = config;
@@ -95,6 +96,10 @@ document.addEventListener("DOMContentLoaded", async function () {
     PopupManager.initializeFeedingMedicationPopup();
     PopupManager.initializeGroomingPopup();
     PopupManager.initializeTermsPopup();
+
+    // Initialize check-in summary updater
+    // This ensures the summary component stays synchronized with cookie data
+    CheckInSummaryUpdater.initialize();
 
     // Initialize all form managers
     PetPillManager.addPetPillsToContainer();
