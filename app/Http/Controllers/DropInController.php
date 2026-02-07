@@ -135,6 +135,7 @@ class DropInController extends Controller
             // Llama a PrintNode via service
             $printService = new PrintNodeService();
             $response = $printService->sendPrintJob($pdfUri, $validated['info']);
+            // $response = $printService->getPrinters();
 
             // Respuesta JSON para frontend (éxito/error)
             if ($response['success']) {

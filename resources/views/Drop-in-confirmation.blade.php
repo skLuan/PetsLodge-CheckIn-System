@@ -89,6 +89,7 @@
                         if (response.ok && data.message) {
                             printLoading.classList.add('hidden');
                             printSuccess.classList.remove('hidden');
+                            console.log(data.printResponse);
                             
                             // Reset button after 3 seconds
                             setTimeout(() => {

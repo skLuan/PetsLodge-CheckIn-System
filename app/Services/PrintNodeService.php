@@ -70,7 +70,13 @@ class PrintNodeService
     {
         try {
             $response = $this->client->get('/printers');
-            return json_decode($response->getBody(), true);
+            $responseData = json_decode($response->getBody(), true);
+            
+            return [
+                'success' => true,
+                'message' => 'Printers fetched successfully',
+                'data' => $responseData,
+            ];
         } catch (GuzzleException $e) {
             return [
                 'success' => false,
