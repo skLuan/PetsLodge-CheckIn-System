@@ -18,6 +18,41 @@ class PopupManager {
         const popupForm = popup.querySelector("#feedingPopupForm");
         const popButtons = popup.querySelectorAll("button");
         const submitPopBtn = popup.querySelector("button[type='submit']");
+        const dayTimeCheckboxes = popup.querySelectorAll('input[name="day_time[]"]');
+        const typeRadios = popup.querySelectorAll('input[name="type"]');
+
+        // Handle day_time checkbox changes for visual feedback
+        dayTimeCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const label = this.closest('label');
+                const div = label.querySelector('.btn-day-time');
+                if (this.checked) {
+                    div.classList.remove('bg-gray-100', 'text-gray-700');
+                    div.classList.add('bg-blue-500', 'text-white');
+                } else {
+                    div.classList.remove('bg-blue-500', 'text-white');
+                    div.classList.add('bg-gray-100', 'text-gray-700');
+                }
+            });
+        });
+
+        // Handle type radio button changes for visual feedback
+        typeRadios.forEach(radio => {
+            radio.addEventListener('change', function() {
+                const label = this.closest('label');
+                const div = label.querySelector('div');
+                typeRadios.forEach(r => {
+                    const l = r.closest('label');
+                    const d = l.querySelector('div');
+                    d.classList.remove('bg-blue-500', 'text-white');
+                    d.classList.add('bg-gray-lightest', 'text-gray');
+                });
+                if (this.checked) {
+                    div.classList.remove('bg-gray-lightest', 'text-gray');
+                    div.classList.add('bg-blue-500', 'text-white');
+                }
+            });
+        });
 
         // Handle popup opening
         addFeedMedButtons.forEach((btn) => {
@@ -25,10 +60,12 @@ class PopupManager {
                 e.preventDefault();
                 const period = btn.getAttribute('data-period') || 'morning';
 
-                // Pre-select the time in the popup
-                const timeRadio = document.querySelector(`input[name="day_time"][value="${period}"]`);
-                if (timeRadio) {
-                    timeRadio.checked = true;
+                // Pre-select the time in the popup (checkbox instead of radio)
+                const timeCheckbox = document.querySelector(`input[name="day_time[]"][value="${period}"]`);
+                if (timeCheckbox) {
+                    timeCheckbox.checked = true;
+                    // Trigger change event to update visual feedback
+                    timeCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
                 }
 
                 if (popup) {
@@ -44,22 +81,16 @@ class PopupManager {
             console.log("Submit button clicked");
 
             const data = FormHandler.extractFormInputValues("#feedingPopupForm");
+            console.log("Extracted form data:", data);
 
-            // Validate required fields
-            if (!data.day_time || !data.type || !data.feeding_med_details?.trim()) {
-                alert("Please fill in all required fields");
+            // Validate required fields - day_time is now an array
+            if (!data.day_time || !Array.isArray(data.day_time) || data.day_time.length === 0 || !data.type || !data.feeding_med_details?.trim()) {
+                console.warn("Validation failed:", { day_time: data.day_time, type: data.type, details: data.feeding_med_details });
+                alert("Please select at least one time of day and fill in all required fields");
                 return;
             }
 
-            const itemData = {
-                day_time: data.day_time,
-                type: data.type,
-                feeding_med_details: data.feeding_med_details.trim()
-            };
-
-            console.log("Saving feeding/medication data:", itemData);
-
-            popupForm.reset();
+            console.log("Saving feeding/medication data for times:", data.day_time);
 
             // Get selected pet or first pet
             const selectedPill = document.querySelector(".pill.selected");
@@ -69,16 +100,45 @@ class PopupManager {
             const sameFeedingCheckbox = document.getElementById("sameFeedingForAll");
             const isSameFeedingForAll = sameFeedingCheckbox && sameFeedingCheckbox.checked && data.type === "food";
 
-            if (isSameFeedingForAll) {
-                // Add to all pets
-                const allPets = FormDataManager.getAllPetsFromCheckin();
-                allPets.forEach((_, index) => {
-                    FormDataManager.addPetFeedingOrMedication(index, "feeding", itemData);
-                });
-            } else {
-                // Add to selected pet
-                FormDataManager.addPetFeedingOrMedication(petIndex, data.type === "food" ? "feeding" : "medication", itemData);
-            }
+            // Create an entry for each selected time
+            data.day_time.forEach((time) => {
+                const itemData = {
+                    day_time: time,
+                    type: data.type,
+                    feeding_med_details: data.feeding_med_details.trim()
+                };
+
+                console.log("Creating entry for time:", time, "with data:", itemData);
+
+                if (isSameFeedingForAll) {
+                    // Add to all pets
+                    const allPets = FormDataManager.getAllPetsFromCheckin();
+                    allPets.forEach((_, index) => {
+                        FormDataManager.addPetFeedingOrMedication(index, "feeding", itemData);
+                    });
+                } else {
+                    // Add to selected pet
+                    FormDataManager.addPetFeedingOrMedication(petIndex, data.type === "food" ? "feeding" : "medication", itemData);
+                }
+            });
+
+            // Reset form after successful submission
+            popupForm.reset();
+            
+            // Reset visual feedback for all checkboxes and radios
+            dayTimeCheckboxes.forEach(checkbox => {
+                const label = checkbox.closest('label');
+                const div = label.querySelector('.btn-day-time');
+                div.classList.remove('bg-blue-500', 'text-white');
+                div.classList.add('bg-gray-100', 'text-gray-700');
+            });
+            
+            typeRadios.forEach(radio => {
+                const label = radio.closest('label');
+                const div = label.querySelector('div');
+                div.classList.remove('bg-blue-500', 'text-white');
+                div.classList.add('bg-gray-lightest', 'text-gray');
+            });
 
             // Close popup
             popup.classList.add("translate-y-[75vh]");

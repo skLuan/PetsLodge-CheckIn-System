@@ -31,7 +31,16 @@ class FormHandler {
 
         inputs.forEach((input) => {
             if (input.name) {
-                if (input.type === "checkbox") {
+                // Handle array-named inputs (e.g., day_time[])
+                if (input.name.endsWith('[]')) {
+                    const baseName = input.name.slice(0, -2); // Remove []
+                    if (!data[baseName]) {
+                        data[baseName] = [];
+                    }
+                    if (input.type === "checkbox" && input.checked) {
+                        data[baseName].push(input.value);
+                    }
+                } else if (input.type === "checkbox") {
                     data[input.name] = input.checked;
                 } else if (input.type === "radio") {
                     if (input.checked) {
