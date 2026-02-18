@@ -71,4 +71,13 @@
     .pill.selected {
         @apply !bg-yellow shadow;
     }
+
+    /* .container-day visibility controlled by JS */
+
+    #feedingMedicationPopup .active {
+        @apply bg-gray text-white shadow-inner;
+    }
+    #feedingMedicationPopup input[type="radio"]:checked + div {
+    @apply bg-gray text-white shadow-inner;
+}
 }

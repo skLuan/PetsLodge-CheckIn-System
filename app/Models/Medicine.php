@@ -9,7 +9,7 @@ class Medicine extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'description', 'check_in_id', 'moment_of_day_id'];
+    protected $fillable = ['name', 'description', 'check_in_id', 'moment_of_day_id', 'pet_id'];
 
     public function checkIn()
     {

@@ -1,6 +1,6 @@
 class Utils {
     static sanitizePhoneNumber(phone) {
-        return phone.replace(/\D/g, '');
+        return phone.replace(/\D/g, "");
     }
 
     static formatPhoneNumber(phone) {
@@ -18,6 +18,15 @@ class Utils {
             const step = urlParams.get("step");
             return parseInt(step) - 1;
         } else return 0;
+    }
+
+    static safeOperation(operation, fallback = null) {
+        try {
+            return operation();
+        } catch (error) {
+            console.error("Cookie operation failed:", error);
+            return fallback;
+        }
     }
 }
 

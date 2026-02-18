@@ -17,7 +17,8 @@ class Pet extends Model
         'gender_id',
         'kind_of_pet_id',
         'castrated_id',
-        'user_id'
+        'user_id',
+        'name',
     ];
 
     public function user()
