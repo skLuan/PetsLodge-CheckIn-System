@@ -4,13 +4,15 @@
     </x-slot>
     <x-slot name="header">
         <div class="flex flex-row gap-6 items-center">
-            <figure>
-                <picture><img height="48" width="48" src="/images/logo-pets-lodge.png" alt="Pets lodge Logo">
-                </picture>
-            </figure>
-            <h2 class="font-semibold text-xl text-white leading-tight">
-                {{ __('Pets Lodge') }}
-            </h2>
+            <a href="/" class="flex flex-row items-center gap-4">
+                <figure>
+                    <picture><img height="48" width="48" src="/images/logo-pets-lodge.png" alt="Pets lodge Logo">
+                    </picture>
+                </figure>
+                <h2 class="font-semibold text-xl text-white leading-tight">
+                    {{ __('Pets Lodge') }}
+                </h2>
+            </a>
         </div>
     </x-slot>
 
@@ -96,7 +98,7 @@
                                 <div class="flex justify-between items-center">
                                     <div>
                                         <h4 class="text-lg font-semibold">
-                                            Check-in #{{ $checkIn->id }} for:
+                                            Check-in ID# {{ str_pad($checkIn->id, 4, '0', STR_PAD_LEFT) }} for:
                                         </h4>
                                         <h2 class="text-xl font-bold text-green-dark">
                                             {{ $checkIn->pet->name ?? 'Unnamed Pet' }}
@@ -108,7 +110,7 @@
                                         </p>
                                     </div>
                                     <button type="button" onclick="editCheckIn({{ $checkIn->id }})"
-                                        class="bg-yellow-second hover:bg-yellow text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200">
+                                        class="edit-button bg-yellow-second hover:bg-yellow text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200">
                                         Edit
                                     </button>
                                 </div>
@@ -120,7 +122,7 @@
                                     <h4 class="font-semibold text-green-dark mb-3">🐾 Pet Information</h4>
                                     <div class="bg-gray-50 rounded-lg p-2">
                                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div>
+                                            <div class="">
                                                 <div class="text-sm text-gray-600 space-y-1">
                                                     @if ($checkIn->pet->race)
                                                         <div class="flex justify-between"><strong>Breed:</strong>
@@ -150,12 +152,12 @@
                                             @if ($checkIn->pet->health_conditions || $checkIn->pet->warnings)
                                                 <div>
                                                     <h6 class="font-semibold text-red-600 mb-2">Health Notes:</h6>
-                                                    <div class="text-sm text-gray-600">
+                                                    <div class="text-sm text-gray-600 ml-auto">
                                                         @if ($checkIn->pet->health_conditions)
-                                                            <div>⚠️ {{ $checkIn->pet->health_conditions }}</div>
+                                                            <p>⚠️ {{ $checkIn->pet->health_conditions }}</p>
                                                         @endif
                                                         @if ($checkIn->pet->warnings)
-                                                            <div>⚠️ {{ $checkIn->pet->warnings }}</div>
+                                                            <p>⚠️ {{ $checkIn->pet->warnings }}</p>
                                                         @endif
                                                     </div>
                                                 </div>
@@ -236,7 +238,7 @@
                                     <div class="mb-4">
                                         <h4 class="font-semibold text-green-dark mb-2">✂️ Grooming Services</h4>
                                         <div class="bg-purple-50 rounded-lg p-3">
-                                            <div class="flex flex-wrap gap-2">
+                                            <div class="flex flex-wrap gap-2 mb-3 justify-end">
                                                 @foreach ($checkIn->extraServices as $service)
                                                     <span
                                                         class="bg-purple-200 text-purple-800 px-3 py-1 rounded-full text-sm">
@@ -244,6 +246,25 @@
                                                     </span>
                                                 @endforeach
                                             </div>
+                                            
+                                            <!-- Grooming Appointment Day -->
+                                            @php
+                                                $appointmentDay = null;
+                                                foreach ($checkIn->extraServices as $service) {
+                                                    if ($service->pivot && $service->pivot->grooming_appointment_day) {
+                                                        $appointmentDay = $service->pivot->grooming_appointment_day;
+                                                        break;
+                                                    }
+                                                }
+                                            @endphp
+                                            
+                                            @if ($appointmentDay)
+                                                <div class="border-t border-purple-200 pt-3">
+                                                    <div class="text-sm">
+                                                        <strong>📅 Appointment Day:</strong> {{ $appointmentDay }}
+                                                    </div>
+                                                </div>
+                                            @endif
                                         </div>
                                     </div>
                                 @endif

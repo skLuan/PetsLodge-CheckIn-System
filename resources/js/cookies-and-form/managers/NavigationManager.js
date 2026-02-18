@@ -111,23 +111,39 @@ class NavigationManager {
                 const inventoryReady = hasItems || (!hasItems && isComplete);
                 const shouldEnable = inventoryReady;
 
+                console.log('🔍 [NavigationManager] Inventory step check:', {
+                    inventoryReady,
+                    groomingAcknowledged,
+                    termsAccepted,
+                    hasItems,
+                    isComplete
+                });
+
                 // Show grooming popup first if inventory is ready but grooming not acknowledged
                 if (inventoryReady && !groomingAcknowledged) {
+                    console.log('📢 [NavigationManager] Showing grooming popup');
                     setTimeout(() => {
                         const groomingPopup = document.getElementById('groomingPopup');
                         if (groomingPopup) {
+                            console.log('✅ [NavigationManager] Grooming popup found and showing');
                             groomingPopup.classList.remove('hidden');
+                        } else {
+                            console.error('❌ [NavigationManager] Grooming popup not found in DOM');
                         }
-                    }, 100); // Small delay
+                    }, 50); // Reduced delay for faster popup display
                 }
                 // Show terms popup only after grooming is acknowledged but terms not accepted
                 else if (inventoryReady && groomingAcknowledged && !termsAccepted) {
+                    console.log('📢 [NavigationManager] Showing terms popup');
                     setTimeout(() => {
                         const termsPopup = document.getElementById('termsConditionsPopup');
                         if (termsPopup) {
+                            console.log('✅ [NavigationManager] Terms popup found and showing');
                             termsPopup.classList.remove('hidden');
+                        } else {
+                            console.error('❌ [NavigationManager] Terms popup not found in DOM');
                         }
-                    }, 100); // Small delay
+                    }, 50); // Reduced delay for faster popup display
                 }
 
                 nextButton.disabled = !shouldEnable;
@@ -137,14 +153,15 @@ class NavigationManager {
                     nextButton.classList.remove('opacity-50', 'cursor-not-allowed');
                 }
             } else if (currentStep === FORM_CONFIG.STEPS.INVENTORY) { // Step 6 - Final step
-                // In final step, check grooming acknowledgment
+                // In final step, check grooming acknowledgment and terms acceptance
                 const checkinData = FormDataManager.getCheckinData();
                 const groomingAcknowledged = checkinData?.groomingAcknowledged;
+                const termsAccepted = checkinData?.termsAccepted;
 
-                // Update submit button state based on grooming acknowledgment
+                // Update submit button state based on grooming acknowledgment AND terms acceptance
                 const finalSubmitButton = document.querySelector("#finalSubmit");
                 if (finalSubmitButton) {
-                    finalSubmitButton.disabled = !groomingAcknowledged;
+                    finalSubmitButton.disabled = !groomingAcknowledged || !termsAccepted;
                     if (finalSubmitButton.disabled) {
                         finalSubmitButton.classList.add('opacity-50', 'cursor-not-allowed');
                     } else {

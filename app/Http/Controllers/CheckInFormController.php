@@ -77,31 +77,38 @@ class CheckInFormController extends Controller
         return view('view-check-in', compact('checkIns', 'user'));
     }
 
-    /**
-     * Prepare check-in data for editing
-     *
-     * @param Request $request
-     * @param int $checkInId
-     * @return \Illuminate\Http\RedirectResponse
-     */
-    public function editCheckIn(Request $request, $checkInId)
-    {
-        $checkIn = CheckIn::with([
-            'pet.gender',
-            'pet.kindOfPet',
-            'pet.castrated',
-            'user.emergencyContacts',
-            'foods.momentOfDay',
-            'medicines.momentOfDay',
-            'items',
-            'extraServices'
-        ])->findOrFail($checkInId);
-        $cookieData = $this->transformer->transformCheckInToCookieFormat($checkIn);
-        dd($cookieData);
+     /**
+      * Prepare check-in data for editing
+      *
+      * PHASE 2.2: Enhanced with editing mode flags for new data flow
+      *
+      * @param Request $request
+      * @param int $checkInId
+      * @return \Illuminate\Http\RedirectResponse
+      */
+     public function editCheckIn(Request $request, $checkInId)
+     {
+         $checkIn = CheckIn::with([
+             'pet.gender',
+             'pet.kindOfPet',
+             'pet.castrated',
+             'user.emergencyContacts',
+             'foods.momentOfDay',
+             'medicines.momentOfDay',
+             'items',
+             'extraServices'
+         ])->findOrFail($checkInId);
+         $cookieData = $this->transformer->transformCheckInToCookieFormat($checkIn);
+         //dd($cookieData);
 
-        // Store in session for pre-population
-        session(['checkin_data' => $cookieData]);
+         // PHASE 2.2: Store editing mode flags in session
+         // These will be extracted by form-processor.js and used to enable editing mode tracking
+         session([
+             'checkin_data' => $cookieData,
+             'editing_mode' => true,
+             'editing_check_in_id' => $checkInId
+         ]);
 
-        return redirect()->route('new-form-pre-filled', ['phone' => $checkIn->user->phone]);
-    }
+         return redirect()->route('new-form-pre-filled', ['phone' => $checkIn->user->phone]);
+     }
 }

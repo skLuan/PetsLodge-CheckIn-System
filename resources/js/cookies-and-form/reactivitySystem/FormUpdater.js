@@ -57,30 +57,38 @@ class FormUpdater {
         });
 
         // Update emergency contact fields
-        this.updateEmergencyContactFields();
+        this.updateEmergencyContactFields(userInfo);
     }
 
     /**
      * Update emergency contact form fields
      *
-     * Populates emergency contact fields with data from the current check-in cookie.
+     * Populates emergency contact fields with data from the provided user info or cookie.
      * Retrieves emergency contact information and updates the corresponding form fields.
      *
      * @static
+     * @param {Object} [userInfo] - Optional user information object containing emergency contact
      * @returns {void}
      *
      * @sideEffects
      * - Updates emergency contact name and phone fields
-     * - Retrieves data from current check-in cookie
+     * - Retrieves data from provided userInfo or current check-in cookie
      */
-    static updateEmergencyContactFields() {
+    static updateEmergencyContactFields(userInfo) {
         const emergencyFields = ['emergencyContactName', 'emergencyContactPhone'];
         emergencyFields.forEach(field => {
             const element = document.getElementById(field) || document.querySelector(`[name="${field}"]`);
             if (element) {
-                // Get emergency contact data from cookie
-                const checkinData = CoreDataManager.getCheckinData();
-                const emergencyData = checkinData?.user?.emergencyContact;
+                // Get emergency contact data from provided userInfo or cookie
+                let emergencyData = null;
+                
+                if (userInfo?.emergencyContact) {
+                    emergencyData = userInfo.emergencyContact;
+                } else {
+                    const checkinData = CoreDataManager.getCheckinData();
+                    emergencyData = checkinData?.user?.emergencyContact;
+                }
+                
                 if (emergencyData) {
                     if (field === 'emergencyContactName' && emergencyData.name) {
                         element.value = emergencyData.name;
@@ -90,6 +98,85 @@ class FormUpdater {
                 }
             }
         });
+    }
+
+    /**
+     * Update health information form fields with pre-population from cookie
+     *
+     * Populates health-related form elements including unusual behavior toggles,
+     * conditional detail fields, grooming checkboxes, and grooming notes.
+     * This method is called during UI updates to ensure form fields reflect
+     * the current state of the check-in data.
+     *
+     * @static
+     * @param {Array} pets - Array of pet objects
+     * @param {Object} grooming - Grooming service selections
+     * @param {string} groomingDetails - Additional grooming notes
+     * @returns {void}
+     *
+     * @sideEffects
+     * - Updates health form fields and conditional sections
+     * - Shows/hides grooming details based on selections
+     * - Manages form field visibility and state
+     */
+    static populateHealthInfoFromCookie(pets, grooming, groomingDetails) {
+        if (!pets || !Array.isArray(pets) || pets.length === 0) return;
+
+        // Get the currently selected pet
+        const currentPetIndex = this.getCurrentSelectedPetIndex();
+        if (currentPetIndex === null || !pets[currentPetIndex]) return;
+
+        const currentPet = pets[currentPetIndex];
+        
+        // Update unusual health behavior radio buttons
+        if (currentPet.health?.unusualHealthBehavior !== undefined) {
+            const healthBehaviorRadios = document.querySelectorAll('input[name="unusualHealthBehavior"]');
+            healthBehaviorRadios.forEach(radio => {
+                if (currentPet.health.unusualHealthBehavior && radio.value === 'yes') {
+                    radio.checked = true;
+                } else if (!currentPet.health.unusualHealthBehavior && radio.value === 'no') {
+                    radio.checked = true;
+                }
+            });
+        }
+
+        // Update health behavior details field
+        if (currentPet.health?.healthBehaviors) {
+            const detailsField = document.getElementById('healthBehaviorDetails') || document.querySelector('[name="healthBehaviorDetails"]');
+            if (detailsField) {
+                detailsField.value = currentPet.health.healthBehaviors;
+            }
+        }
+
+        // Update warnings field
+        if (currentPet.health?.warnings) {
+            const warningsField = document.getElementById('warnings') || document.querySelector('[name="warnings"]');
+            if (warningsField) {
+                warningsField.value = currentPet.health.warnings;
+            }
+        }
+
+        // Update grooming checkboxes
+        if (grooming && typeof grooming === 'object') {
+            Object.entries(grooming).forEach(([key, value]) => {
+                if (key !== 'appointmentDay' && key !== 'no') {
+                    const checkbox = document.querySelector(`input[name="grooming[]"][value="${key}"]`);
+                    if (checkbox) {
+                        checkbox.checked = value === true;
+                    }
+                }
+            });
+        }
+
+        // Update grooming details field
+        if (groomingDetails) {
+            const groomingDetailsField = document.getElementById('groomingDetails') || document.querySelector('[name="groomingDetails"]');
+            if (groomingDetailsField) {
+                groomingDetailsField.value = groomingDetails;
+            }
+        }
+
+        console.log("Populated health info form from cookie");
     }
 
     /**
@@ -154,8 +241,69 @@ class FormUpdater {
      * - Manages form field visibility and state
      */
     static updateHealthInfoForm(pets, grooming, groomingDetails) {
-        // Simplified implementation - can be expanded based on health form requirements
+        if (!pets || !Array.isArray(pets) || pets.length === 0) return;
+
+        // Get the currently selected pet
+        const currentPetIndex = this.getCurrentSelectedPetIndex();
+        if (currentPetIndex === null || !pets[currentPetIndex]) return;
+
+        const currentPet = pets[currentPetIndex];
+        
+        // Update unusual health behavior radio buttons
+        if (currentPet.health?.unusualHealthBehavior !== undefined) {
+            const healthBehaviorRadios = document.querySelectorAll('input[name="unusualHealthBehavior"]');
+            healthBehaviorRadios.forEach(radio => {
+                if (currentPet.health.unusualHealthBehavior && radio.value === 'yes') {
+                    radio.checked = true;
+                } else if (!currentPet.health.unusualHealthBehavior && radio.value === 'no') {
+                    radio.checked = true;
+                }
+            });
+        }
+
+        // Update health behavior details field
+        if (currentPet.health?.healthBehaviors) {
+            const detailsField = document.getElementById('healthBehaviorDetails') || document.querySelector('[name="healthBehaviorDetails"]');
+            if (detailsField) {
+                detailsField.value = currentPet.health.healthBehaviors;
+            }
+        }
+
+        // Update grooming checkboxes
+        if (grooming && typeof grooming === 'object') {
+            Object.entries(grooming).forEach(([key, value]) => {
+                if (key !== 'appointmentDay' && key !== 'no') {
+                    const checkbox = document.querySelector(`input[name="grooming[]"][value="${key}"]`);
+                    if (checkbox) {
+                        checkbox.checked = value === true;
+                    }
+                }
+            });
+        }
+
+        // Update grooming details field
+        if (groomingDetails) {
+            const groomingDetailsField = document.getElementById('groomingDetails') || document.querySelector('[name="groomingDetails"]');
+            if (groomingDetailsField) {
+                groomingDetailsField.value = groomingDetails;
+            }
+        }
+
         console.log("Update health info form");
+    }
+
+    /**
+     * Get the currently selected pet index
+     * @static
+     * @private
+     * @returns {number|null} Index of selected pet or null
+     */
+    static getCurrentSelectedPetIndex() {
+        const selectedPill = document.querySelector('.pill.selected');
+        if (selectedPill && selectedPill.dataset.index !== undefined) {
+            return parseInt(selectedPill.dataset.index, 10);
+        }
+        return null;
     }
 
     /**
@@ -174,7 +322,26 @@ class FormUpdater {
      * @see InventoryManager.updateInventoryUI
      */
     static updateGroomingAndInventoryForm(grooming, inventory, details) {
-        // Simplified implementation
+        // Update grooming checkboxes
+        if (grooming && typeof grooming === 'object') {
+            Object.entries(grooming).forEach(([key, value]) => {
+                if (key !== 'appointmentDay' && key !== 'no') {
+                    const checkbox = document.querySelector(`input[name="grooming[]"][value="${key}"]`);
+                    if (checkbox) {
+                        checkbox.checked = value === true;
+                    }
+                }
+            });
+        }
+
+        // Update grooming details field
+        if (details) {
+            const groomingDetailsField = document.getElementById('groomingDetails') || document.querySelector('[name="groomingDetails"]');
+            if (groomingDetailsField) {
+                groomingDetailsField.value = details;
+            }
+        }
+
         console.log("Update grooming and inventory form");
     }
 }

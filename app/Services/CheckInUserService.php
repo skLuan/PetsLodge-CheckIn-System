@@ -30,8 +30,8 @@ class CheckInUserService
             throw new \Exception('User phone is required');
         }
 
-        // Check if user with this email already exists
-        $user = User::where('email', $userInfo['email'] ?? null)->first();
+        // Check if user with this phone already exists
+        $user = User::where('phone', $userInfo['phone'] ?? null)->first();
 
         if ($user) {
             // Update existing user with new information
@@ -39,6 +39,9 @@ class CheckInUserService
                 'name' => $userInfo['name'] ?? $user->name,
                 'phone' => $userInfo['phone'],
                 'address' => $userInfo['address'] ?? $user->address,
+                'city' => $userInfo['city'] ?? $user->city,
+                'state' => $userInfo['state'] ?? $user->state,
+                'zip' => $userInfo['zip'] ?? $user->zip,
                 'role' => $user->role ?? 'CLIENT',
             ]);
         } else {
@@ -48,6 +51,9 @@ class CheckInUserService
                 'email' => $userInfo['email'] ?? '',
                 'phone' => $userInfo['phone'],
                 'address' => $userInfo['address'] ?? '',
+                'city' => $userInfo['city'] ?? '',
+                'state' => $userInfo['state'] ?? '',
+                'zip' => $userInfo['zip'] ?? '',
                 'password' => bcrypt('default_password'), // Should be changed later
                 'email_verified_at' => null,
                 'remember_token' => null,
@@ -72,8 +78,8 @@ class CheckInUserService
             throw new \Exception('User phone, name, and email are required');
         }
 
-        // Check if user with this email already exists
-        $user = User::where('email', $userInfo['email'])->first();
+        // Check if user with this phone already exists
+        $user = User::where('phone', $userInfo['phone'])->first();
 
         if ($user) {
             // Update existing user with new information
@@ -81,6 +87,9 @@ class CheckInUserService
                 'name' => $userInfo['name'],
                 'phone' => $userInfo['phone'],
                 'address' => $userInfo['address'] ?? $user->address,
+                'city' => $userInfo['city'] ?? $user->city,
+                'state' => $userInfo['state'] ?? $user->state,
+                'zip' => $userInfo['zip'] ?? $user->zip,
                 'role' => $user->role ?? 'CLIENT', // Preserve existing role or set to CLIENT
             ]);
         } else {
@@ -90,6 +99,9 @@ class CheckInUserService
                 'email' => $userInfo['email'],
                 'phone' => $userInfo['phone'],
                 'address' => $userInfo['address'] ?? '',
+                'city' => $userInfo['city'] ?? '',
+                'state' => $userInfo['state'] ?? '',
+                'zip' => $userInfo['zip'] ?? '',
                 'password' => bcrypt('default_password'), // Should be changed later
                 'email_verified_at' => null,
                 'remember_token' => null,

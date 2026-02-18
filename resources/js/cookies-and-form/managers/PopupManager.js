@@ -18,6 +18,41 @@ class PopupManager {
         const popupForm = popup.querySelector("#feedingPopupForm");
         const popButtons = popup.querySelectorAll("button");
         const submitPopBtn = popup.querySelector("button[type='submit']");
+        const dayTimeCheckboxes = popup.querySelectorAll('input[name="day_time[]"]');
+        const typeRadios = popup.querySelectorAll('input[name="type"]');
+
+        // Handle day_time checkbox changes for visual feedback
+        dayTimeCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const label = this.closest('label');
+                const div = label.querySelector('.btn-day-time');
+                if (this.checked) {
+                    div.classList.remove('bg-gray-100', 'text-gray-700');
+                    div.classList.add('bg-blue-500', 'text-white');
+                } else {
+                    div.classList.remove('bg-blue-500', 'text-white');
+                    div.classList.add('bg-gray-100', 'text-gray-700');
+                }
+            });
+        });
+
+        // Handle type radio button changes for visual feedback
+        typeRadios.forEach(radio => {
+            radio.addEventListener('change', function() {
+                const label = this.closest('label');
+                const div = label.querySelector('div');
+                typeRadios.forEach(r => {
+                    const l = r.closest('label');
+                    const d = l.querySelector('div');
+                    d.classList.remove('bg-blue-500', 'text-white');
+                    d.classList.add('bg-gray-lightest', 'text-gray');
+                });
+                if (this.checked) {
+                    div.classList.remove('bg-gray-lightest', 'text-gray');
+                    div.classList.add('bg-blue-500', 'text-white');
+                }
+            });
+        });
 
         // Handle popup opening
         addFeedMedButtons.forEach((btn) => {
@@ -25,10 +60,12 @@ class PopupManager {
                 e.preventDefault();
                 const period = btn.getAttribute('data-period') || 'morning';
 
-                // Pre-select the time in the popup
-                const timeRadio = document.querySelector(`input[name="day_time"][value="${period}"]`);
-                if (timeRadio) {
-                    timeRadio.checked = true;
+                // Pre-select the time in the popup (checkbox instead of radio)
+                const timeCheckbox = document.querySelector(`input[name="day_time[]"][value="${period}"]`);
+                if (timeCheckbox) {
+                    timeCheckbox.checked = true;
+                    // Trigger change event to update visual feedback
+                    timeCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
                 }
 
                 if (popup) {
@@ -44,22 +81,16 @@ class PopupManager {
             console.log("Submit button clicked");
 
             const data = FormHandler.extractFormInputValues("#feedingPopupForm");
+            console.log("Extracted form data:", data);
 
-            // Validate required fields
-            if (!data.day_time || !data.type || !data.feeding_med_details?.trim()) {
-                alert("Please fill in all required fields");
+            // Validate required fields - day_time is now an array
+            if (!data.day_time || !Array.isArray(data.day_time) || data.day_time.length === 0 || !data.type || !data.feeding_med_details?.trim()) {
+                console.warn("Validation failed:", { day_time: data.day_time, type: data.type, details: data.feeding_med_details });
+                alert("Please select at least one time of day and fill in all required fields");
                 return;
             }
 
-            const itemData = {
-                day_time: data.day_time,
-                type: data.type,
-                feeding_med_details: data.feeding_med_details.trim()
-            };
-
-            console.log("Saving feeding/medication data:", itemData);
-
-            popupForm.reset();
+            console.log("Saving feeding/medication data for times:", data.day_time);
 
             // Get selected pet or first pet
             const selectedPill = document.querySelector(".pill.selected");
@@ -69,16 +100,45 @@ class PopupManager {
             const sameFeedingCheckbox = document.getElementById("sameFeedingForAll");
             const isSameFeedingForAll = sameFeedingCheckbox && sameFeedingCheckbox.checked && data.type === "food";
 
-            if (isSameFeedingForAll) {
-                // Add to all pets
-                const allPets = FormDataManager.getAllPetsFromCheckin();
-                allPets.forEach((_, index) => {
-                    FormDataManager.addPetFeedingOrMedication(index, "feeding", itemData);
-                });
-            } else {
-                // Add to selected pet
-                FormDataManager.addPetFeedingOrMedication(petIndex, data.type === "food" ? "feeding" : "medication", itemData);
-            }
+            // Create an entry for each selected time
+            data.day_time.forEach((time) => {
+                const itemData = {
+                    day_time: time,
+                    type: data.type,
+                    feeding_med_details: data.feeding_med_details.trim()
+                };
+
+                console.log("Creating entry for time:", time, "with data:", itemData);
+
+                if (isSameFeedingForAll) {
+                    // Add to all pets
+                    const allPets = FormDataManager.getAllPetsFromCheckin();
+                    allPets.forEach((_, index) => {
+                        FormDataManager.addPetFeedingOrMedication(index, "feeding", itemData);
+                    });
+                } else {
+                    // Add to selected pet
+                    FormDataManager.addPetFeedingOrMedication(petIndex, data.type === "food" ? "feeding" : "medication", itemData);
+                }
+            });
+
+            // Reset form after successful submission
+            popupForm.reset();
+            
+            // Reset visual feedback for all checkboxes and radios
+            dayTimeCheckboxes.forEach(checkbox => {
+                const label = checkbox.closest('label');
+                const div = label.querySelector('.btn-day-time');
+                div.classList.remove('bg-blue-500', 'text-white');
+                div.classList.add('bg-gray-100', 'text-gray-700');
+            });
+            
+            typeRadios.forEach(radio => {
+                const label = radio.closest('label');
+                const div = label.querySelector('div');
+                div.classList.remove('bg-blue-500', 'text-white');
+                div.classList.add('bg-gray-lightest', 'text-gray');
+            });
 
             // Close popup
             popup.classList.add("translate-y-[75vh]");
@@ -116,7 +176,11 @@ class PopupManager {
      */
     static initializeGroomingPopup() {
         const groomingPopup = document.getElementById('groomingPopup');
-        if (!groomingPopup) return;
+        console.log('🔧 [PopupManager] Initializing grooming popup:', groomingPopup ? 'FOUND' : 'NOT FOUND');
+        if (!groomingPopup) {
+            console.error('❌ [PopupManager] Grooming popup element not found in DOM');
+            return;
+        }
 
         const groomingCheckboxes = groomingPopup.querySelectorAll('input[name="groomingOptions[]"]');
         const groomingNotesTextarea = document.getElementById('groomingNotes');
@@ -148,52 +212,89 @@ class PopupManager {
                 );
 
                 const notesContainer = groomingPopup.querySelector('.conditional-grooming-notes-popup');
+                const appointmentContainer = groomingPopup.querySelector('.conditional-grooming-appointment-popup');
+                
                 if (hasGroomingSelected) {
                     notesContainer.style.display = '';
+                    appointmentContainer.style.display = '';
                 } else {
                     notesContainer.style.display = 'none';
+                    appointmentContainer.style.display = 'none';
                     // Clear the notes field
                     if (groomingNotesTextarea) {
                         groomingNotesTextarea.value = '';
                     }
+                    // Clear the appointment day selection
+                    const appointmentRadios = groomingPopup.querySelectorAll('input[name="groomingAppointmentDay"]');
+                    appointmentRadios.forEach(radio => {
+                        radio.checked = false;
+                    });
                 }
             });
         });
 
         // Handle confirm button
-        if (confirmGroomingBtn) {
-            confirmGroomingBtn.addEventListener('click', function() {
-                // Collect grooming data
-                const groomingData = {};
-                groomingCheckboxes.forEach(checkbox => {
-                    groomingData[checkbox.value] = checkbox.checked;
-                });
+         if (confirmGroomingBtn) {
+             confirmGroomingBtn.addEventListener('click', function() {
+                 // Check if any grooming service is selected
+                 const hasGroomingSelected = Array.from(groomingCheckboxes).some(cb =>
+                     cb.checked && cb.value !== 'no'
+                 );
 
-                const groomingNotes = groomingNotesTextarea ? groomingNotesTextarea.value.trim() : '';
+                 // If grooming is selected, validate that appointment day is selected
+                 if (hasGroomingSelected) {
+                     const appointmentRadios = groomingPopup.querySelectorAll('input[name="groomingAppointmentDay"]');
+                     const appointmentDaySelected = Array.from(appointmentRadios).some(radio => radio.checked);
+                     
+                     if (!appointmentDaySelected) {
+                         alert('Please select a preferred appointment day for grooming services');
+                         return;
+                     }
+                 }
 
-                // Save to FormDataManager
-                FormDataManager.updateCheckinData({
-                    grooming: groomingData,
-                    groomingDetails: groomingNotes,
-                    groomingAcknowledged: true // Mark as acknowledged
-                });
+                 // Collect grooming data
+                 const groomingData = {};
+                 groomingCheckboxes.forEach(checkbox => {
+                     groomingData[checkbox.value] = checkbox.checked;
+                 });
 
-                // Update grooming summary in the receipt section
-                PopupManager.updateGroomingSummary();
+                 // Get selected appointment day if grooming is selected
+                 if (hasGroomingSelected) {
+                     const appointmentRadios = groomingPopup.querySelectorAll('input[name="groomingAppointmentDay"]');
+                     const selectedAppointment = Array.from(appointmentRadios).find(radio => radio.checked);
+                     if (selectedAppointment) {
+                         groomingData.appointmentDay = selectedAppointment.value;
+                     }
+                 }
 
-                // Hide grooming popup
-                groomingPopup.classList.add('hidden');
+                 const groomingNotes = groomingNotesTextarea ? groomingNotesTextarea.value.trim() : '';
 
-                // Show terms popup after grooming confirmation (but only if not already accepted)
-                const checkinData = FormDataManager.getCheckinData();
-                if (!checkinData?.termsAccepted) {
-                    const termsPopup = document.getElementById('termsConditionsPopup');
-                    if (termsPopup) {
-                        termsPopup.classList.remove('hidden');
-                    }
-                }
-            });
-        }
+                 // Save to FormDataManager
+                 FormDataManager.updateCheckinData({
+                     grooming: groomingData,
+                     groomingDetails: groomingNotes,
+                     groomingAcknowledged: true // Mark as acknowledged
+                 });
+
+                 // Update grooming summary in the receipt section
+                 PopupManager.updateGroomingSummary();
+
+                 // Hide grooming popup
+                 groomingPopup.classList.add('hidden');
+
+                 // Show terms popup after grooming confirmation (but only if not already accepted)
+                 // Use a small delay to ensure popup is properly rendered
+                 const checkinData = FormDataManager.getCheckinData();
+                 if (!checkinData?.termsAccepted) {
+                     setTimeout(() => {
+                         const termsPopup = document.getElementById('termsConditionsPopup');
+                         if (termsPopup) {
+                             termsPopup.classList.remove('hidden');
+                         }
+                     }, 50);
+                 }
+             });
+         }
 
         // Handle close button - allow closing without acknowledgment
         if (closeGroomingPopupBtn) {
@@ -226,13 +327,26 @@ class PopupManager {
                         groomingNotesTextarea.value = checkinData.groomingDetails;
                     }
 
-                    // Show/hide notes container based on selections
+                    // Pre-populate appointment day
+                    if (checkinData.grooming.appointmentDay) {
+                        const appointmentRadios = groomingPopup.querySelectorAll('input[name="groomingAppointmentDay"]');
+                        const selectedRadio = Array.from(appointmentRadios).find(radio => radio.value === checkinData.grooming.appointmentDay);
+                        if (selectedRadio) {
+                            selectedRadio.checked = true;
+                        }
+                    }
+
+                    // Show/hide notes and appointment containers based on selections
                     const hasGroomingSelected = Array.from(groomingCheckboxes).some(cb =>
                         cb.checked && cb.value !== 'no'
                     );
                     const notesContainer = groomingPopup.querySelector('.conditional-grooming-notes-popup');
+                    const appointmentContainer = groomingPopup.querySelector('.conditional-grooming-appointment-popup');
                     if (notesContainer) {
                         notesContainer.style.display = hasGroomingSelected ? '' : 'none';
+                    }
+                    if (appointmentContainer) {
+                        appointmentContainer.style.display = hasGroomingSelected ? '' : 'none';
                     }
                 }
 
@@ -258,11 +372,16 @@ class PopupManager {
 
         // Build summary of selected grooming options
         const selectedServices = Object.entries(checkinData.grooming)
-            .filter(([key, value]) => value && key !== 'no')
+            .filter(([key, value]) => value && key !== 'no' && key !== 'appointmentDay')
             .map(([key]) => key.charAt(0).toUpperCase() + key.slice(1));
 
         if (selectedServices.length > 0) {
             summaryHTML += `<div class="font-semibold text-green-800 mb-1">🛁 Grooming Services: ${selectedServices.join(', ')}</div>`;
+            
+            // Add appointment day if grooming services are selected
+            if (checkinData.grooming.appointmentDay) {
+                summaryHTML += `<div class="pl-4 text-sm">📅 Appointment Day: ${checkinData.grooming.appointmentDay}</div>`;
+            }
         } else {
             summaryHTML += `<div class="font-semibold text-gray-600 mb-1">No grooming services selected</div>`;
         }
@@ -284,7 +403,11 @@ class PopupManager {
      */
     static initializeTermsPopup() {
         const termsPopup = document.getElementById('termsConditionsPopup');
-        if (!termsPopup) return;
+        console.log('🔧 [PopupManager] Initializing terms popup:', termsPopup ? 'FOUND' : 'NOT FOUND');
+        if (!termsPopup) {
+            console.error('❌ [PopupManager] Terms popup element not found in DOM');
+            return;
+        }
 
         const termsContent = document.getElementById('termsContent');
         const termsAcceptedCheckbox = document.getElementById('termsAccepted');
@@ -308,12 +431,22 @@ class PopupManager {
             termsAcceptedCheckbox.addEventListener('change', function() {
                 if (this.checked) {
                     FormDataManager.setTermsAccepted(true);
+                    // Update the finalTermsAccepted checkbox in the receipt section
+                    const finalTermsCheckbox = document.getElementById('finalTermsAccepted');
+                    if (finalTermsCheckbox) {
+                        finalTermsCheckbox.checked = true;
+                    }
                     // Show continue button
                     if (continueButton) {
                         continueButton.classList.remove('hidden');
                     }
                 } else {
                     FormDataManager.setTermsAccepted(false);
+                    // Update the finalTermsAccepted checkbox in the receipt section
+                    const finalTermsCheckbox = document.getElementById('finalTermsAccepted');
+                    if (finalTermsCheckbox) {
+                        finalTermsCheckbox.checked = false;
+                    }
                     // Hide continue button
                     if (continueButton) {
                         continueButton.classList.add('hidden');
@@ -332,12 +465,22 @@ class PopupManager {
             if (termsAcceptedCheckbox) {
                 termsAcceptedCheckbox.checked = true;
             }
+            // Also update the finalTermsAccepted checkbox in the receipt section
+            const finalTermsCheckbox = document.getElementById('finalTermsAccepted');
+            if (finalTermsCheckbox) {
+                finalTermsCheckbox.checked = true;
+            }
         } else {
             if (continueButton) {
                 continueButton.classList.add('hidden');
             }
             if (termsAcceptedCheckbox) {
                 termsAcceptedCheckbox.checked = false;
+            }
+            // Also update the finalTermsAccepted checkbox in the receipt section
+            const finalTermsCheckbox = document.getElementById('finalTermsAccepted');
+            if (finalTermsCheckbox) {
+                finalTermsCheckbox.checked = false;
             }
         }
 
@@ -394,6 +537,34 @@ class PopupManager {
                 
                 if (continueButton) {
                     continueButton.classList.add('hidden');
+                }
+            });
+        }
+
+        // Handle finalTermsAccepted checkbox from receipt section
+        const finalTermsCheckbox = document.getElementById('finalTermsAccepted');
+        if (finalTermsCheckbox) {
+            finalTermsCheckbox.addEventListener('change', function() {
+                if (this.checked) {
+                    FormDataManager.setTermsAccepted(true);
+                    // Update the popup checkbox as well
+                    if (termsAcceptedCheckbox) {
+                        termsAcceptedCheckbox.checked = true;
+                    }
+                    // Show continue button in popup
+                    if (continueButton) {
+                        continueButton.classList.remove('hidden');
+                    }
+                } else {
+                    FormDataManager.setTermsAccepted(false);
+                    // Update the popup checkbox as well
+                    if (termsAcceptedCheckbox) {
+                        termsAcceptedCheckbox.checked = false;
+                    }
+                    // Hide continue button in popup
+                    if (continueButton) {
+                        continueButton.classList.add('hidden');
+                    }
                 }
             });
         }

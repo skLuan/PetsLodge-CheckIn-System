@@ -5,6 +5,7 @@ import { InventoryManager } from "../managers/InventoryManager.js";
 import { UtilitiesManager } from "../managers/UtilitiesManager.js";
 import { NavigationManager } from "../managers/NavigationManager.js";
 import config from "../config.js";
+import Utils from "../../Utils.js";
 
 const { FORM_CONFIG } = config;
 
@@ -72,35 +73,49 @@ class UIManager {
      * - Preserves user input in active form fields
      * - Logs update operations to console for debugging
      */
-    static updateUIFromCookieData(cookieData) {
+    static updateUIFromCookieData(cookieData) {        
         if (!cookieData) return;
 
-        console.log("🔄 Updating UI from cookie data (conservative mode)");
+        const currentStep = Utils.actualStep();
+        console.log("🔄 Updating UI from cookie data (conservative mode) - Step:", currentStep);
 
         try {
-            // Update owner info form globally
-            FormUpdater.updateOwnerInfoForm(cookieData.user?.info);
+            // STEP 0: Owner Info - Only update owner form
+            if (currentStep === FORM_CONFIG.STEPS.OWNER_INFO - 1) {
+                console.log("📝 Step 0 (Owner Info): Updating owner form only");
+                FormUpdater.updateOwnerInfoForm(cookieData.user?.info);
+            }
+            // STEP 1: Pet Info - Only update pet pills and pet form
+            else if (currentStep === FORM_CONFIG.STEPS.PET_INFO - 1) {
+                console.log("🐾 Step 1 (Pet Info): Updating pet pills and forms only");
+                this.updatePetPillsAndForms(cookieData.pets);
+            }
+            // STEP 2: Feeding/Medication - Only update feeding/medication displays
+            else if (currentStep === FORM_CONFIG.STEPS.FEEDING_MEDICATION - 1) {
+                console.log("🍽️ Step 2 (Feeding/Medication): Updating feeding/medication UI only");
+                this.updateFeedingMedicationUI(cookieData.pets);
+            }
+            // STEP 3: Health Info - Only update health info and grooming
+            else if (currentStep === FORM_CONFIG.STEPS.HEALTH_INFO - 1) {
+                console.log("🏥 Step 3 (Health Info): Updating health info and grooming only");
+                this.updateHealthInfoUI(cookieData.pets, cookieData.grooming, cookieData.groomingDetails);
+                this.updateGroomingAndInventoryUI(cookieData.grooming, cookieData.inventory, cookieData.groomingDetails);
+                // Pre-populate grooming popup if it's open
+                this.populateGroomingPopupFromCookie(cookieData.grooming, cookieData.groomingDetails);
+            }
+            // STEP 4: Inventory - Only update inventory UI
+            else if (currentStep === FORM_CONFIG.STEPS.INVENTORY - 1) {
+                console.log("📦 Step 4 (Inventory): Updating inventory UI only");
+                InventoryManager.updateInventoryUI(cookieData.inventory, cookieData.inventoryComplete);
+            }
+            // STEP 5: Thanks/Summary - Update summary
+            else if (currentStep === FORM_CONFIG.STEPS.THANKS - 1) {
+                console.log("✅ Step 5 (Thanks): Updating check-in summary only");
+                SummaryRenderer.updateCheckinSummary(cookieData);
+            }
 
-            // Update pet pills and forms
-            this.updatePetPillsAndForms(cookieData.pets);
-
-            // Update feeding/medication displays
-            this.updateFeedingMedicationUI(cookieData.pets);
-
-            // Update health info UI
-            this.updateHealthInfoUI(cookieData.pets, cookieData.grooming, cookieData.groomingDetails);
-
-            // Update inventory UI
-            InventoryManager.updateInventoryUI(cookieData.inventory, cookieData.inventoryComplete);
-
-            // Update same feeding checkbox visibility
+            // Always update same feeding checkbox visibility (multi-step relevant)
             this.updateSameFeedingCheckbox(cookieData.pets);
-
-            // Update grooming checkboxes
-            this.updateGroomingAndInventoryUI(cookieData.grooming, cookieData.inventory, cookieData.groomingDetails);
-
-            // Update check-in summary in THANKS step
-            SummaryRenderer.updateCheckinSummary(cookieData);
 
         } catch (error) {
             console.error("Error updating UI from cookie:", error);
@@ -362,6 +377,57 @@ class UIManager {
      */
     static getCurrentStep() {
         return NavigationManager.getCurrentStep();
+    }
+
+    /**
+     * Populate grooming popup fields from cookie data
+     *
+     * Pre-populates the grooming popup with data from the check-in cookie
+     * when the popup is opened or when cookie data changes.
+     *
+     * @static
+     * @param {Object} grooming - Grooming service selections from cookie
+     * @param {string} groomingDetails - Grooming notes from cookie
+     * @returns {void}
+     *
+     * @sideEffects
+     * - Updates grooming popup form fields with cookie data
+     * - Checks/unchecks grooming checkboxes
+     * - Populates grooming notes textarea
+     * - Selects appointment day radio button
+     */
+    static populateGroomingPopupFromCookie(grooming, groomingDetails) {
+        const groomingPopup = document.getElementById('groomingPopup');
+        if (!groomingPopup || groomingPopup.classList.contains('hidden')) {
+            return; // Only populate if popup is visible
+        }
+
+        if (!grooming || typeof grooming !== 'object') {
+            return;
+        }
+
+        // Pre-populate checkboxes
+        const groomingCheckboxes = groomingPopup.querySelectorAll('input[name="groomingOptions[]"]');
+        groomingCheckboxes.forEach(checkbox => {
+            checkbox.checked = grooming[checkbox.value] || false;
+        });
+
+        // Pre-populate notes
+        const groomingNotesTextarea = document.getElementById('groomingNotes');
+        if (groomingNotesTextarea && groomingDetails) {
+            groomingNotesTextarea.value = groomingDetails;
+        }
+
+        // Pre-populate appointment day
+        if (grooming.appointmentDay) {
+            const appointmentRadios = groomingPopup.querySelectorAll('input[name="groomingAppointmentDay"]');
+            const selectedRadio = Array.from(appointmentRadios).find(radio => radio.value === grooming.appointmentDay);
+            if (selectedRadio) {
+                selectedRadio.checked = true;
+            }
+        }
+
+        console.log("Populated grooming popup from cookie");
     }
 }
 

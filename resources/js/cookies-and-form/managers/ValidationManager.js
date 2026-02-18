@@ -71,16 +71,39 @@ class ValidationManager {
                 const checkinData = CoreDataManager.getCheckinData();
                 const hasItems = checkinData?.inventory?.length > 0;
                 const isComplete = checkinData?.inventoryComplete;
+                const groomingAcknowledged = checkinData?.groomingAcknowledged;
                 const termsAccepted = checkinData?.termsAccepted;
+
+                console.log('🔍 [ValidationManager] Inventory step validation:', {
+                    hasItems,
+                    isComplete,
+                    groomingAcknowledged,
+                    termsAccepted
+                });
 
                 if (!hasItems && !isComplete) {
                     alert('Please add inventory items or confirm you are not leaving anything in inventory.');
                     return false;
                 }
 
+                // Show grooming popup first if not acknowledged
+                if (!groomingAcknowledged) {
+                    console.log('📢 [ValidationManager] Showing grooming popup');
+                    setTimeout(() => {
+                        const groomingPopup = document.getElementById('groomingPopup');
+                        if (groomingPopup) {
+                            groomingPopup.classList.remove('hidden');
+                        }
+                    }, 50);
+                    return false;
+                }
+
+                // Show terms popup only after grooming is acknowledged
                 if (!termsAccepted) {
-                    // Show terms popup if not accepted yet
-                    this.showTermsPopup();
+                    console.log('📢 [ValidationManager] Showing terms popup');
+                    setTimeout(() => {
+                        this.showTermsPopup();
+                    }, 50);
                     return false;
                 }
 

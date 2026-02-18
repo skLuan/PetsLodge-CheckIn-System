@@ -82,12 +82,20 @@ class CheckInService
 
         foreach ($checkIns as $checkIn) {
             foreach ($groomingData as $service => $enabled) {
-                if ($enabled) {
-                    $extraService = ExtraService::firstOrCreate(['name' => $service]);
-
-                    // Attach service to check-in (using pivot table)
-                    $checkIn->extraServices()->syncWithoutDetaching([$extraService->id]);
+                // Skip non-service keys like 'appointmentDay'
+                if ($service === 'appointmentDay' || !$enabled) {
+                    continue;
                 }
+
+                $extraService = ExtraService::firstOrCreate(['name' => $service]);
+
+                // Get the appointment day if it exists
+                $appointmentDay = $groomingData['appointmentDay'] ?? null;
+
+                // Attach service to check-in with appointment day in pivot table
+                $checkIn->extraServices()->syncWithoutDetaching([
+                    $extraService->id => ['grooming_appointment_day' => $appointmentDay]
+                ]);
             }
         }
     }

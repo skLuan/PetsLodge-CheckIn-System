@@ -34,6 +34,7 @@ const TIME_SLOTS = {
 
 const DEFAULT_CHECKIN_STRUCTURE = {
     date: "",
+    id: "",
     user: {
         info: {
             phone: "",
@@ -53,9 +54,25 @@ const DEFAULT_CHECKIN_STRUCTURE = {
         bath: false,
         nails: false,
         grooming: false,
+        appointmentDay: "",
     },
     groomingDetails: "",
     inventory: [],
+    inventoryComplete: false,
+    termsAccepted: false,
+    lastUpdated: "",
+    /**
+     * Editing mode flag - indicates whether this check-in is being edited
+     * @type {Object}
+     * @property {boolean} enabled - true when editing existing check-in
+     * @property {number|null} checkInId - ID of check-in being edited
+     * @property {Object|null} originalData - Snapshot of data at edit start
+     */
+    editingMode: {
+        enabled: false,
+        checkInId: null,
+        originalData: null,
+    },
 };
 
 const DEFAULT_PET_STRUCTURE = {

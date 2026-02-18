@@ -13,6 +13,8 @@ class ExtraService extends Model
 
     public function checkIns()
     {
-        return $this->belongsToMany(CheckIn::class, 'check_in_extra_service');
+        return $this->belongsToMany(CheckIn::class, 'check_in_extra_service')
+            ->withPivot('grooming_appointment_day')
+            ->withTimestamps();
     }
 }
