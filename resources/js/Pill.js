@@ -1,4 +1,4 @@
-import CookieHandler from "./CookieHandler.js";
+import { FormDataManager } from "./cookies-and-form/FormDataManager.js";
 class Pill {
     constructor(name, type, index) {
         this.name = name;
@@ -69,8 +69,7 @@ class Pill {
         });
         this.pillElement.classList.add("selected");
         // Populate form with this pet's data
-        const petData =
-            CookieHandler.getFormDataFromCookies(2)[`pet${this.index}`];
+        const petData = FormDataManager.getAllPetsFromCheckin()[this.index];
         if (petData) {
             Object.entries(petData).forEach(([key, value]) => {
                 const input = document.querySelector(`[name="${key}"]`);
@@ -95,27 +94,9 @@ class Pill {
      * @param {number} index - The pet index to remove.
      */
     removePet(index) {
-        let existingData = CookieHandler.getFormDataFromCookies(2);
-        const cookieKey = `formStep-2`;
-        // Remove the pet at the specified index
-        delete existingData[`pet${index}`];
-        console.log(existingData);
-
-        // Reindex remaining pets to maintain sequential keys
-        const reindexedData = {};
-        let newIndex = 0;
-        Object.keys(existingData)
-            .sort() // Ensure consistent order
-            .forEach((key) => {
-                if (key.startsWith("pet")) {
-                    reindexedData[`pet${newIndex}`] = existingData[key];
-                    newIndex++;
-                }
-            });
-
-        CookieHandler.setCookie(cookieKey, reindexedData);
-        console.log(reindexedData);
-        console.log(`Removed pet${index} and reindexed cookies.`);
+        console.log(`Removing pet at index ${index}`);
+        FormDataManager.removePetFromCheckin(index);
+        // The UI will be updated automatically via cookie reactivity
     }
 
     getCloseIcon() {

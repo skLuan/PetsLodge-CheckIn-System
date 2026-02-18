@@ -11,6 +11,11 @@ class CheckIn extends Model
 
     protected $fillable = ['check_in', 'check_out', 'pet_id', 'user_id'];
 
+    protected $casts = [
+        'check_in' => 'datetime',
+        'check_out' => 'datetime',
+    ];
+
     public function pet()
     {
         return $this->belongsTo(Pet::class);
@@ -23,7 +28,9 @@ class CheckIn extends Model
 
     public function extraServices()
     {
-        return $this->belongsToMany(ExtraService::class, 'check_in_extra_service');
+        return $this->belongsToMany(ExtraService::class, 'check_in_extra_service')
+            ->withPivot('grooming_appointment_day')
+            ->withTimestamps();
     }
 
     public function foods()

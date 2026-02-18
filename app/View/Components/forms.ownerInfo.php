@@ -8,12 +8,14 @@ use Illuminate\View\Component;
 
 class FormsOwnerInfo extends Component
 {
+    public $user;
+
     /**
      * Create a new component instance.
      */
-    public function __construct()
+    public function __construct($user = null)
     {
-        //
+        $this->user = $user;
     }
 
     /**
@@ -21,6 +23,6 @@ class FormsOwnerInfo extends Component
      */
     public function render(): View|Closure|string
     {
-        return view('components.forms.parent-info');
+        return view('components.forms.owner-info');
     }
 }

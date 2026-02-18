@@ -5,6 +5,7 @@
 /public/storage
 **/.htaccess
 /storage/*.key
+/temp
 /vendor
 .env
 .env.backup
@@ -18,3 +19,6 @@ yarn-error.log
 /.fleet
 /.idea
 /.vscode
+/plans/
+/logs
+/reports

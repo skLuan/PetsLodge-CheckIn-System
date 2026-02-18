@@ -36,7 +36,7 @@
         </label>
     </div>
     <div class="pl-input-container flex  items-center pr-3">
-        <label class="flex w-full items-center justify-center" for="petGender">Gender
+        <label class="flex w-full items-center justify-center" for="petGender">Sex
             <span class="ml-auto">
                 Male <input class="h-6 !w-6 mr-6" type="radio" id="petGenderMale" name="petGender" value="male" required>
                 Female <input class="h-6 !w-6" type="radio" id="petGenderFemale" name="petGender" value="female" required>
