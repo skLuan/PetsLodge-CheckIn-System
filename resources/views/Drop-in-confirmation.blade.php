@@ -11,20 +11,19 @@
         </div>
     </x-slot>
 
-    <div class="container px-4 pb-8 max-w-screen-lg mx-auto">
+    <div class="container px-4 pb-8 max-w-screen-sm mx-auto">
         <div class="py-6">
-            <div class="mx-auto mb-6">
+            <div class="bg-white p-4 rounded-md shadow-md mx-auto mb-6">
                 <h1 class="text-2xl font-bold text-center">Check-in Summary</h1>
                 <p class="text-lg text-center pt-1 pb-6">Please review your check-in details before proceeding.</p>
+                <!-- CheckInSummary Component -->
+                <x-check-in-summary :checkinData="session('checkin_data', $checkinData ?? [])" />
             </div>
-
-            <!-- CheckInSummary Component -->
-            <x-check-in-summary :checkinData="$checkinData" />
 
             <div class="mt-8 text-center">
                 <p class="text-lg text-gray-600 mb-4">Ready to drop off your pet? Our team has been notified.</p>
                 <p class="text-lg">See you later alligator 😄 🐊</p>
-                
+
                 <!-- Print Button -->
                 <div class="mt-6">
                     <button id="print-button"
@@ -33,17 +32,18 @@
                         🖨️ Print Check-in
                     </button>
                 </div>
-                
+
                 <!-- Loading indicator -->
                 <div id="print-loading" class="hidden mt-4">
                     <p class="text-gray-600">Sending to printer...</p>
                 </div>
-                
+
                 <!-- Success message -->
-                <div id="print-success" class="hidden mt-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
+                <div id="print-success"
+                    class="hidden mt-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
                     <p>✓ Print job sent successfully!</p>
                 </div>
-                
+
                 <!-- Error message -->
                 <div id="print-error" class="hidden mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
                     <p id="error-message"></p>
@@ -51,7 +51,7 @@
             </div>
         </div>
     </div>
-    
+
     <x-slot name="scripts">
         <script>
             document.addEventListener('DOMContentLoaded', function() {
@@ -77,7 +77,8 @@
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')
+                                    .content,
                             },
                             body: JSON.stringify({
                                 info: checkinData
@@ -90,7 +91,7 @@
                             printLoading.classList.add('hidden');
                             printSuccess.classList.remove('hidden');
                             console.log(data.printResponse);
-                            
+
                             // Reset button after 3 seconds
                             setTimeout(() => {
                                 printButton.disabled = false;

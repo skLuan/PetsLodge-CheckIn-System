@@ -20,7 +20,6 @@
         </div>
     </div>
     <x-slot name="scripts">
-        @vite(['resources/js/components/CheckInHandler.js'])
         <script>
             // Wait for CheckInHandler to be available in global scope
             function initializeDropInHandler() {
