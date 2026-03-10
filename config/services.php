@@ -30,5 +30,10 @@ return [
         'secret' => env('AWS_SECRET_ACCESS_KEY'),
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
+    'printnode' => [
+        'api_key'    => env('PRINTNODE_API_KEY'),
+        'printer_id' => env('PRINTNODE_PRINTER_ID'),
+    ],
+
 
 ];

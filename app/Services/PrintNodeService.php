@@ -13,8 +13,8 @@ class PrintNodeService
 
     public function __construct()
     {
-        $this->apiKey = env('PRINTNODE_API_KEY');
-        $this->printerId = env('PRINTNODE_PRINTER_ID');
+        $this->apiKey = config('services.printnode.api_key');
+        $this->printerId = config('services.printnode.printer_id');
         
         $this->client = new Client([
             'base_uri' => 'https://api.printnode.com',
