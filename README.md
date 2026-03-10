@@ -12,11 +12,13 @@ PetsLodge is a comprehensive pet lodging management system designed to streamlin
 - **User Authentication** - Secure login and role-based access control
 
 ### Advanced Features
-- **Editing Mode** - Edit existing check-ins with change detection
-- **Data Persistence** - Automatic data saving across page reloads
-- **Reactivity System** - Real-time UI updates when data changes
-- **Change Detection** - Track what changed when editing check-ins
-- **Form Validation** - Comprehensive validation at each step
+- **Editing Mode** - Edit existing check-ins with change detection and original data snapshots
+- **Data Persistence** - Automatic data saving across page reloads with cookie-based storage
+- **Reactivity System** - Real-time UI updates when data changes via MutationObserver
+- **Change Detection** - Track what changed when editing check-ins with detailed summaries
+- **Form Validation** - Comprehensive validation at each step with error handling
+- **Multiple Feeding/Medication Times** - Select multiple times of day for feeding and medication in a single action
+- **PDF Generation** - Generate and print check-in summaries as PDF documents
 
 ## Architecture
 
@@ -30,17 +32,39 @@ Database → Laravel Session → DOM Attributes → Cookies (Single Source) → 
 
 **Key Principles:**
 1. **Cookies as Single Source of Truth** - All form state stored in `pl_checkin_data` cookie
-2. **One-Time Session Merge** - Session data merged once at initialization
-3. **Explicit Editing Mode** - Dedicated flag tracks edit vs. create operations
-4. **Lossless Data Transformation** - All fields preserved during conversions
-5. **Automatic Reactivity** - Cookie changes trigger automatic UI updates
+2. **One-Time Session Merge** - Session data merged once at initialization with proper ordering
+3. **Explicit Editing Mode** - Dedicated flag tracks edit vs. create operations with original data snapshots
+4. **Lossless Data Transformation** - All fields preserved during conversions with null-safe operators
+5. **Automatic Reactivity** - Cookie changes trigger automatic UI updates via MutationObserver
+6. **Race Condition Prevention** - Proper async/await ordering ensures editing mode preservation
 
 ### System Layers
 
 1. **Database Layer** - Laravel database with check-in, pet, and service records
-2. **Backend Layer** - Laravel controllers and services for data transformation
-3. **Frontend Layer** - JavaScript managers for data handling and UI updates
-4. **Cookie Layer** - Browser cookies for persistent form state
+2. **Backend Layer** - Laravel controllers and services for data transformation with comprehensive validation
+3. **Frontend Layer** - JavaScript managers for data handling and UI updates with reactivity
+4. **Cookie Layer** - Browser cookies for persistent form state with size optimization
+5. **Monitoring Layer** - Health check endpoints and data flow monitoring for production
+
+### Recent Improvements (Phase 3-5)
+
+**Phase 3: Critical Data Flow Fixes**
+- Fixed editing mode flag initialization order
+- Resolved cookie initialization race conditions
+- Added null-safe operators for emergency contact handling
+- Preserved editing mode during session data merge
+
+**Phase 4: Comprehensive Testing**
+- Verified all critical data flows working correctly
+- Confirmed editing mode flag preservation
+- Validated original data snapshot storage
+- Tested data persistence across page reloads
+
+**Phase 5: Deployment & Monitoring**
+- Implemented health check endpoint (`/health`)
+- Added monitoring dashboard for admins
+- Created deployment verification scripts
+- Established rollback procedures
 
 For detailed architecture information, see [`docs/DATA_FLOW.md`](docs/DATA_FLOW.md).
 
@@ -130,15 +154,23 @@ The application will be available at `http://localhost:8000`
 - [Migration Guide](docs/MIGRATION_GUIDE.md) - Upgrading to new system
 - [Deployment Guide](docs/DEPLOYMENT_GUIDE.md) - Deployment procedures
 
+### Implementation & Testing Documentation
+- [Phase 3 Fixes Summary](plans/PHASE_3_FIXES_SUMMARY.md) - Critical data flow fixes and improvements
+- [Phase 4 Test Results](plans/PHASE_4_TEST_RESULTS_SUMMARY.md) - Comprehensive testing results
+- [Implementation Summary](plans/IMPLEMENTATION_SUMMARY.md) - Feature implementation details
+- [Deployment Log](DEPLOYMENT_LOG.md) - Deployment history and monitoring setup
+- [Check-in Cookie Refactor](CHECKIN_COOKIE_REFACTOR_README.md) - Cookie-based state management details
+
 ## Key Components
 
 ### FormDataManager
 The main API for managing check-in form data. Provides methods for:
 - Creating and updating check-in data
-- Managing pets, feeding, and medication
+- Managing pets, feeding, and medication with multiple time support
 - Handling inventory items
-- Detecting changes in editing mode
+- Detecting changes in editing mode with original data snapshots
 - Automatic UI updates via reactivity
+- Resetting to original data in edit mode
 
 **Example:**
 ```javascript
@@ -156,19 +188,26 @@ FormDataManager.addPetToCheckin({
 if (FormDataManager.hasDataChanged()) {
     console.log("User made changes");
 }
+
+// Get change summary
+const changes = FormDataManager.getChangeSummary();
+
+// Reset to original data
+FormDataManager.resetToOriginal();
 ```
 
 See [`docs/DEVELOPER_GUIDE.md`](docs/DEVELOPER_GUIDE.md) for more examples.
 
 ### Data Transformation
 The system includes comprehensive data transformation between database and cookie formats:
-- **CheckInTransformer** - Transforms between database and cookie formats
-- **CheckInDataValidator** - Validates data structure and required fields
+- **CheckInTransformer** - Transforms between database and cookie formats with null-safe operators
+- **CheckInDataValidator** - Validates data structure and required fields with comprehensive error handling
 
 ### Reactivity System
 Automatic UI updates when data changes:
-- **CookieReactivityManager** - Detects cookie changes
-- **UIManager** - Updates DOM elements based on data changes
+- **CookieReactivityManager** - Detects cookie changes via MutationObserver (no aggressive polling)
+- **UIManager** - Updates DOM elements based on data changes without clearing user input
+- **FormUpdater** - Handles form field updates with proper event handling
 
 ## Project Structure
 
@@ -176,16 +215,30 @@ Automatic UI updates when data changes:
 PetsLodge/
 ├── app/
 │   ├── Http/Controllers/          # Laravel controllers
+│   │   ├── CheckInApiController.php # API endpoints
+│   │   ├── CheckInFormController.php # Form handling
+│   │   ├── HealthCheckController.php # Health monitoring
+│   │   └── DropInController.php    # Drop-in management
 │   ├── Services/                  # Business logic services
 │   │   ├── CheckInTransformer.php # Data transformation
-│   │   └── CheckInDataValidator.php # Data validation
+│   │   ├── CheckInDataValidator.php # Data validation
+│   │   ├── CheckInService.php     # Check-in operations
+│   │   ├── CheckInPetService.php  # Pet operations
+│   │   ├── PdfService.php         # PDF generation
+│   │   └── PrintNodeService.php   # Print integration
 │   └── Models/                    # Eloquent models
 ├── resources/
 │   ├── js/
 │   │   └── cookies-and-form/      # Form data management
 │   │       ├── FormDataManager.js # Main API
 │   │       ├── managers/          # Specialized managers
+│   │       │   ├── EditingModeManager.js # Editing mode handling
+│   │       │   ├── CoreDataManager.js # Core data operations
+│   │       │   ├── CheckInSummaryUpdater.js # Summary updates
+│   │       │   └── FormHandler.js # Form extraction
 │   │       └── reactivitySystem/  # Reactivity system
+│   │           ├── UIManager.js   # DOM updates
+│   │           └── FormUpdater.js # Form updates
 │   └── views/                     # Blade templates
 ├── docs/                          # Documentation
 │   ├── DATA_FLOW.md              # Architecture documentation
@@ -193,6 +246,10 @@ PetsLodge/
 │   ├── API_REFERENCE.md          # API documentation
 │   ├── DEPLOYMENT_GUIDE.md       # Deployment procedures
 │   └── MIGRATION_GUIDE.md        # Migration guide
+├── plans/                         # Implementation plans and reports
+│   ├── PHASE_3_FIXES_SUMMARY.md  # Critical fixes documentation
+│   ├── PHASE_4_TEST_RESULTS_SUMMARY.md # Testing results
+│   └── IMPLEMENTATION_SUMMARY.md # Feature implementation details
 └── database/
     ├── migrations/                # Database migrations
     └── seeders/                   # Database seeders
@@ -247,30 +304,76 @@ Contributions are welcome! Please follow these guidelines:
 **Form fields not pre-populated when editing:**
 - Check browser console for errors
 - Verify session data in DOM attributes
+- Verify editing mode flag is set: `FormDataManager.isEditingMode()`
 - Clear browser cookies and reload
+- Check that `data-session-checkin` attribute contains valid JSON
 
 **Changes not detected:**
-- Verify editing mode is enabled
-- Check original data snapshot is stored
+- Verify editing mode is enabled: `FormDataManager.isEditingMode()`
+- Check original data snapshot is stored: `FormDataManager.getEditingMode()`
+- Verify you're modifying data (not just viewing)
 - See [`docs/DATA_FLOW.md`](docs/DATA_FLOW.md) troubleshooting section
 
 **Cookie size exceeded:**
+- Monitor cookie size with: `FormDataManager.debugCheckinData()`
 - Reduce number of pets or inventory items
 - Clear unnecessary data before submission
 - See [`docs/DEPLOYMENT_GUIDE.md`](docs/DEPLOYMENT_GUIDE.md) for more details
+
+**UI not updating when data changes:**
+- Verify reactivity listeners are registered
+- Check browser console for MutationObserver errors
+- Ensure cookie changes are being triggered
+- Try manual trigger: `CookieReactivityManager.triggerCheck()`
+
+**Multiple feeding/medication times not working:**
+- Verify checkboxes are selected (not radio buttons)
+- Check that at least one time is selected
+- Verify form submission includes all selected times
+- See [`plans/IMPLEMENTATION_SUMMARY.md`](plans/IMPLEMENTATION_SUMMARY.md) for details
 
 For more troubleshooting help, see:
 - [`docs/DATA_FLOW.md`](docs/DATA_FLOW.md) - Data flow troubleshooting
 - [`docs/DEVELOPER_GUIDE.md`](docs/DEVELOPER_GUIDE.md) - Debugging tips
 - [`docs/DEPLOYMENT_GUIDE.md`](docs/DEPLOYMENT_GUIDE.md) - Deployment troubleshooting
+- [`plans/PHASE_3_FIXES_SUMMARY.md`](plans/PHASE_3_FIXES_SUMMARY.md) - Critical fixes documentation
 
-## Contributing
+## Recent Updates
 
-Contributions are welcome! Please open issues or submit pull requests.
+### Latest Changes (March 2026)
+
+**System Stability & Monitoring:**
+- ✅ Health check endpoint for system monitoring
+- ✅ Monitoring dashboard for administrators
+- ✅ Deployment verification scripts
+- ✅ Rollback procedures documented
+
+**Data Flow Improvements:**
+- ✅ Fixed editing mode flag initialization order
+- ✅ Resolved cookie initialization race conditions
+- ✅ Added null-safe operators for emergency contact handling
+- ✅ Preserved editing mode during session data merge
+
+**Feature Enhancements:**
+- ✅ Multiple feeding/medication times in single action
+- ✅ PDF generation and printing support
+- ✅ Comprehensive change detection with summaries
+- ✅ Original data snapshots for edit mode
+
+**Testing & Validation:**
+- ✅ Phase 4 comprehensive testing completed
+- ✅ All critical data flows verified
+- ✅ Data persistence validated
+- ✅ Change detection mechanisms tested
+
+For detailed information on recent changes, see:
+- [`plans/PHASE_3_FIXES_SUMMARY.md`](plans/PHASE_3_FIXES_SUMMARY.md) - Critical fixes
+- [`plans/PHASE_4_TEST_RESULTS_SUMMARY.md`](plans/PHASE_4_TEST_RESULTS_SUMMARY.md) - Testing results
+- [`DEPLOYMENT_LOG.md`](DEPLOYMENT_LOG.md) - Deployment history
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the MIT License. See [`LICENCE`](LICENCE) for details.
 
 ---
 ## Project Stack
@@ -284,5 +387,6 @@ PetsLodge is built with the following technologies:
 - **Build Tools:** Vite, PostCSS, Autoprefixer
 - **API & HTTP:** Axios
 - **Containerization:** Docker
+- **Monitoring:** Health check endpoints, data flow monitoring
 
-For a full list of dependencies, see `composer.json` and `package.json`.
+For a full list of dependencies, see [`composer.json`](composer.json) and [`package.json`](package.json).

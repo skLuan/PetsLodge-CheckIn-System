@@ -23,12 +23,16 @@ class DropInController extends Controller
     }
     public function showDropConfirmation(Request $request)
     {
-        // Load check-in data from session or database
+        $phone = $request->validate(['phone' => 'required|string|regex:/^[0-9]{10}$/']);
+        $user = User::where('phone', $phone['phone'])->first();
+
+
+        // Initialize checkinData with user info
         $checkinData = session('checkin_data', []);
 
-        // If no session data, try to get from user's latest check-in
-        if (empty($checkinData) && $request->user()) {
-            $latestCheckIn = $request->user()->checkIns()->latest()->first();
+        // If no session data, populate from user's latest check-in
+        if (empty($checkinData) && $user) {
+            $latestCheckIn = $user->checkIns()->latest()->first();
             if ($latestCheckIn) {
                 // Eager load all relationships needed by the transformer
                 $latestCheckIn->load([
@@ -36,18 +40,34 @@ class DropInController extends Controller
                     'pet.gender',
                     'pet.castrated',
                     'user.emergencyContacts',
-                    'foods.moment_of_day',
-                    'medicines.moment_of_day',
+                    'foods.momentOfDay',
+                    'medicines.momentOfDay',
                     'items',
                     'extraServices'
                 ]);
-                
+
                 $transformer = new CheckInTransformer();
                 $checkinData = $transformer->transformCheckInToCookieFormat($latestCheckIn);
+
+                // Store in session for consistency with Process flow
+                session(['checkin_data' => $checkinData]);
+            } else {
+                // If no latest check-in but user exists, populate with user info
+                $user->load('emergencyContacts');
+                $checkinData = [
+                    'user' => [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'phone' => $user->phone,
+                        'email' => $user->email,
+                        'address' => $user->address,
+                        'emergencyContacts' => $user->emergencyContacts->toArray()
+                    ]
+                ];
             }
         }
 
-        return view('Drop-in-confirmation', compact('checkinData'));
+        return view('Drop-in-confirmation', compact('checkinData', 'user'));
     }
     public function checkInfo(Request $request)
     {
@@ -58,14 +78,14 @@ class DropInController extends Controller
         $checkInApiController = app(CheckInApiController::class);
         $response = $checkInApiController->checkUser($request);
         $responseData = $response->getData();
-        
+
         if ($responseData->userExists === false) {
             return response()->json([
                 'userExists' => false,
                 'message' => 'User not found'
             ], 404);
         }
-        
+
         if ($responseData->userExists === true && $responseData->hasCheckIn === false) {
             return response()->json([
                 'userExists' => true,
@@ -76,12 +96,12 @@ class DropInController extends Controller
                 'userAddress' => $responseData->userAddress,
             ], 200);
         }
-        
+
         if ($responseData->userExists === true && $responseData->hasCheckIn === true) {
             // Get the user and their latest check-in to populate session data
             $user = User::findOrFail($responseData->userId);
             $latestCheckIn = $user->checkIns()->latest()->first();
-            
+
             if ($latestCheckIn) {
                 // Eager load all relationships needed by the transformer
                 $latestCheckIn->load([
@@ -89,18 +109,18 @@ class DropInController extends Controller
                     'pet.gender',
                     'pet.castrated',
                     'user.emergencyContacts',
-                    'foods.moment_of_day',
-                    'medicines.moment_of_day',
+                    'foods.momentOfDay',
+                    'medicines.momentOfDay',
                     'items',
                     'extraServices'
                 ]);
-                
+
                 // Transform and store in session
                 $transformer = new CheckInTransformer();
                 $checkinData = $transformer->transformCheckInToCookieFormat($latestCheckIn);
                 session(['checkin_data' => $checkinData]);
             }
-            
+
             return response()->json([
                 'userExists' => true,
                 'hasCheckIn' => true,
@@ -110,7 +130,7 @@ class DropInController extends Controller
                 'userAddress' => $responseData->userAddress,
             ], 200);
         }
-        
+
         return response()->json([
             'error' => 'Unexpected error'
         ], 500);
