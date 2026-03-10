@@ -35,12 +35,15 @@ class PrintNodeService
     public function sendPrintJob($pdfUri, $info = [])
     {
         try {
+            // Add host URL to PDF URI if it's a relative path
+            $fullPdfUri = $this->getFullPdfUri($pdfUri);
+            
             $response = $this->client->post('/printjobs', [
                 'json' => [
                     'printerId' => (int) $this->printerId,
                     'title' => $info['title'] ?? 'Drop-in Print Job',
                     'contentType' => 'pdf_uri',
-                    'content' => $pdfUri,
+                    'content' => $fullPdfUri,
                     'source' => 'PetsLodge Drop-in System',
                 ],
             ]);
@@ -59,6 +62,24 @@ class PrintNodeService
                 'error' => $e->getMessage(),
             ];
         }
+    }
+
+    /**
+     * Convert relative PDF URI to full URL with host
+     *
+     * @param string $pdfUri - Relative or absolute PDF URI
+     * @return string - Full URL with host
+     */
+    private function getFullPdfUri($pdfUri)
+    {
+        // If it's already a full URL, return as is
+        if (filter_var($pdfUri, FILTER_VALIDATE_URL)) {
+            return $pdfUri;
+        }
+
+        // If it's a relative path, prepend the application URL
+        $appUrl = config('app.url');
+        return rtrim($appUrl, '/') . '/' . ltrim($pdfUri, '/');
     }
 
     /**
