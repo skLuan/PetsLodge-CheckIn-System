@@ -1,0 +1,153 @@
+version: '3.8'
+
+services:
+  # PHP-FPM Application Service
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: petslodge-app
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      # Mount storage and cache directories for persistence
+      - app_storage:/var/www/storage
+      - app_bootstrap:/var/www/bootstrap/cache
+      # Mount config file
+      - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - APP_KEY=base64:s12COBNOF0DKWXWTo7709hGBJ31sAhwQLjbvzPQH09M=
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=petslodge
+      - DB_USERNAME=petslodge
+      - DB_PASSWORD=petslodge_secret
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CACHE_DRIVER=redis
+      - SESSION_DRIVER=redis
+      - QUEUE_CONNECTION=redis
+    networks:
+      - petslodge-network
+    entrypoint: ["php-fpm"]
+
+  # Nginx Web Server
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx
+    container_name: petslodge-nginx
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./:/var/www
+    depends_on:
+      - app
+    networks:
+      - petslodge-network
+
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: petslodge-mysql
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=root_secret
+      - MYSQL_DATABASE=petslodge
+      - MYSQL_USER=petslodge
+      - MYSQL_PASSWORD=petslodge_secret
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    networks:
+      - petslodge-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_secret"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: petslodge-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - petslodge-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Composer (utility service for running commands)
+  composer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: petslodge-composer
+    # No volume mount - uses vendor from built image
+    working_dir: /var/www
+    entrypoint: ['composer']
+    networks:
+      - petslodge-network
+
+  # Artisan (utility service for running Laravel commands)
+  artisan:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: petslodge-artisan
+    # No volume mount - uses vendor from built image
+    working_dir: /var/www
+    entrypoint: ['php', 'artisan']
+    environment:
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=petslodge
+      - DB_USERNAME=petslodge
+      - DB_PASSWORD=petslodge_secret
+    networks:
+      - petslodge-network
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  # NPM (utility service for running Node.js commands)
+  npm:
+    image: node:20-alpine
+    container_name: petslodge-npm
+    volumes:
+      - ./:/var/www
+    working_dir: /var/www
+    entrypoint: ['npm']
+    networks:
+      - petslodge-network
+
+networks:
+  petslodge-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+  app_storage:
+    driver: local
+  app_bootstrap:
+    driver: local
