@@ -31,11 +31,11 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Set working directory
 WORKDIR /var/www
 
-# Copy .env.docker as .env (user should customize this)
-COPY .env.docker .env
-
 # Copy application files
 COPY . .
+
+# Copy .env.docker as .env (after COPY . . so it's not overwritten by local .env)
+COPY .env.docker .env
 
 # Install PHP dependencies
 RUN composer install --optimize-autoloader --no-dev

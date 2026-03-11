@@ -1,12 +1,14 @@
-#!/bin/bash
+#!/bin/sh
 set -e
 
 echo "Starting PetsLodge Docker Setup..."
 
 # Wait for MySQL to be ready (simple wait)
 echo "Waiting for MySQL to be ready..."
-for i in {1..30}; do
-    if mysqladmin ping -h "$DB_HOST" -u "$DB_USERNAME" -p"$DB_PASSWORD" --silent 2>/dev/null; then
+i=0
+while [ $i -lt 30 ]; do
+    i=$((i + 1))
+    if php artisan db:monitor --databases=mysql 2>/dev/null; then
         echo "MySQL is ready!"
         break
     fi
@@ -17,6 +19,10 @@ done
 # Run migrations
 echo "Running database migrations..."
 php artisan migrate --force
+
+# Seed database (skip if already seeded)
+echo "Seeding database..."
+php artisan db:seed --force 2>/dev/null || echo "Seeding skipped (already seeded)."
 
 # Clear and rebuild caches
 echo "Clearing caches..."
@@ -32,3 +38,6 @@ if [ ! -L public/storage ]; then
 fi
 
 echo "Docker setup complete!"
+
+# Execute the container command (php artisan serve)
+exec "$@"
