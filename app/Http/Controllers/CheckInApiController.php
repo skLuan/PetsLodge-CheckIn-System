@@ -99,9 +99,9 @@ class CheckInApiController extends Controller
             ]);
 
             // Submit check-in using service
-            //$result = $this->checkInService->submitCheckIn($checkinData, $this->userService, $this->petService);
+            $result = $this->checkInService->submitCheckIn($checkinData, $this->userService, $this->petService);
 
-            Log::info('CheckInApiController: Check-in submitted successfully', $result);
+            Log::info('CheckInApiController: Check-in submitted successfully', $result ?? []);
 
             return response()->json([
                 'success' => true,

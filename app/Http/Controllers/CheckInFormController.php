@@ -111,4 +111,26 @@ class CheckInFormController extends Controller
 
          return redirect()->route('new-form-pre-filled', ['phone' => $checkIn->user->phone]);
      }
+
+    /**
+     * Delete a check-in and its related records
+     *
+     * @param int $checkInId
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function deleteCheckIn($checkInId)
+    {
+        $checkIn = CheckIn::with(['foods', 'medicines', 'items', 'extraServices'])->findOrFail($checkInId);
+        $phone = $checkIn->user->phone;
+
+        // Delete related records
+        $checkIn->foods()->delete();
+        $checkIn->medicines()->delete();
+        $checkIn->items()->delete();
+        $checkIn->extraServices()->detach();
+        $checkIn->delete();
+
+        return redirect()->route('view-check-in', ['phone' => $phone])
+            ->with('success', 'Check-in deleted successfully.');
+    }
 }
