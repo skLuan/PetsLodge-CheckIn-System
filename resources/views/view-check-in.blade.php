@@ -109,10 +109,16 @@
                                             {{ $checkIn->check_in ? $checkIn->check_in->format('M j, Y g:i A') : 'N/A' }}
                                         </p>
                                     </div>
-                                    <button type="button" onclick="editCheckIn({{ $checkIn->id }})"
-                                        class="edit-button bg-yellow-second hover:bg-yellow text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200">
-                                        Edit
-                                    </button>
+                                    <div class="flex flex-col gap-2">
+                                        <button type="button" onclick="editCheckIn({{ $checkIn->id }})"
+                                            class="edit-button bg-yellow-second hover:bg-yellow text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200">
+                                            Edit
+                                        </button>
+                                        <button type="button" onclick="deleteCheckIn({{ $checkIn->id }}, '{{ addslashes($checkIn->pet->name ?? 'this pet') }}')"
+                                            class="bg-red-500 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 text-sm">
+                                            Delete
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -290,6 +296,28 @@
         function editCheckIn(checkInId) {
             // Redirect to edit endpoint
             window.location.href = `/edit-check-in/${checkInId}`;
+        }
+
+        function deleteCheckIn(checkInId, petName) {
+            if (!confirm(`Are you sure you want to delete the check-in for ${petName}? This action cannot be undone.`)) {
+                return;
+            }
+
+            fetch(`/delete-check-in/${checkInId}`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                    'Accept': 'application/json',
+                },
+            }).then(response => {
+                if (response.ok || response.redirected) {
+                    window.location.reload();
+                } else {
+                    alert('Failed to delete check-in. Please try again.');
+                }
+            }).catch(() => {
+                alert('An error occurred. Please try again.');
+            });
         }
     </script>
 </x-app-layout>

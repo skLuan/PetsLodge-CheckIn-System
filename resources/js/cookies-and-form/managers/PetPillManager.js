@@ -30,8 +30,10 @@ class PetPillManager {
         }
 
         pets.forEach((pet, index) => {
-            if (pet && pet.petName) {
-                const pill = new Pill(pet.petName, pet.petType, index);
+            const petName = pet?.info?.petName || pet?.petName;
+            const petType = pet?.info?.petType || pet?.petType;
+            if (pet && petName) {
+                const pill = new Pill(petName, petType, index);
                 container.appendChild(pill.render());
             } else {
                 console.warn(

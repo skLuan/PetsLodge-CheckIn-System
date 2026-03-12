@@ -1,0 +1,84 @@
+services:
+  # Laravel Application (php artisan serve)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: petslodge-app
+    restart: no
+    working_dir: /var/www
+    ports:
+      - "8080:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - APP_KEY=base64:s12COBNOF0DKWXWTo7709hGBJ31sAhwQLjbvzPQH09M=
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - APP_URL=http://localhost:8080
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=petslodge
+      - DB_USERNAME=petslodge
+      - DB_PASSWORD=petslodge_secret
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CACHE_DRIVER=redis
+      - SESSION_DRIVER=redis
+      - QUEUE_CONNECTION=redis
+    command: php artisan serve --host=0.0.0.0 --port=8000
+    networks:
+      - petslodge-network
+
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: petslodge-mysql
+    restart: no
+    environment:
+      - MYSQL_ROOT_PASSWORD=root_secret
+      - MYSQL_DATABASE=petslodge
+      - MYSQL_USER=petslodge
+      - MYSQL_PASSWORD=petslodge_secret
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    networks:
+      - petslodge-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_secret"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: petslodge-redis
+    restart: no
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - petslodge-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+networks:
+  petslodge-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local

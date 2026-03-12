@@ -46,6 +46,7 @@ Route::get('/new-form', [App\Http\Controllers\CheckInFormController::class, 'new
 Route::get('/new-form-pre-filled', [App\Http\Controllers\CheckInFormController::class, 'newFormPreFilled'])->name('new-form-pre-filled');
 Route::get('/view-check-in', [App\Http\Controllers\CheckInFormController::class, 'viewCheckIn'])->name('view-check-in');
 Route::get('/edit-check-in/{checkInId}', [App\Http\Controllers\CheckInFormController::class, 'editCheckIn'])->name('edit-check-in');
+Route::delete('/delete-check-in/{checkInId}', [App\Http\Controllers\CheckInFormController::class, 'deleteCheckIn'])->name('delete-check-in');
 
 // Health check routes
 Route::get('/health', [HealthCheckController::class, 'index'])->name('health.check');
