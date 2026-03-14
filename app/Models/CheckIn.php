@@ -9,7 +9,7 @@ class CheckIn extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['check_in', 'check_out', 'pet_id', 'user_id', 'status_id'];
+    protected $fillable = ['check_in', 'check_out', 'pet_id', 'user_id', 'status_id', 'document_url'];
 
     protected $casts = [
         'check_in' => 'datetime',

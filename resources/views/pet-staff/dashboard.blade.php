@@ -3,7 +3,7 @@
         <h1 class="text-3xl font-bold mb-8">Pet Staff Dashboard</h1>
 
         @if (session('success'))
-            <div class="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
+            <div class="mb-4 p-4 bg-green-lightest border border-green text-green rounded">
                 {{ session('success') }}
             </div>
         @endif
@@ -11,14 +11,14 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <!-- Checked-In Pets Section -->
             <div class="bg-white rounded-lg shadow-lg p-6">
-                <h2 class="text-2xl font-bold mb-4 text-blue-600">Checked-In Pets</h2>
+                <h2 class="text-2xl font-bold mb-4 text-green">Checked-In Pets</h2>
 
                 @if ($checkedInPets->isEmpty())
                     <p class="text-gray-500">No checked-in pets at the moment.</p>
                 @else
                     <div class="space-y-4">
                         @foreach ($checkedInPets as $checkIn)
-                            <div class="border border-blue-200 rounded-lg p-4 bg-blue-50">
+                            <div class="border border-green-lightest rounded-lg p-4 bg-white-yellow">
                                 <div class="flex justify-between items-start mb-3">
                                     <div>
                                         <h3 class="text-lg font-semibold text-gray-800">{{ $checkIn->pet->name }}</h3>
@@ -27,8 +27,8 @@
                                             {{ $checkIn->pet->kindOfPet->name ?? 'N/A' }}</p>
                                         <p class="text-sm text-gray-600">Contact: {{ $checkIn->user->phone }}</p>
                                     </div>
-                                    <span
-                                        class="px-3 py-1 bg-blue-200 text-blue-800 rounded-full text-xs font-semibold">
+                            <span
+                                        class="px-3 py-1 bg-green-lightest text-green rounded-full text-xs font-semibold">
                                         CHECKED-IN
                                     </span>
                                 </div>
@@ -42,7 +42,7 @@
                                         class="flex-1">
                                         @csrf
                                         <button type="submit"
-                                            class="w-full px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition">
+                                            class="w-full px-4 py-2 bg-green text-white rounded hover:bg-green-dark transition">
                                             Mark as Dropped-In
                                         </button>
                                     </form>
@@ -91,13 +91,28 @@
                                     Check-in: {{ $checkIn->check_in->format('M d, Y H:i') }}
                                 </p>
 
-                                <form action="{{ route('pet-staff.checkout', $checkIn->id) }}" method="POST">
-                                    @csrf
-                                    <button type="submit"
-                                        class="w-full px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition">
-                                        Checkout Pet
-                                    </button>
-                                </form>
+                                <div class="flex gap-2">
+                                    <form action="{{ route('pet-staff.checkout', $checkIn->id) }}" method="POST"
+                                        class="flex-1">
+                                        @csrf
+                                        <button type="submit"
+                                            class="w-full px-4 py-2 bg-green text-white rounded hover:bg-green-dark transition">
+                                            Checkout Pet
+                                        </button>
+                                    </form>
+
+                                    @if ($checkIn->document_url)
+                                        <form action="{{ route('pet-staff.reprint', $checkIn->id) }}" method="POST"
+                                            class="flex-1">
+                                            @csrf
+                                            <button type="submit"
+                                                class="w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
+                                                title="Re-print the check-in document">
+                                                Re-Print
+                                            </button>
+                                        </form>
+                                    @endif
+                                </div>
                             </div>
                         @endforeach
                     </div>

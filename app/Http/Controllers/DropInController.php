@@ -144,12 +144,34 @@ class DropInController extends Controller
         ]);
 
         try {
-            // Genera PDF via service
-            $pdfService = new PdfService();
-            $pdfUri = $pdfService->generatePdf($validated['info']);  // Devuelve URI (e.g., S3 URL)
+            // Extract check-in ID from info if available
+            $checkInId = $validated['info']['checkInId'] ?? null;
+            $pdfUri = null;
 
+            // Check if document_url already exists for this check-in
+            if ($checkInId) {
+                $checkIn = \App\Models\CheckIn::find($checkInId);
+                if ($checkIn && $checkIn->document_url) {
+                    $pdfUri = $checkIn->document_url;
+                }
+            }
+
+            // Generate PDF only if not already stored
             if (!$pdfUri) {
-                return response()->json(['error' => 'Error generating PDF'], 500);
+                $pdfService = new PdfService();
+                $pdfUri = $pdfService->generatePdf($validated['info']);  // Devuelve URI (e.g., S3 URL)
+
+                if (!$pdfUri) {
+                    return response()->json(['error' => 'Error generating PDF'], 500);
+                }
+
+                // Save document_url to database if check-in ID is available
+                if ($checkInId) {
+                    $checkIn = \App\Models\CheckIn::find($checkInId);
+                    if ($checkIn) {
+                        $checkIn->update(['document_url' => $pdfUri]);
+                    }
+                }
             }
 
             // Llama a PrintNode via service

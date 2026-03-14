@@ -80,4 +80,37 @@ class PetStaffDashboardController extends Controller
         return redirect()->route('pet-staff.dashboard')
             ->with('success', 'Check-in cancelled successfully!');
     }
+
+    /**
+     * Re-print a check-in document using the stored document_url
+     */
+    public function reprint(Request $request, $id)
+    {
+        $checkIn = CheckIn::findOrFail($id);
+
+        // Check if document_url exists
+        if (!$checkIn->document_url) {
+            return redirect()->route('pet-staff.dashboard')
+                ->with('error', 'No document URL found for this check-in.');
+        }
+
+        try {
+            // Send to PrintNode using stored document_url
+            $printService = new \App\Services\PrintNodeService();
+            $response = $printService->sendPrintJob($checkIn->document_url, [
+                'title' => 'Re-Print: ' . $checkIn->pet->name . ' - ' . $checkIn->user->name
+            ]);
+
+            if ($response['success']) {
+                return redirect()->route('pet-staff.dashboard')
+                    ->with('success', 'Document re-printed successfully!');
+            } else {
+                return redirect()->route('pet-staff.dashboard')
+                    ->with('error', 'Error re-printing document: ' . ($response['message'] ?? 'Unknown error'));
+            }
+        } catch (\Exception $e) {
+            return redirect()->route('pet-staff.dashboard')
+                ->with('error', 'Unexpected error: ' . $e->getMessage());
+        }
+    }
 }

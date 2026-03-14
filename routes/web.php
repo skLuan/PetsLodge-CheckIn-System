@@ -45,9 +45,11 @@ Route::middleware(['auth', 'pet.staff.only'])->group(function () {
     Route::post('/pet-staff/checkout/{id}', [PetStaffDashboardController::class, 'checkout'])->name('pet-staff.checkout');
     Route::post('/pet-staff/dropped-in/{id}', [PetStaffDashboardController::class, 'dropped_in'])->name('pet-staff.dropped-in');
     Route::post('/pet-staff/cancel/{id}', [PetStaffDashboardController::class, 'cancel'])->name('pet-staff.cancel');
+    Route::post('/pet-staff/reprint/{id}', [PetStaffDashboardController::class, 'reprint'])->name('pet-staff.reprint');
 });
 
 Route::redirect('/dropin', '/drop-in');
+Route::redirect('/pet-staff', '/pet-staff/dashboard');
 // -----------------------
 // ---------------------
 // Check-in routes
