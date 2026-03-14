@@ -33,6 +33,22 @@ class PetStaffDashboardController extends Controller
     }
 
     /**
+     * Update check-in status to DROPPED_IN with dropIn date
+     */
+    public function dropped_in(Request $request, $id)
+    {
+        $checkIn = CheckIn::findOrFail($id);
+        $checkedOutStatus = Status::where('name', 'DROPPED_IN')->first();
+
+        $checkIn->update([
+            'status_id' => $checkedOutStatus->id,
+            'check_out' => now(),
+        ]);
+
+        return redirect()->route('pet-staff.dashboard')
+            ->with('success', 'Pet Dropped In successfully!');
+    }
+    /**
      * Update check-in status to CHECKED_OUT with checkout date
      */
     public function checkout(Request $request, $id)

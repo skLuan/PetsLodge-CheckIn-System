@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\CheckIn;
 use App\Models\Item;
 use App\Models\ExtraService;
+use App\Models\Status;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -23,6 +24,12 @@ class CheckInService
      */
     public function processCheckIn($user, $pet, array $checkinData): CheckIn
     {
+        // Get CHECKED_IN status
+        $checkedInStatus = Status::where('name', 'CHECKED_IN')->first();
+        if (!$checkedInStatus) {
+            throw new \Exception('CHECKED_IN status not found in database');
+        }
+
         // Check if there's already an active check-in for this pet
         $existingCheckIn = CheckIn::where('pet_id', $pet->id)
                                  ->whereNull('check_out')
@@ -32,14 +39,16 @@ class CheckInService
             // Update existing check-in
             $existingCheckIn->update([
                 'check_in' => now(),
+                'status_id' => $checkedInStatus->id,
             ]);
             return $existingCheckIn;
         } else {
-            // Create new check-in
+            // Create new check-in with CHECKED_IN status
             return CheckIn::create([
                 'check_in' => now(),
                 'pet_id' => $pet->id,
                 'user_id' => $user->id,
+                'status_id' => $checkedInStatus->id,
             ]);
         }
     }

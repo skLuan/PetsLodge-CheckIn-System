@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\CheckIn;
+use App\Models\Status;
 use App\Services\CheckInService;
 use App\Services\CheckInUserService;
 use App\Services\CheckInPetService;
@@ -339,11 +340,18 @@ class CheckInApiController extends Controller
                 'warnings' => $healthData['warnings'] ?? null,
             ]);
 
+            // Get CHECKED_IN status
+            $checkedInStatus = Status::where('name', 'CHECKED_IN')->first();
+            if (!$checkedInStatus) {
+                throw new \Exception('CHECKED_IN status not found in database');
+            }
+
             // Create a temporary check-in for feeding/medication (will be updated in step 4)
             $tempCheckIn = \App\Models\CheckIn::create([
                 'check_in' => now(),
                 'pet_id' => $petId,
                 'user_id' => $pet->user_id,
+                'status_id' => $checkedInStatus->id,
             ]);
 
             // Process feeding and medication

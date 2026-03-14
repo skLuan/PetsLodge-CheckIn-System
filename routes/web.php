@@ -43,6 +43,7 @@ Route::middleware(['auth', 'pet.staff.only'])->group(function () {
     // Pet Staff Dashboard
     Route::get('/pet-staff/dashboard', [PetStaffDashboardController::class, 'index'])->name('pet-staff.dashboard');
     Route::post('/pet-staff/checkout/{id}', [PetStaffDashboardController::class, 'checkout'])->name('pet-staff.checkout');
+    Route::post('/pet-staff/dropped-in/{id}', [PetStaffDashboardController::class, 'dropped_in'])->name('pet-staff.dropped-in');
     Route::post('/pet-staff/cancel/{id}', [PetStaffDashboardController::class, 'cancel'])->name('pet-staff.cancel');
 });
 
