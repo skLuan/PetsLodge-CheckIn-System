@@ -9,7 +9,7 @@ class CheckIn extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['check_in', 'check_out', 'pet_id', 'user_id'];
+    protected $fillable = ['check_in', 'check_out', 'pet_id', 'user_id', 'status_id'];
 
     protected $casts = [
         'check_in' => 'datetime',
@@ -24,6 +24,11 @@ class CheckIn extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function status()
+    {
+        return $this->belongsTo(Status::class);
     }
 
     public function extraServices()
