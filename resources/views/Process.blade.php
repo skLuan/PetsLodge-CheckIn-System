@@ -56,19 +56,73 @@
                     </div>
 
                     <div class="grooming bg-white p-4 rounded-lg border border-gray-300 mb-6">
-                        <div class="flex flex-col items-center justify-between mb-3">
+                        <h3 class="font-bold text-lg mb-4">Grooming Options</h3>
+                        <div class="mb-4">
+                            <div>
+                                <h4 class="text-base font-semibold text-gray-700">Want grooming before picking up?</h4>
+                                <h3 class="mt-1 mb-3 text-sm">Take the service with 10% discount!</h3>
+                            </div>
+                            <div class="flex flex-col gap-3">
+                                <label class="flex items-center">
+                                    <input type="checkbox" name="groomingOptions[]" value="bath" class="mr-3 w-5 h-5">
+                                    <span class="text-sm font-medium">Bath</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="checkbox" name="groomingOptions[]" value="nails" class="mr-3 w-5 h-5">
+                                    <span class="text-sm font-medium">Nails</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="checkbox" name="groomingOptions[]" value="grooming" class="mr-3 w-5 h-5">
+                                    <span class="text-sm font-medium">Grooming</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="checkbox" name="groomingOptions[]" value="no" class="mr-3 w-5 h-5">
+                                    <span class="text-sm font-medium">No</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Conditional grooming appointment day -->
+                        <div class="conditional-grooming-appointment-popup mb-4" style="display: none;">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Preferred appointment day:
+                            </label>
+                            <div class="flex flex-col gap-2">
+                                <label class="flex items-center">
+                                    <input type="radio" name="groomingAppointmentDay" value="Monday" class="mr-3 w-5 h-5">
+                                    <span class="text-sm font-medium">Monday</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="radio" name="groomingAppointmentDay" value="Wednesday" class="mr-3 w-5 h-5">
+                                    <span class="text-sm font-medium">Wednesday</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="radio" name="groomingAppointmentDay" value="Friday" class="mr-3 w-5 h-5">
+                                    <span class="text-sm font-medium">Friday</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Conditional grooming notes textarea -->
+                        <div class="conditional-grooming-notes-popup mb-4" style="display: none;">
+                            <label for="groomingNotes" class="block text-sm font-medium text-gray-700 mb-2">
+                                Grooming instructions & notes:
+                            </label>
+                            <textarea
+                                class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                id="groomingNotes"
+                                name="groomingNotes"
+                                rows="3"
+                                placeholder="Enter grooming instructions and any special notes"
+                            ></textarea>
+                        </div>
+
+                        <div class="flex flex-col items-start justify-between mb-3">
                             <label for="groomingAcknowledged" class="flex items-center cursor-pointer">
                                 <input type="checkbox" id="groomingAcknowledged"
                                     class="mr-3 h-4 w-4 focus:ring-green border-gray-300 rounded">
-                                <span class="text-sm text-gray-700">Grooming options confirmed</span>
+                                <span class="text-sm text-gray-700">I confirm my grooming preferences above</span>
                             </label>
-                            <button type="button" id="editGroomingBtn"
-                                class="text-sm text-blue-600 hover:text-blue-800 underline">
-                                Edit Grooming Options
-                            </button>
-                        </div>
-                        <div id="groomingSummary" class="text-sm text-gray-600">
-                            <!-- Grooming summary will be populated by JavaScript -->
                         </div>
                         <p class="text-xs text-gray-500 mt-2">Please confirm your grooming preferences before submitting.</p>
                     </div>
@@ -101,7 +155,6 @@
             <!-- Additional steps will be added here dynamically -->
         </div>
         <x-pop-ups.feeding-medication />
-        <x-pop-ups.grooming />
         <x-pop-ups.terms-conditions />
         <x-tabbar />
     </div>
