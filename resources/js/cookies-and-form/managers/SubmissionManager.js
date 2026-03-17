@@ -115,11 +115,8 @@ class SubmissionManager {
             // Clear the cookie after successful submission
             FormDataManager.clearCheckinData();
 
-            // Show success message
-            alert("Check-in completed successfully!");
-
-            // Redirect to success page or dashboard
-            window.location.href = `/view-check-in?phone=${checkinData.user?.info?.phone}`;
+            // Show countdown timer and redirect to home page after 60 seconds
+            this.showCountdownAndRedirect();
 
         } catch (error) {
             const errorTime = new Date().toISOString();
@@ -134,6 +131,71 @@ class SubmissionManager {
 
             alert(`An error occurred during submission: ${error.message}`);
         }
+    }
+
+    /**
+     * Show countdown timer and redirect to home page after 60 seconds
+     */
+    static showCountdownAndRedirect() {
+        // Create countdown overlay
+        const overlay = document.createElement('div');
+        overlay.id = 'countdown-overlay';
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        `;
+
+        const message = document.createElement('div');
+        message.style.cssText = `
+            font-size: 24px;
+            margin-bottom: 20px;
+            text-align: center;
+        `;
+        message.textContent = 'Check-in completed successfully!';
+
+        const countdown = document.createElement('div');
+        countdown.style.cssText = `
+            font-size: 48px;
+            font-weight: bold;
+            color: #10b981;
+        `;
+        countdown.textContent = '60';
+
+        const redirectText = document.createElement('div');
+        redirectText.style.cssText = `
+            font-size: 16px;
+            margin-top: 20px;
+            color: #9ca3af;
+        `;
+        redirectText.textContent = 'Redirecting to home page...';
+
+        overlay.appendChild(message);
+        overlay.appendChild(countdown);
+        overlay.appendChild(redirectText);
+        document.body.appendChild(overlay);
+
+        // Countdown timer
+        let secondsLeft = 60;
+        const timer = setInterval(() => {
+            secondsLeft--;
+            countdown.textContent = secondsLeft.toString();
+
+            if (secondsLeft <= 0) {
+                clearInterval(timer);
+                window.location.href = '/';
+            }
+        }, 1000);
     }
 
     /**
