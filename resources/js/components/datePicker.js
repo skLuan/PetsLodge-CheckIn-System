@@ -15,6 +15,24 @@ export default function datePicker() {
         ],
         dayNames: ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'],
 
+        years() {
+            const current = new Date().getFullYear();
+            const arr = [];
+            for (let y = current; y >= current - 30; y--) {
+                arr.push(y);
+            }
+            return arr;
+        },
+
+        clampMonth() {
+            const now = new Date();
+            this.year = parseInt(this.year);
+            this.month = parseInt(this.month);
+            if (this.year >= now.getFullYear() && this.month > now.getMonth()) {
+                this.month = now.getMonth();
+            }
+        },
+
         daysInMonth() {
             const count = new Date(this.year, this.month + 1, 0).getDate();
             return Array.from({ length: count }, (_, i) => i + 1);

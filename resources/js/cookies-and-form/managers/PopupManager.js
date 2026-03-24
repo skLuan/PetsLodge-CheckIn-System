@@ -172,20 +172,19 @@ class PopupManager {
     }
 
     /**
-     * Initializes grooming popup event handlers
+     * Initializes grooming in-page form event handlers
      */
     static initializeGroomingPopup() {
         const groomingPopup = document.getElementById('groomingPopup');
-        console.log('🔧 [PopupManager] Initializing grooming popup:', groomingPopup ? 'FOUND' : 'NOT FOUND');
+        console.log('🔧 [PopupManager] Initializing grooming form:', groomingPopup ? 'FOUND' : 'NOT FOUND');
         if (!groomingPopup) {
-            console.error('❌ [PopupManager] Grooming popup element not found in DOM');
+            console.error('❌ [PopupManager] Grooming form element not found in DOM');
             return;
         }
 
         const groomingCheckboxes = groomingPopup.querySelectorAll('input[name="groomingOptions[]"]');
         const groomingNotesTextarea = document.getElementById('groomingNotes');
-        const confirmGroomingBtn = document.getElementById('confirmGrooming');
-        const closeGroomingPopupBtn = document.getElementById('closeGroomingPopup');
+        const groomingAcknowledgedCheckbox = document.getElementById('groomingAcknowledged');
 
         // Handle grooming checkbox changes for mutual exclusivity and conditional notes display
         groomingCheckboxes.forEach(checkbox => {
@@ -230,129 +229,140 @@ class PopupManager {
                         radio.checked = false;
                     });
                 }
+
+                // Auto-save grooming data when options change
+                PopupManager.saveGroomingData();
             });
         });
 
-        // Handle confirm button
-         if (confirmGroomingBtn) {
-             confirmGroomingBtn.addEventListener('click', function() {
-                 // Check if any grooming service is selected
-                 const hasGroomingSelected = Array.from(groomingCheckboxes).some(cb =>
-                     cb.checked && cb.value !== 'no'
-                 );
-
-                 // If grooming is selected, validate that appointment day is selected
-                 if (hasGroomingSelected) {
-                     const appointmentRadios = groomingPopup.querySelectorAll('input[name="groomingAppointmentDay"]');
-                     const appointmentDaySelected = Array.from(appointmentRadios).some(radio => radio.checked);
-                     
-                     if (!appointmentDaySelected) {
-                         alert('Please select a preferred appointment day for grooming services');
-                         return;
-                     }
-                 }
-
-                 // Collect grooming data
-                 const groomingData = {};
-                 groomingCheckboxes.forEach(checkbox => {
-                     groomingData[checkbox.value] = checkbox.checked;
-                 });
-
-                 // Get selected appointment day if grooming is selected
-                 if (hasGroomingSelected) {
-                     const appointmentRadios = groomingPopup.querySelectorAll('input[name="groomingAppointmentDay"]');
-                     const selectedAppointment = Array.from(appointmentRadios).find(radio => radio.checked);
-                     if (selectedAppointment) {
-                         groomingData.appointmentDay = selectedAppointment.value;
-                     }
-                 }
-
-                 const groomingNotes = groomingNotesTextarea ? groomingNotesTextarea.value.trim() : '';
-
-                 // Save to FormDataManager
-                 FormDataManager.updateCheckinData({
-                     grooming: groomingData,
-                     groomingDetails: groomingNotes,
-                     groomingAcknowledged: true // Mark as acknowledged
-                 });
-
-                 // Update grooming summary in the receipt section
-                 PopupManager.updateGroomingSummary();
-
-                 // Hide grooming popup
-                 groomingPopup.classList.add('hidden');
-
-                 // Show terms popup after grooming confirmation (but only if not already accepted)
-                 // Use a small delay to ensure popup is properly rendered
-                 const checkinData = FormDataManager.getCheckinData();
-                 if (!checkinData?.termsAccepted) {
-                     setTimeout(() => {
-                         const termsPopup = document.getElementById('termsConditionsPopup');
-                         if (termsPopup) {
-                             termsPopup.classList.remove('hidden');
-                         }
-                     }, 50);
-                 }
-             });
-         }
-
-        // Handle close button - allow closing without acknowledgment
-        if (closeGroomingPopupBtn) {
-            closeGroomingPopupBtn.addEventListener('click', function() {
-                groomingPopup.classList.add('hidden');
+        // Handle grooming acknowledged checkbox
+        if (groomingAcknowledgedCheckbox) {
+            groomingAcknowledgedCheckbox.addEventListener('change', function() {
+                PopupManager.saveGroomingData();
             });
         }
 
-        // Handle outside click to close
-        document.addEventListener('click', function(e) {
-            if (groomingPopup && !groomingPopup.contains(e.target) && !e.target.closest('.btn-trigger-grooming') && !e.target.closest('#editGroomingBtn')) {
-                groomingPopup.classList.add('hidden');
-            }
+        // Handle appointment day radio changes
+        const appointmentRadios = groomingPopup.querySelectorAll('input[name="groomingAppointmentDay"]');
+        appointmentRadios.forEach(radio => {
+            radio.addEventListener('change', function() {
+                PopupManager.saveGroomingData();
+            });
         });
 
-        // Handle edit grooming button from receipt section
-        const editGroomingBtn = document.getElementById('editGroomingBtn');
-        if (editGroomingBtn) {
-            editGroomingBtn.addEventListener('click', function() {
-                // Load existing grooming data into popup
-                const checkinData = FormDataManager.getCheckinData();
-                if (checkinData?.grooming) {
-                    // Pre-populate checkboxes
-                    groomingCheckboxes.forEach(checkbox => {
-                        checkbox.checked = checkinData.grooming[checkbox.value] || false;
-                    });
-
-                    // Pre-populate notes
-                    if (groomingNotesTextarea && checkinData.groomingDetails) {
-                        groomingNotesTextarea.value = checkinData.groomingDetails;
-                    }
-
-                    // Pre-populate appointment day
-                    if (checkinData.grooming.appointmentDay) {
-                        const appointmentRadios = groomingPopup.querySelectorAll('input[name="groomingAppointmentDay"]');
-                        const selectedRadio = Array.from(appointmentRadios).find(radio => radio.value === checkinData.grooming.appointmentDay);
-                        if (selectedRadio) {
-                            selectedRadio.checked = true;
-                        }
-                    }
-
-                    // Show/hide notes and appointment containers based on selections
-                    const hasGroomingSelected = Array.from(groomingCheckboxes).some(cb =>
-                        cb.checked && cb.value !== 'no'
-                    );
-                    const notesContainer = groomingPopup.querySelector('.conditional-grooming-notes-popup');
-                    const appointmentContainer = groomingPopup.querySelector('.conditional-grooming-appointment-popup');
-                    if (notesContainer) {
-                        notesContainer.style.display = hasGroomingSelected ? '' : 'none';
-                    }
-                    if (appointmentContainer) {
-                        appointmentContainer.style.display = hasGroomingSelected ? '' : 'none';
-                    }
-                }
-
-                // Show popup
-                groomingPopup.classList.remove('hidden');
+        // Handle notes textarea changes
+        if (groomingNotesTextarea) {
+            groomingNotesTextarea.addEventListener('input', function() {
+                PopupManager.saveGroomingData();
             });
+        }
+
+        // Load existing grooming data on initialization
+        PopupManager.loadGroomingData();
+    }
+
+    /**
+     * Save grooming data to FormDataManager
+     */
+    static saveGroomingData() {
+        const groomingPopup = document.getElementById('groomingPopup');
+        if (!groomingPopup) return;
+
+        const groomingCheckboxes = groomingPopup.querySelectorAll('input[name="groomingOptions[]"]');
+        const groomingNotesTextarea = document.getElementById('groomingNotes');
+        const groomingAcknowledgedCheckbox = document.getElementById('groomingAcknowledged');
+
+        // Check if any grooming service is selected
+        const hasGroomingSelected = Array.from(groomingCheckboxes).some(cb =>
+            cb.checked && cb.value !== 'no'
+        );
+
+        // If grooming is selected, validate that appointment day is selected
+        if (hasGroomingSelected) {
+            const appointmentRadios = groomingPopup.querySelectorAll('input[name="groomingAppointmentDay"]');
+            const appointmentDaySelected = Array.from(appointmentRadios).some(radio => radio.checked);
+            
+            if (!appointmentDaySelected) {
+                // Don't save yet, waiting for appointment day selection
+                return;
+            }
+        }
+
+        // Collect grooming data
+        const groomingData = {};
+        groomingCheckboxes.forEach(checkbox => {
+            groomingData[checkbox.value] = checkbox.checked;
+        });
+
+        // Get selected appointment day if grooming is selected
+        if (hasGroomingSelected) {
+            const appointmentRadios = groomingPopup.querySelectorAll('input[name="groomingAppointmentDay"]');
+            const selectedAppointment = Array.from(appointmentRadios).find(radio => radio.checked);
+            if (selectedAppointment) {
+                groomingData.appointmentDay = selectedAppointment.value;
+            }
+        }
+
+        const groomingNotes = groomingNotesTextarea ? groomingNotesTextarea.value.trim() : '';
+        const groomingAcknowledged = groomingAcknowledgedCheckbox ? groomingAcknowledgedCheckbox.checked : false;
+
+        // Save to FormDataManager
+        FormDataManager.updateCheckinData({
+            grooming: groomingData,
+            groomingDetails: groomingNotes,
+            groomingAcknowledged: groomingAcknowledged
+        });
+    }
+
+    /**
+     * Load grooming data from FormDataManager
+     */
+    static loadGroomingData() {
+        const checkinData = FormDataManager.getCheckinData();
+        if (!checkinData?.grooming) return;
+
+        const groomingPopup = document.getElementById('groomingPopup');
+        if (!groomingPopup) return;
+
+        const groomingCheckboxes = groomingPopup.querySelectorAll('input[name="groomingOptions[]"]');
+        const groomingNotesTextarea = document.getElementById('groomingNotes');
+        const groomingAcknowledgedCheckbox = document.getElementById('groomingAcknowledged');
+
+        // Pre-populate checkboxes
+        groomingCheckboxes.forEach(checkbox => {
+            checkbox.checked = checkinData.grooming[checkbox.value] || false;
+        });
+
+        // Pre-populate notes
+        if (groomingNotesTextarea && checkinData.groomingDetails) {
+            groomingNotesTextarea.value = checkinData.groomingDetails;
+        }
+
+        // Pre-populate acknowledgment
+        if (groomingAcknowledgedCheckbox && checkinData.groomingAcknowledged) {
+            groomingAcknowledgedCheckbox.checked = true;
+        }
+
+        // Pre-populate appointment day
+        if (checkinData.grooming.appointmentDay) {
+            const appointmentRadios = groomingPopup.querySelectorAll('input[name="groomingAppointmentDay"]');
+            const selectedRadio = Array.from(appointmentRadios).find(radio => radio.value === checkinData.grooming.appointmentDay);
+            if (selectedRadio) {
+                selectedRadio.checked = true;
+            }
+        }
+
+        // Show/hide notes and appointment containers based on selections
+        const hasGroomingSelected = Array.from(groomingCheckboxes).some(cb =>
+            cb.checked && cb.value !== 'no'
+        );
+        const notesContainer = groomingPopup.querySelector('.conditional-grooming-notes-popup');
+        const appointmentContainer = groomingPopup.querySelector('.conditional-grooming-appointment-popup');
+        if (notesContainer) {
+            notesContainer.style.display = hasGroomingSelected ? '' : 'none';
+        }
+        if (appointmentContainer) {
+            appointmentContainer.style.display = hasGroomingSelected ? '' : 'none';
         }
     }
 

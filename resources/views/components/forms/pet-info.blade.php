@@ -42,7 +42,20 @@
                 {{-- Header --}}
                 <div class="flex items-center justify-between mb-4">
                     <button type="button" x-on:click="prevMonth()" class="p-1 rounded-lg hover:bg-green-lightest text-green-dark font-bold text-lg">&larr;</button>
-                    <span class="font-bold text-green-dark" x-text="monthNames[month] + ' ' + year"></span>
+                    <div class="flex items-center gap-1">
+                        <select x-model="month" x-on:change="clampMonth()"
+                                class="text-sm font-bold text-green-dark bg-transparent border border-green-light rounded-md px-1 py-0.5 cursor-pointer focus:outline-none focus:ring-1 focus:ring-green">
+                            <template x-for="(name, idx) in monthNames" :key="idx">
+                                <option :value="idx" x-text="name" :disabled="year >= new Date().getFullYear() && idx > new Date().getMonth()"></option>
+                            </template>
+                        </select>
+                        <select x-model="year" x-on:change="clampMonth()"
+                                class="text-sm font-bold text-green-dark bg-transparent border border-green-light rounded-md px-1 py-0.5 cursor-pointer focus:outline-none focus:ring-1 focus:ring-green">
+                            <template x-for="y in years()" :key="y">
+                                <option :value="y" x-text="y"></option>
+                            </template>
+                        </select>
+                    </div>
                     <button type="button" x-on:click="nextMonth()" class="p-1 rounded-lg hover:bg-green-lightest text-green-dark font-bold text-lg">&rarr;</button>
                 </div>
 
