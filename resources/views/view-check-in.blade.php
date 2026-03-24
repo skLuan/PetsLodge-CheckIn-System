@@ -281,7 +281,7 @@
             @else
                 <div class="text-center py-12">
                     <div class="text-gray-500 text-lg mb-4">No active check-ins found</div>
-                    <a href="{{ route('check-in-form') }}"
+                    <a href="{{ route('new-form') }}"
                         class="bg-green hover:bg-green-dark text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200">
                         Create New Check-in
                     </a>

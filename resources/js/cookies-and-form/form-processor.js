@@ -13,9 +13,9 @@ import {
     InventoryFormManager,
     HealthFormManager,
     NavigationManager,
-    SubmissionManager
+    SubmissionManager,
+    FastCheckinManager
 } from "./managers/index.js";
-import { CoreDataManager } from "./managers/CoreDataManager.js";
 import { FormDataManager } from "./FormDataManager.js";
 import { CheckInSummaryUpdater } from "./managers/CheckInSummaryUpdater.js";
 import config from "./config.js";
@@ -104,6 +104,9 @@ document.addEventListener("DOMContentLoaded", async function () {
     // Initialize all form managers
     PetPillManager.addPetPillsToContainer();
     FormHandler.populateFormWithCookies();
+
+    // Initialize fast check-in pills for existing user pets
+    FastCheckinManager.initialize();
 
     // Initialize form-specific handlers
     InventoryFormManager.initializeInventoryForm();

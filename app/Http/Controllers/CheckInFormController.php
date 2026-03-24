@@ -30,7 +30,7 @@ class CheckInFormController extends Controller
         $phone = $request->get('phone');
         $user = null;
         if ($phone) {
-            $user = User::where('phone', $phone)->first();
+            $user = User::where('phone', $phone)->with('pets.kindOfPet', 'pets.gender', 'pets.castrated')->first();
         }
         return view('Process', compact('user'));
     }
@@ -44,7 +44,7 @@ class CheckInFormController extends Controller
     public function newFormPreFilled(Request $request)
     {
         $phone = $request->input('phone');
-        $user = User::where('phone', $phone)->first();
+        $user = User::where('phone', $phone)->with('pets.kindOfPet', 'pets.gender', 'pets.castrated')->first();
 
         if (!$user) {
             return redirect()->route('new-form')->with('error', 'User not found');

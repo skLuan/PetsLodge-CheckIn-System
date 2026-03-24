@@ -4,6 +4,8 @@ import { SummaryRenderer } from "./SummaryRenderer.js";
 import { InventoryManager } from "../managers/InventoryManager.js";
 import { UtilitiesManager } from "../managers/UtilitiesManager.js";
 import { NavigationManager } from "../managers/NavigationManager.js";
+import { FastCheckinManager } from "../managers/FastCheckinManager.js";
+import Pill from "../../Pill.js";
 import config from "../config.js";
 import Utils from "../../Utils.js";
 
@@ -159,10 +161,21 @@ class UIManager {
 
                 pets.forEach((pet, index) => {
                     if (pet && pet.info?.petName) {
-                        // This would need Pill import - simplified for now
-                        console.log(`Would add pill for pet ${index}: ${pet.info.petName}`);
+                        const pill = new Pill(pet.info.petName, pet.info.petType, index);
+                        container.appendChild(pill.render());
                     }
                 });
+
+                // Re-select the previously selected pill if it still exists
+                if (previouslySelectedIndex !== null && previouslySelectedIndex < pets.length) {
+                    const pillToReselect = container.querySelector(`[data-index="${previouslySelectedIndex}"]`);
+                    if (pillToReselect) {
+                        pillToReselect.classList.add('selected');
+                    }
+                }
+
+                // Refresh fast check-in pills after rebuilding pet pills
+                FastCheckinManager.refresh();
             }
         }
 

@@ -145,7 +145,7 @@ class DropInController extends Controller
 
         try {
             // Extract check-in ID from info if available
-            $checkInId = $validated['info']['checkInId'] ?? null;
+            $checkInId = $validated['info']['id'] ?? null;
             $pdfUri = null;
 
             // Check if document_url already exists for this check-in
@@ -173,7 +173,6 @@ class DropInController extends Controller
                     }
                 }
             }
-
             // Llama a PrintNode via service
             $printService = new PrintNodeService();
             $response = $printService->sendPrintJob($pdfUri, $validated['info']);

@@ -19,6 +19,7 @@ export { InventoryFormManager } from './InventoryFormManager.js';
 export { HealthFormManager } from './HealthFormManager.js';
 export { NavigationManager } from './NavigationManager.js';
 export { SubmissionManager } from './SubmissionManager.js';
+export { FastCheckinManager } from './FastCheckinManager.js';
 
 // Utilities and helpers
 export { UtilitiesManager } from './UtilitiesManager.js';
