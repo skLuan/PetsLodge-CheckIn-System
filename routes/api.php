@@ -33,3 +33,6 @@ Route::post('/checkin/step2/pet-info', [App\Http\Controllers\CheckInApiControlle
 Route::post('/checkin/step3/pet-health', [App\Http\Controllers\CheckInApiController::class, 'submitPetHealth']);
 Route::post('/checkin/step4/checkin-data', [App\Http\Controllers\CheckInApiController::class, 'submitCheckInData']);
 Route::post('/checkin/step5/extra-info', [App\Http\Controllers\CheckInApiController::class, 'submitExtraInfo']);
+
+// Session update route
+Route::post('/update-session-checkin', [App\Http\Controllers\CheckInApiController::class, 'updateSessionCheckIn']);

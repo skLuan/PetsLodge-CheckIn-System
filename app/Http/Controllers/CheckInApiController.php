@@ -564,18 +564,69 @@ class CheckInApiController extends Controller
         }
     }
 
-    /**
-     * Auto-save check-in data (for future implementation)
-     *
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function autoSaveCheckIn(Request $request)
-    {
-        // This could be implemented later for periodic saving
-        return response()->json([
-            'success' => true,
-            'message' => 'Auto-save not implemented yet'
-        ]);
-    }
+     /**
+      * Auto-save check-in (not implemented)
+      *
+      * @param Request $request
+      * @return \Illuminate\Http\JsonResponse
+      */
+     public function autoSaveCheckIn(Request $request)
+     {
+         // This could be implemented later for periodic saving
+         return response()->json([
+             'success' => true,
+             'message' => 'Auto-save not implemented yet'
+         ]);
+     }
+
+     /**
+      * Update server session with newly created check-in data
+      *
+      * This endpoint is called after successful check-in submission to ensure
+      * that the server session contains the newly created check-in data.
+      * This prevents the drop-in confirmation page from loading stale data.
+      *
+      * @param Request $request
+      * @return \Illuminate\Http\JsonResponse
+      */
+     public function updateSessionCheckIn(Request $request)
+     {
+         try {
+             $validated = $request->validate([
+                 'checkin_data' => 'required|array',
+             ]);
+
+             $checkinData = $validated['checkin_data'];
+             $checkinId = $checkinData['id'] ?? null;
+
+             Log::info('CheckInApiController: updateSessionCheckIn', [
+                 'checkin_id' => $checkinId,
+                 'user_phone' => $checkinData['user']['info']['phone'] ?? 'UNKNOWN',
+             ]);
+
+             // Store the check-in data in session
+             session(['checkin_data' => $checkinData]);
+
+             Log::info('CheckInApiController: Session updated with new check-in', [
+                 'checkin_id' => $checkinId,
+                 'session_key' => 'checkin_data'
+             ]);
+
+             return response()->json([
+                 'success' => true,
+                 'message' => 'Session updated with check-in data',
+                 'checkin_id' => $checkinId
+             ]);
+         } catch (\Exception $e) {
+             Log::error('CheckInApiController: updateSessionCheckIn failed', [
+                 'error' => $e->getMessage(),
+                 'trace' => $e->getTraceAsString()
+             ]);
+
+             return response()->json([
+                 'success' => false,
+                 'message' => 'Failed to update session: ' . $e->getMessage()
+             ], 500);
+          }
+      }
 }

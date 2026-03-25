@@ -112,6 +112,33 @@ class SubmissionManager {
             const endTime = new Date().toISOString();
             console.log(`✅ [${endTime}] Sequential check-in completed successfully!`);
 
+            // CRITICAL FIX: Update server session with newly created check-in data
+            // This ensures the confirmation page loads the correct new check-in, not the old one
+            console.log(`📡 [${new Date().toISOString()}] Updating server session with new check-in data...`);
+            const checkinDataWithId = {
+                ...checkinData,
+                id: lastCheckinId
+            };
+            
+            try {
+                const sessionResponse = await fetch('/api/update-session-checkin', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    },
+                    body: JSON.stringify({ checkin_data: checkinDataWithId })
+                });
+                
+                if (sessionResponse.ok) {
+                    console.log(`✅ [${new Date().toISOString()}] Server session updated with new check-in ID: ${lastCheckinId}`);
+                } else {
+                    console.warn(`⚠️ [${new Date().toISOString()}] Session update response not ok:`, sessionResponse.status);
+                }
+            } catch (sessionError) {
+                console.warn(`⚠️ [${new Date().toISOString()}] Session update failed (non-critical):`, sessionError.message);
+            }
+
             // Clear the cookie after successful submission
             FormDataManager.clearCheckinData();
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use App\Services\PdfService;
 use App\Services\PrintNodeService;
 use App\Services\CheckInTransformer;
@@ -30,9 +31,24 @@ class DropInController extends Controller
         // Initialize checkinData with user info
         $checkinData = session('checkin_data', []);
 
+        // DIAGNOSTIC LOG
+        \Log::info('DropInController::showDropConfirmation', [
+            'phone' => $phone['phone'],
+            'session_checkin_data_exists' => !empty($checkinData),
+            'session_checkin_id' => $checkinData['id'] ?? 'EMPTY',
+            'user_exists' => $user ? true : false,
+            'user_id' => $user->id ?? null,
+        ]);
+
         // If no session data, populate from user's latest check-in
         if (empty($checkinData) && $user) {
             $latestCheckIn = $user->checkIns()->latest()->first();
+            
+            \Log::info('DropInController::showDropConfirmation - Loading from DB', [
+                'latest_checkin_exists' => $latestCheckIn ? true : false,
+                'latest_checkin_id' => $latestCheckIn->id ?? 'NONE',
+            ]);
+            
             if ($latestCheckIn) {
                 // Eager load all relationships needed by the transformer
                 $latestCheckIn->load([
