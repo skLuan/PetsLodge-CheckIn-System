@@ -44,7 +44,7 @@ class SummaryRenderer {
      * - Shows/hides terms popup trigger
      */
     static updateCheckinSummary(cookieData) {
-        const summaryElement = document.getElementById('checkinSummary');
+        const summaryElement = document.querySelector('[data-check-in-summary]');
         const termsCheckbox = document.getElementById('finalTermsAccepted');
         const readTermsBtn = document.getElementById('readTermsAgainBtn');
         const finalSubmitBtn = document.getElementById('finalSubmit');

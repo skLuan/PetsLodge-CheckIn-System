@@ -17,7 +17,6 @@ import {
     FastCheckinManager
 } from "./managers/index.js";
 import { FormDataManager } from "./FormDataManager.js";
-import { CheckInSummaryUpdater } from "./managers/CheckInSummaryUpdater.js";
 import config from "./config.js";
 
 const { FORM_CONFIG } = config;
@@ -86,10 +85,13 @@ document.addEventListener("DOMContentLoaded", async function () {
      // If phone from URL differs from phone in cookie (if cookie exists), clear the form data
      // UNLESS we're in editing mode (in which case we want to keep the pre-populated data)
      if (phoneFromUrl && existingData && existingData.user && existingData.user.info &&
-         existingData.user.info.phone !== phoneFromUrl && !isEditingMode) {
-             console.log(existingData);
-         FormDataManager.clearCheckinData();
-     }
+          existingData.user.info.phone !== phoneFromUrl && !isEditingMode) {
+              console.log(existingData);
+          FormDataManager.clearCheckinData();
+      }
+
+    // Clean up any empty/incomplete pet entries left in the cookie
+    FormDataManager.cleanEmptyPets();
 
     // Initialize popup handlers FIRST (before form managers)
     // This ensures popups are ready before any form initialization
@@ -97,9 +99,9 @@ document.addEventListener("DOMContentLoaded", async function () {
     PopupManager.initializeGroomingPopup();
     PopupManager.initializeTermsPopup();
 
-    // Initialize check-in summary updater
-    // This ensures the summary component stays synchronized with cookie data
-    CheckInSummaryUpdater.initialize();
+    // Note: CheckInSummaryUpdater is not used here.
+    // Summary is rendered by SummaryRenderer via UIManager when entering step 6,
+    // and also re-rendered on any cookie change while on step 6.
 
     // Initialize all form managers
     PetPillManager.addPetPillsToContainer();
@@ -135,6 +137,14 @@ document.addEventListener("DOMContentLoaded", async function () {
             e.preventDefault();
             const data = extractFormInputValues(form);
 
+            // Guard: skip saving if the pet has no meaningful data (all fields empty)
+            const _KEY_FIELDS = ['petName', 'petColor', 'petType', 'petBreed', 'petAge', 'petWeight', 'petGender', 'petSpayed'];
+            const _hasData = _KEY_FIELDS.some(field => data[field] !== undefined && data[field] !== null && data[field] !== '');
+            if (!_hasData) {
+                console.warn('[petInfoForm] Skipped saving: all pet fields are empty.');
+                return;
+            }
+
             // Use the same method as the "next" button for consistency
             FormDataManager.handleFormStep(1, data, null); // step 1 = PET_INFO, selectedPetIndex = null to add new
             form.reset();
@@ -151,6 +161,14 @@ document.addEventListener("DOMContentLoaded", async function () {
         petInfoForm.addEventListener("submit", function (e) {
             e.preventDefault();
             const data = FormHandler.extractFormInputValues(petInfoForm);
+
+            // Guard: skip saving if the pet has no meaningful data (all fields empty)
+            const KEY_FIELDS = ['petName', 'petColor', 'petType', 'petBreed', 'petAge', 'petWeight', 'petGender', 'petSpayed'];
+            const hasData = KEY_FIELDS.some(field => data[field] !== undefined && data[field] !== null && data[field] !== '');
+            if (!hasData) {
+                console.warn('[petInfoForm] Skipped saving: all pet fields are empty.');
+                return;
+            }
 
             // Use the same method as the "next" button for consistency
             FormDataManager.handleFormStep(1, data, null); // step 1 = PET_INFO, selectedPetIndex = null to add new

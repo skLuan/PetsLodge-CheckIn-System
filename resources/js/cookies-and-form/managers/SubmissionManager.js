@@ -116,7 +116,9 @@ class SubmissionManager {
             FormDataManager.clearCheckinData();
 
             // Show countdown timer and redirect to home page after 60 seconds
-            this.showCountdownAndRedirect();
+            window.location.href = '/view-check-in?phone=' + checkinData.user.info.phone;
+            //;
+            //this.showCountdownAndRedirect();
 
         } catch (error) {
             const errorTime = new Date().toISOString();

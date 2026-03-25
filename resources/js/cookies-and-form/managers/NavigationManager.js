@@ -10,6 +10,7 @@ import config from "../config.js";
 import { FormDataManager } from "../FormDataManager.js";
 import { PopupManager } from "./PopupManager.js";
 import { CookieReactivityManager } from "../reactivitySystem/CookieReactivityManager.js";
+import { SummaryRenderer } from "../reactivitySystem/SummaryRenderer.js";
 
 const { FORM_CONFIG } = config;
 
@@ -87,6 +88,12 @@ class NavigationManager {
 
             // Update grooming summary and check grooming acknowledgment
             PopupManager.updateGroomingSummary();
+
+            // Render check-in summary from cookie data (no cookie change fires on step entry)
+            const cookieData = FormDataManager.getCheckinData();
+            if (cookieData) {
+                SummaryRenderer.updateCheckinSummary(cookieData);
+            }
         } else {
             // Show next button for other steps
             nextButton.style.display = '';
@@ -98,6 +105,12 @@ class NavigationManager {
             if (currentStep === FORM_CONFIG.STEPS.INVENTORY - 1) {
                 // Inventory step - change to "Complete Inventory"
                 nextButton.innerHTML = 'Complete Inventory <iconify-icon class="text-3xl" icon="fluent:next-frame-20-filled"></iconify-icon>';
+
+                // Populate inventory UI from cookie data on step entry
+                const invData = FormDataManager.getCheckinData();
+                if (invData) {
+                    FormDataManager.updateInventoryUI(invData.inventory, invData.inventoryComplete);
+                }
 
                 // Check inventory status, grooming acknowledgment, and terms acceptance
                 const checkinData = FormDataManager.getCheckinData();

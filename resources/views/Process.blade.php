@@ -72,7 +72,7 @@
                         <x-check-in-summary :checkinData="session('checkin_data', [])" />
                     </div>
 
-                    <div class="grooming bg-white p-4 rounded-lg border border-gray-300 mb-6">
+                    <div id="groomingPopup" class="grooming bg-white p-4 rounded-lg border border-gray-300 mb-6">
                         <h3 class="font-bold text-lg mb-4">Grooming Options</h3>
                         <div class="mb-4">
                             <div>
