@@ -101,9 +101,10 @@ class FormHandler {
             this._populateForm(petForm, petData);
         }
 
-        // Step 2: Feeding/Medication — list rendering handled by UIManager,
-        // but we trigger it here so items show on load
-        this._populateFeedingMedicationUI(checkinData.pets);
+         // Step 2: Feeding/Medication — list rendering is ENTIRELY handled by UIManager
+         // via CookieReactivityManager. Do NOT call _populateFeedingMedicationUI here
+         // as it will create simple text divs that conflict with UIManager's editable items.
+         // this._populateFeedingMedicationUI(checkinData.pets);
 
         // Step 3: Health Info
         const healthForm = forms[3];
