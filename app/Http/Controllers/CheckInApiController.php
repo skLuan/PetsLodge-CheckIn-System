@@ -210,6 +210,9 @@ class CheckInApiController extends Controller
     /**
      * Step 2: Submit Pet Info
      *
+     * Handles both new pet creation (sequential form submission) and pet updates (fast check-in).
+     * If petId is provided, updates the existing pet instead of creating a new one.
+     *
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
@@ -241,23 +244,28 @@ class CheckInApiController extends Controller
 
             $userId = $request->input('user_id');
             $petInfo = $request->input('pet_info');
+            $petId = $petInfo['petId'] ?? null;
+
             Log::info("CheckInApiController: Step 2 - Processing pet info [{$timestamp}]", [
                 'user_id' => $userId,
+                'pet_id' => $petId,
                 'pet_name' => $petInfo['petName'],
                 'pet_type' => $petInfo['petType'],
-                'pet_breed' => $petInfo['petBreed']
+                'pet_breed' => $petInfo['petBreed'],
+                'is_fast_checkin' => !is_null($petId)
             ]);
 
             // Get user
             $user = \App\Models\User::findOrFail($userId);
 
-            // Process pet using service (always create new for sequential submission)
+            // Process pet using service (creates new or updates existing if petId provided)
             $pet = $this->petService->processPetInfo($user, $petInfo);
 
             Log::info("CheckInApiController: Step 2 - Pet info submitted successfully [{$timestamp}]", [
                 'pet_id' => $pet->id,
                 'pet_name' => $pet->name,
-                'user_id' => $userId
+                'user_id' => $userId,
+                'was_updated' => !is_null($petId)
             ]);
 
             return response()->json([

@@ -243,16 +243,17 @@ class FastCheckinManager {
         console.log(`FastCheckinManager: Adding fast check-in pet "${dbPet.petName}"`);
 
         // Create form data object matching the structure expected by FormDataManager
-        const formData = {
-            petName: dbPet.petName,
-            petType: dbPet.petType,
-            petColor: dbPet.petColor,
-            petBreed: dbPet.petBreed,
-            petAge: dbPet.petAge,
-            petWeight: dbPet.petWeight,
-            petGender: dbPet.petGender,
-            petSpayed: dbPet.petSpayed,
-        };
+         const formData = {
+             petId: dbPet.id,
+             petName: dbPet.petName,
+             petType: dbPet.petType,
+             petColor: dbPet.petColor,
+             petBreed: dbPet.petBreed,
+             petAge: dbPet.petAge,
+             petWeight: dbPet.petWeight,
+             petGender: dbPet.petGender,
+             petSpayed: dbPet.petSpayed,
+         };
 
         // Add the pet to the check-in (immediately, without form validation)
         // This uses the same method as the "Add Pet" form submission

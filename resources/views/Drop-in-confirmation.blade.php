@@ -22,9 +22,8 @@
                     <x-check-in-summary :checkinData="session('checkin_data', $checkinData ?? [])" />
                 </div>
 
-                <div class="mt-8 text-center">
-                    <p class="text-lg text-gray-600 mb-4">Ready to drop off your pet? Our team has been notified.</p>
-                    <p class="text-lg">See you later alligator 😄 🐊</p>
+                <div class="mt-8 text-center px-4">
+                    <p class="text-lg text-left text-gray-600 mb-4">If all is ok, please print the check in, our team will be with you shortly</p>
 
                     <!-- Print Button -->
                     <div class="mt-6">
@@ -37,13 +36,13 @@
 
                     <!-- Loading indicator -->
                     <div id="print-loading" class="hidden mt-4">
-                        <p class="text-gray-600">Sending to printer...</p>
+                        <p class="text-gray-600">Sending to the team...</p>
                     </div>
 
                     <!-- Success message -->
                     <div id="print-success"
                         class="hidden mt-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
-                        <p>✓ Print job sent successfully!</p>
+                        <p>✓ Drop in sent successfully!</p>
                     </div>
 
                     <!-- Error message -->
@@ -151,6 +150,7 @@
                     <p class="text-lg text-gray-600 mb-4">Redirecting to drop-in area in:</p>
                     <p class="text-4xl font-bold text-green-600" id="countdown-timer">30</p>
                     <p class="text-sm text-gray-500 mt-2">seconds</p>
+                    <a href="/drop-in">Drop in area</a>
                 </div>
             </div>
         </div>
