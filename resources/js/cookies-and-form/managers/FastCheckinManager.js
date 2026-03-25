@@ -82,7 +82,7 @@ class FastCheckinManager {
         }
 
         // Parse DB pets from data attribute
-        const dbPetsStr = this.section.getAttribute("data-db-pets");
+        let dbPetsStr = this.section.getAttribute("data-db-pets");
         if (!dbPetsStr) {
             console.log("FastCheckinManager: No DB pets available");
             this.dbPets = [];
@@ -90,10 +90,16 @@ class FastCheckinManager {
         }
 
         try {
+            // Decode HTML entities that may have been added by htmlspecialchars() in the view
+            const decoder = document.createElement('textarea');
+            decoder.innerHTML = dbPetsStr;
+            dbPetsStr = decoder.value;
+            
             this.dbPets = JSON.parse(dbPetsStr);
             console.log(`FastCheckinManager: Loaded ${this.dbPets.length} DB pets`);
         } catch (error) {
             console.error("FastCheckinManager: Failed to parse data-db-pets:", error);
+            console.error("Raw string was:", dbPetsStr);
             this.dbPets = [];
             return;
         }

@@ -180,7 +180,7 @@
                                             @php
                                                 $feedingByTime = [];
                                                 foreach ($checkIn->foods as $food) {
-                                                    $time = $food->moment_of_day->name ?? 'morning';
+                                                    $time = $food->momentOfDay->name ?? $food->moment_of_day_id;
                                                     if (!isset($feedingByTime[$time])) {
                                                         $feedingByTime[$time] = [];
                                                     }
@@ -206,7 +206,7 @@
                                             @php
                                                 $medByTime = [];
                                                 foreach ($checkIn->medicines as $medicine) {
-                                                    $time = $medicine->moment_of_day->name ?? 'morning';
+                                                    $time = $medicine->momentOfDay->name ?? $medicine->moment_of_day_id;
                                                     if (!isset($medByTime[$time])) {
                                                         $medByTime[$time] = [];
                                                     }

@@ -206,47 +206,61 @@ class UIManager {
      * - Shows/hides day sections based on data availability
      * - Creates editable input elements for schedule items
      */
-    static updateFeedingMedicationUI(pets) {
-        if (!Array.isArray(pets)) return;
+     static updateFeedingMedicationUI(pets) {
+         if (!Array.isArray(pets)) {
+             console.warn("[updateFeedingMedicationUI] pets is not an array");
+             return;
+         }
 
-        // Track which time slots have items
-        const timeSlotsWithItems = new Set();
+         console.log("[updateFeedingMedicationUI] Starting with pets:", pets);
 
-        // Check all pets for feeding/medication items
-        pets.forEach(pet => {
-            if (pet?.feeding && Array.isArray(pet.feeding)) {
-                pet.feeding.forEach(item => {
-                    if (item.day_time) {
-                        timeSlotsWithItems.add(item.day_time);
-                    }
-                });
-            }
+         // Track which time slots have items
+         const timeSlotsWithItems = new Set();
 
-            if (pet?.medication && Array.isArray(pet.medication)) {
-                pet.medication.forEach(item => {
-                    if (item.day_time) {
-                        timeSlotsWithItems.add(item.day_time);
-                    }
-                });
-            }
-        });
+         // Check all pets for feeding/medication items
+         pets.forEach((pet, idx) => {
+             if (pet?.feeding && Array.isArray(pet.feeding)) {
+                 console.log(`[updateFeedingMedicationUI] Pet ${idx} has ${pet.feeding.length} feeding items`);
+                 pet.feeding.forEach(item => {
+                     if (item.day_time) {
+                         timeSlotsWithItems.add(item.day_time);
+                     }
+                 });
+             }
 
-        // Show/hide container-day sections based on whether they have items
-        const timeSlots = ['morning', 'afternoon', 'night'];
-        timeSlots.forEach(timeSlot => {
-            const container = document.querySelector(`.container-day[data-time-slot="${timeSlot}"]`);
-            if (container) {
-                if (timeSlotsWithItems.has(timeSlot)) {
-                    container.classList.remove('hidden');
-                } else {
-                    container.classList.add('hidden');
-                }
-            }
-        });
+             if (pet?.medication && Array.isArray(pet.medication)) {
+                 console.log(`[updateFeedingMedicationUI] Pet ${idx} has ${pet.medication.length} medication items`);
+                 pet.medication.forEach(item => {
+                     if (item.day_time) {
+                         timeSlotsWithItems.add(item.day_time);
+                     }
+                 });
+             }
+         });
 
-        // Update the actual feeding/medication displays
-        this.updateFeedingMedicationDisplays(pets);
-    }
+         console.log("[updateFeedingMedicationUI] Time slots with items:", Array.from(timeSlotsWithItems));
+
+         // Show/hide container-day sections based on whether they have items
+         const timeSlots = ['morning', 'afternoon', 'night'];
+         timeSlots.forEach(timeSlot => {
+             const container = document.querySelector(`.container-day[data-time-slot="${timeSlot}"]`);
+             if (container) {
+                 if (timeSlotsWithItems.has(timeSlot)) {
+                     container.classList.remove('hidden');
+                     console.log(`[updateFeedingMedicationUI] Showing ${timeSlot} container`);
+                 } else {
+                     container.classList.add('hidden');
+                     console.log(`[updateFeedingMedicationUI] Hiding ${timeSlot} container`);
+                 }
+             } else {
+                 console.warn(`[updateFeedingMedicationUI] Container for ${timeSlot} not found`);
+             }
+         });
+
+         // Update the actual feeding/medication displays
+         console.log("[updateFeedingMedicationUI] Calling updateFeedingMedicationDisplays...");
+         this.updateFeedingMedicationDisplays(pets);
+     }
 
     /**
      * Update the actual feeding and medication display elements
@@ -256,58 +270,83 @@ class UIManager {
      * @param {Array} pets - Array of pet objects
      * @returns {void}
      */
-    static updateFeedingMedicationDisplays(pets) {
-        // Clear all existing displays
-        const timeSlots = ['morning', 'afternoon', 'night'];
-        timeSlots.forEach(timeSlot => {
-            const foodContainer = document.querySelector(`#${timeSlot}-food-list`);
-            const medContainer = document.querySelector(`#${timeSlot}-med-list`);
+     static updateFeedingMedicationDisplays(pets) {
+         console.log("[updateFeedingMedicationDisplays] Starting...");
+         
+         // Clear all existing displays
+         const timeSlots = ['morning', 'afternoon', 'night'];
+         timeSlots.forEach(timeSlot => {
+             const foodContainer = document.querySelector(`#${timeSlot}-food-list`);
+             const medContainer = document.querySelector(`#${timeSlot}-med-list`);
 
-            if (foodContainer) foodContainer.innerHTML = '';
-            if (medContainer) medContainer.innerHTML = '';
-        });
+             if (foodContainer) {
+                 foodContainer.innerHTML = '';
+                 console.log(`[updateFeedingMedicationDisplays] Cleared ${timeSlot}-food-list`);
+             } else {
+                 console.warn(`[updateFeedingMedicationDisplays] ${timeSlot}-food-list container not found`);
+             }
+             if (medContainer) {
+                 medContainer.innerHTML = '';
+                 console.log(`[updateFeedingMedicationDisplays] Cleared ${timeSlot}-med-list`);
+             } else {
+                 console.warn(`[updateFeedingMedicationDisplays] ${timeSlot}-med-list container not found`);
+             }
+         });
 
-        // Populate displays with current data
-        if (!Array.isArray(pets)) return;
+         // Populate displays with current data
+         if (!Array.isArray(pets)) {
+             console.warn("[updateFeedingMedicationDisplays] pets is not an array");
+             return;
+         }
 
-        pets.forEach((pet, petIndex) => {
-            if (pet?.feeding && Array.isArray(pet.feeding)) {
-                pet.feeding.forEach((feed, itemIndex) => {
-                    if (feed.day_time) {
-                        const container = document.querySelector(`#${feed.day_time}-food-list`);
-                        if (container) {
-                            UtilitiesManager.createEditableItem(
-                                container,
-                                feed,
-                                petIndex,
-                                'feeding',
-                                itemIndex,
-                                pet.info?.petName || 'Pet'
-                            );
-                        }
-                    }
-                });
-            }
+         console.log("[updateFeedingMedicationDisplays] Processing", pets.length, "pets");
 
-            if (pet?.medication && Array.isArray(pet.medication)) {
-                pet.medication.forEach((med, itemIndex) => {
-                    if (med.day_time) {
-                        const container = document.querySelector(`#${med.day_time}-med-list`);
-                        if (container) {
-                            UtilitiesManager.createEditableItem(
-                                container,
-                                med,
-                                petIndex,
-                                'medication',
-                                itemIndex,
-                                pet.info?.petName || 'Pet'
-                            );
-                        }
-                    }
-                });
-            }
-        });
-    }
+         pets.forEach((pet, petIndex) => {
+             if (pet?.feeding && Array.isArray(pet.feeding)) {
+                 console.log(`[updateFeedingMedicationDisplays] Pet ${petIndex} has ${pet.feeding.length} feeding items`);
+                 pet.feeding.forEach((feed, itemIndex) => {
+                     if (feed.day_time) {
+                         const container = document.querySelector(`#${feed.day_time}-food-list`);
+                         if (container) {
+                             console.log(`[updateFeedingMedicationDisplays] Creating feeding item for ${feed.day_time}`);
+                             UtilitiesManager.createEditableItem(
+                                 container,
+                                 feed,
+                                 petIndex,
+                                 'feeding',
+                                 itemIndex,
+                                 pet.info?.petName || 'Pet'
+                             );
+                         } else {
+                             console.warn(`[updateFeedingMedicationDisplays] Container #${feed.day_time}-food-list not found`);
+                         }
+                     }
+                 });
+             }
+
+             if (pet?.medication && Array.isArray(pet.medication)) {
+                 console.log(`[updateFeedingMedicationDisplays] Pet ${petIndex} has ${pet.medication.length} medication items`);
+                 pet.medication.forEach((med, itemIndex) => {
+                     if (med.day_time) {
+                         const container = document.querySelector(`#${med.day_time}-med-list`);
+                         if (container) {
+                             console.log(`[updateFeedingMedicationDisplays] Creating medication item for ${med.day_time}`);
+                             UtilitiesManager.createEditableItem(
+                                 container,
+                                 med,
+                                 petIndex,
+                                 'medication',
+                                 itemIndex,
+                                 pet.info?.petName || 'Pet'
+                             );
+                         } else {
+                             console.warn(`[updateFeedingMedicationDisplays] Container #${med.day_time}-med-list not found`);
+                         }
+                     }
+                 });
+             }
+         });
+     }
 
     /**
      * Update health information UI

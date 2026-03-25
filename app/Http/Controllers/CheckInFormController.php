@@ -71,7 +71,7 @@ class CheckInFormController extends Controller
 
         $checkIns = CheckIn::where('user_id', $user->id)
                             ->whereNull('check_out')
-                            ->with('pet')
+                            ->with('pet', 'foods.momentOfDay', 'medicines.momentOfDay', 'items')
                             ->get();
 
         return view('view-check-in', compact('checkIns', 'user'));

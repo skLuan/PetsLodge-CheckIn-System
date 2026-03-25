@@ -13,10 +13,10 @@ class MomentOfDaySeeder extends Seeder
      */
     public function run(): void
     {
-        //
-        MomentOfDay::create(['name' => 'Morning']);
-        MomentOfDay::create(['name' => 'Noon']);
-        MomentOfDay::create(['name' => 'Evening']);
-        MomentOfDay::create(['name' => 'Night']);
+        MomentOfDay::firstOrCreate(['name' => 'Morning']);
+        MomentOfDay::firstOrCreate(['name' => 'Noon']);
+        MomentOfDay::firstOrCreate(['name' => 'Evening']);
+        MomentOfDay::firstOrCreate(['name' => 'Night']);
+        MomentOfDay::firstOrCreate(['name' => 'Afternoon']);
     }
 }

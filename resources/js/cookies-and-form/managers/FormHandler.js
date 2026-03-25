@@ -224,7 +224,7 @@ class FormHandler {
                 const container = document.querySelector(`#${feed.day_time}-food-list`);
                 if (container) {
                     const el = document.createElement('div');
-                    el.className = 'text-sm py-1 px-2 bg-blue-50 rounded mb-1';
+                    el.className = 'feeding-item text-sm py-1 px-2 bg-blue-50 rounded mb-1';
                     el.textContent = `${petName}: ${feed.feeding_med_details || ''}`;
                     container.appendChild(el);
                 }
@@ -235,7 +235,7 @@ class FormHandler {
                 const container = document.querySelector(`#${med.day_time}-med-list`);
                 if (container) {
                     const el = document.createElement('div');
-                    el.className = 'text-sm py-1 px-2 bg-red-50 rounded mb-1';
+                    el.className = 'medication-item text-sm py-1 px-2 bg-red-50 rounded mb-1';
                     el.textContent = `${petName}: ${med.feeding_med_details || ''}`;
                     container.appendChild(el);
                 }
