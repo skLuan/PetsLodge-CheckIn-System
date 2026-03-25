@@ -7,6 +7,7 @@
 
 import { FormDataManager } from "../FormDataManager.js";
 import { FormHandler } from "./FormHandler.js";
+import { FormUpdater } from "../reactivitySystem/FormUpdater.js";
 
 class PopupManager {
     /**
@@ -67,6 +68,10 @@ class PopupManager {
                     // Trigger change event to update visual feedback
                     timeCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
                 }
+
+                // Populate popup with existing data from cookie (for editing)
+                const pets = FormDataManager.getAllPetsFromCheckin();
+                FormUpdater.populateFeedingMedicationPopup(pets);
 
                 if (popup) {
                     popup.classList.remove("translate-y-[75vh]");

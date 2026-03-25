@@ -39,6 +39,7 @@ Route::middleware('auth')->group(function () {
 Route::middleware(['auth', 'pet.staff.only'])->group(function () {
     Route::get('/drop-in', [DropInController::class, 'show'])->name('drop-in.show');
     Route::get('/drop-in/confirmation', [DropInController::class, 'showDropConfirmation'])->name('drop-in.confirmation');
+    Route::post('/drop-in/check-user', [DropInController::class, 'checkUser'])->name('drop-in.check-user');
     
     // Pet Staff Dashboard
     Route::get('/pet-staff/dashboard', [PetStaffDashboardController::class, 'index'])->name('pet-staff.dashboard');
@@ -69,5 +70,3 @@ Route::get('/admin/monitoring-dashboard', function () {
 })->middleware(['auth', 'verified', 'admin.only'])->name('monitoring-dashboard');
 
 require __DIR__.'/auth.php';
-
-Route::post('/drop-in/check-user', [DropInController::class, 'checkUser'])->name('drop-in.check-user');

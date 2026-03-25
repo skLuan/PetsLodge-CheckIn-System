@@ -344,6 +344,99 @@ class FormUpdater {
 
         console.log("Update grooming and inventory form");
     }
+
+    /**
+     * Populate feeding/medication popup fields from cookie data
+     *
+     * Pre-populates the feeding/medication popup form with data from the check-in cookie
+     * when the popup is opened. This allows users to see and modify existing feeding/medication
+     * entries during editing mode. Only populates if the selected pet has existing data.
+     *
+     * @static
+     * @param {Array} pets - Array of pet objects with feeding/medication data
+     * @returns {boolean} True if popup was populated, false otherwise
+     *
+     * @example
+     * const pets = FormDataManager.getAllPetsFromCheckin();
+     * const wasPopulated = FormUpdater.populateFeedingMedicationPopup(pets);
+     *
+     * @sideEffects
+     * - Updates feeding/medication popup form fields with cookie data
+     * - Pre-selects day_time checkboxes based on most recent item
+     * - Pre-selects type radio based on most recent item
+     * - Populates feeding_med_details field
+     */
+    static populateFeedingMedicationPopup(pets) {
+        if (!Array.isArray(pets)) return false;
+
+        const popup = document.querySelector("#feedingMedicationPopup");
+        if (!popup) return false;
+
+        // Get the currently selected pet
+        const currentPetIndex = this.getCurrentSelectedPetIndex();
+        if (currentPetIndex === null || !pets[currentPetIndex]) return false;
+
+        const currentPet = pets[currentPetIndex];
+
+        // Find the most recent feeding or medication item to pre-populate
+        let mostRecentItem = null;
+        let mostRecentType = null;
+        let mostRecentIndex = -1;
+
+        // Check for most recent feeding item
+        if (currentPet.feeding && Array.isArray(currentPet.feeding) && currentPet.feeding.length > 0) {
+            mostRecentItem = currentPet.feeding[currentPet.feeding.length - 1];
+            mostRecentType = 'food';
+            mostRecentIndex = 0; // feeding priority
+        }
+
+        // Check for most recent medication item (compare timestamps if available, or just use last)
+        if (currentPet.medication && Array.isArray(currentPet.medication) && currentPet.medication.length > 0) {
+            const lastMed = currentPet.medication[currentPet.medication.length - 1];
+            // Prefer medication if we have no feeding, or if both exist (use the one from most recent add)
+            if (!mostRecentItem) {
+                mostRecentItem = lastMed;
+                mostRecentType = 'medication';
+                mostRecentIndex = 1; // medication priority
+            }
+        }
+
+        // If no data exists, return false (don't populate)
+        if (!mostRecentItem) {
+            return false;
+        }
+
+        // Pre-select day_time checkbox
+        if (mostRecentItem.day_time) {
+            const dayCheckbox = popup.querySelector(`input[name="day_time[]"][value="${mostRecentItem.day_time}"]`);
+            if (dayCheckbox) {
+                dayCheckbox.checked = true;
+                // Trigger change event to update visual feedback
+                dayCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }
+
+        // Pre-select type radio
+        if (mostRecentType) {
+            const typeRadio = popup.querySelector(`input[name="type"][value="${mostRecentType}"]`);
+            if (typeRadio) {
+                typeRadio.checked = true;
+                // Trigger change event to update visual feedback
+                typeRadio.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }
+
+        // Populate feeding_med_details field
+        if (mostRecentItem.feeding_med_details) {
+            const detailsField = popup.querySelector('[name="feeding_med_details"]');
+            if (detailsField) {
+                detailsField.value = mostRecentItem.feeding_med_details;
+            }
+        }
+
+        console.log("✅ Populated feeding/medication popup from cookie - Type:", mostRecentType, "Details:", mostRecentItem.feeding_med_details);
+        return true;
+    }
 }
 
 export { FormUpdater };

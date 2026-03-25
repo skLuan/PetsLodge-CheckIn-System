@@ -40,9 +40,9 @@ class DropInController extends Controller
             'user_id' => $user->id ?? null,
         ]);
 
-        // If no session data, populate from user's latest check-in
+        // If no session data, populate from user's active check-in
         if (empty($checkinData) && $user) {
-            $latestCheckIn = $user->checkIns()->latest()->first();
+            $latestCheckIn = $user->checkIns()->whereNull('check_out')->latest()->first();
             
             \Log::info('DropInController::showDropConfirmation - Loading from DB', [
                 'latest_checkin_exists' => $latestCheckIn ? true : false,

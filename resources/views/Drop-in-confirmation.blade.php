@@ -150,7 +150,7 @@
                     <p class="text-lg text-gray-600 mb-4">Redirecting to drop-in area in:</p>
                     <p class="text-4xl font-bold text-green-600" id="countdown-timer">30</p>
                     <p class="text-sm text-gray-500 mt-2">seconds</p>
-                    <a href="/drop-in">Drop in area</a>
+                     <a href="{{ route('drop-in.show') }}">Go now</a>
                 </div>
             </div>
         </div>
@@ -181,7 +181,7 @@
                         if (secondsRemaining <= 0) {
                             clearInterval(countdownInterval);
                             // Redirect to drop-in area
-                            window.location.href = '/drop-in';
+                            window.location.href = '{{ route("drop-in.show") }}';
                         }
                     }, 1000);
                 }
