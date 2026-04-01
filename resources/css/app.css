@@ -3,6 +3,8 @@
 @tailwind components;
 @tailwind utilities;
 
+[x-cloak] { display: none !important; }
+
 @layer base {
     body {
         @apply font-nun bg-green-lightest text-gray font-normal;

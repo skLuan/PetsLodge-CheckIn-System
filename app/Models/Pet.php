@@ -12,6 +12,7 @@ class Pet extends Model
         'birth_date',
         'race',
         'color',
+        'weight',
         'health_conditions',
         'warnings',
         'gender_id',

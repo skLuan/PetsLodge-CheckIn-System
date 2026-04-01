@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use App\Services\PdfService;
 use App\Services\PrintNodeService;
 use App\Services\CheckInTransformer;
@@ -30,9 +31,24 @@ class DropInController extends Controller
         // Initialize checkinData with user info
         $checkinData = session('checkin_data', []);
 
-        // If no session data, populate from user's latest check-in
+        // DIAGNOSTIC LOG
+        \Log::info('DropInController::showDropConfirmation', [
+            'phone' => $phone['phone'],
+            'session_checkin_data_exists' => !empty($checkinData),
+            'session_checkin_id' => $checkinData['id'] ?? 'EMPTY',
+            'user_exists' => $user ? true : false,
+            'user_id' => $user->id ?? null,
+        ]);
+
+        // If no session data, populate from user's active check-in
         if (empty($checkinData) && $user) {
-            $latestCheckIn = $user->checkIns()->latest()->first();
+            $latestCheckIn = $user->checkIns()->whereNull('check_out')->latest()->first();
+            
+            \Log::info('DropInController::showDropConfirmation - Loading from DB', [
+                'latest_checkin_exists' => $latestCheckIn ? true : false,
+                'latest_checkin_id' => $latestCheckIn->id ?? 'NONE',
+            ]);
+            
             if ($latestCheckIn) {
                 // Eager load all relationships needed by the transformer
                 $latestCheckIn->load([
@@ -144,14 +160,35 @@ class DropInController extends Controller
         ]);
 
         try {
-            // Genera PDF via service
-            $pdfService = new PdfService();
-            $pdfUri = $pdfService->generatePdf($validated['info']);  // Devuelve URI (e.g., S3 URL)
+            // Extract check-in ID from info if available
+            $checkInId = $validated['info']['id'] ?? null;
+            $pdfUri = null;
 
-            if (!$pdfUri) {
-                return response()->json(['error' => 'Error generating PDF'], 500);
+            // Check if document_url already exists for this check-in
+            if ($checkInId) {
+                $checkIn = \App\Models\CheckIn::find($checkInId);
+                if ($checkIn && $checkIn->document_url) {
+                    $pdfUri = $checkIn->document_url;
+                }
             }
 
+            // Generate PDF only if not already stored
+            if (!$pdfUri) {
+                $pdfService = new PdfService();
+                $pdfUri = $pdfService->generatePdf($validated['info']);  // Devuelve URI (e.g., S3 URL)
+
+                if (!$pdfUri) {
+                    return response()->json(['error' => 'Error generating PDF'], 500);
+                }
+
+                // Save document_url to database if check-in ID is available
+                if ($checkInId) {
+                    $checkIn = \App\Models\CheckIn::find($checkInId);
+                    if ($checkIn) {
+                        $checkIn->update(['document_url' => $pdfUri]);
+                    }
+                }
+            }
             // Llama a PrintNode via service
             $printService = new PrintNodeService();
             $response = $printService->sendPrintJob($pdfUri, $validated['info']);

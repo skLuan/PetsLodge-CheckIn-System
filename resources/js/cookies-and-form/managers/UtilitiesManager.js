@@ -98,47 +98,68 @@ class UtilitiesManager {
     /**
      * Crea un elemento editable para alimentación/medicación
      */
-    static createEditableItem(container, item, petIndex, type, itemIndex, petName) {
-        if (!container) return;
+     static createEditableItem(container, item, petIndex, type, itemIndex, petName) {
+         if (!container) {
+             console.warn(`[createEditableItem] Container is null for ${type} at ${petName}`);
+             return;
+         }
 
-        const itemDiv = document.createElement('div');
-        itemDiv.className = 'flex items-center rounded-b-sm py-1';
+         console.log(`[createEditableItem] Creating item for ${petName} - ${type}`, { item, container });
 
-        // Edit button
-        const editBtn = document.createElement('button');
-        editBtn.type = 'button';
-        editBtn.className = 'ml-2 text-green-dark hover:text-blue-700 focus:outline focus:outline-2 focus:outline-green w-11 h-11 flex items-center justify-center rounded';
-        editBtn.setAttribute('aria-label', 'Edit item');
-        editBtn.innerHTML = '<iconify-icon icon="material-symbols:edit" class="text-lg"></iconify-icon>';
-        editBtn.onclick = () => this.toggleEdit(input, editBtn);
+         const itemDiv = document.createElement('div');
+         itemDiv.className = 'flex items-center rounded-b-sm py-1';
 
-        // Input field
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.value = item.feeding_med_details || '';
-        input.disabled = true;
-        input.className = 'flex-1 mb-0';
-        input.dataset.petIndex = petIndex;
-        input.dataset.type = type;
-        input.dataset.itemIndex = itemIndex;
+         // Input field (must be created first so it can be referenced by editBtn)
+         const input = document.createElement('input');
+         input.type = 'text';
+         input.value = item.feeding_med_details || '';
+         input.disabled = true;
+         input.className = 'flex-1 mb-0';
+         input.dataset.petIndex = petIndex;
+         input.dataset.type = type;
+         input.dataset.itemIndex = itemIndex;
 
-        // Delete button
-        const deleteBtn = document.createElement('button');
-        deleteBtn.type = 'button';
-        deleteBtn.className = 'ml-2 text-orange-600 hover:text-red-700 focus:outline focus:outline-2 focus:outline-orange-600 w-11 h-11 flex items-center justify-center rounded';
-        deleteBtn.setAttribute('aria-label', 'Delete item');
-        deleteBtn.innerHTML = '<iconify-icon icon="material-symbols:delete" class="text-lg"></iconify-icon>';
-        deleteBtn.onclick = () => {
-            if (confirm('Are you sure you want to delete this item?')) {
-                PetManager.removeFeedingMedicationItem(petIndex, type, itemIndex);
-            }
-        };
+         // Edit button
+         const editBtn = document.createElement('button');
+         editBtn.type = 'button';
+         editBtn.className = 'ml-2 text-green-dark hover:text-blue-700 focus:outline focus:outline-2 focus:outline-green w-11 h-11 flex items-center justify-center rounded';
+         editBtn.setAttribute('aria-label', 'Edit item');
+         editBtn.innerHTML = '<iconify-icon icon="material-symbols:edit" class="text-lg"></iconify-icon>';
+         editBtn.onclick = () => this.toggleEdit(input, editBtn);
 
-        itemDiv.appendChild(input);
-        itemDiv.appendChild(editBtn);
-        itemDiv.appendChild(deleteBtn);
-        container.appendChild(itemDiv);
-    }
+         // Delete button
+         const deleteBtn = document.createElement('button');
+         deleteBtn.type = 'button';
+         deleteBtn.className = 'ml-2 text-orange-600 hover:text-red-700 focus:outline focus:outline-2 focus:outline-orange-600 w-11 h-11 flex items-center justify-center rounded';
+         deleteBtn.setAttribute('aria-label', 'Delete item');
+         deleteBtn.innerHTML = '<iconify-icon icon="material-symbols:delete" class="text-lg"></iconify-icon>';
+         deleteBtn.onclick = () => {
+             if (confirm('Are you sure you want to delete this item?')) {
+                 PetManager.removeFeedingMedicationItem(petIndex, type, itemIndex);
+             }
+         };
+
+         itemDiv.appendChild(input);
+         itemDiv.appendChild(editBtn);
+         itemDiv.appendChild(deleteBtn);
+         
+         console.log(`[createEditableItem] Built itemDiv:`, {
+             itemDiv,
+             itemDivHTML: itemDiv.outerHTML,
+             itemDivChildren: itemDiv.children.length,
+             containerExists: !!container,
+             containerParent: container?.parentElement?.id || 'no-parent',
+             containerID: container?.id
+         });
+         
+         console.log(`[createEditableItem] Appending to container...`);
+         container.appendChild(itemDiv);
+         
+         console.log(`[createEditableItem] Item appended successfully`, {
+             containerChildCount: container.children.length,
+             containerHTML: container.innerHTML.substring(0, 300)
+         });
+     }
 
     /**
      * Crea un elemento editable para items de inventario

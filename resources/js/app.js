@@ -4,8 +4,11 @@ import { CheckInHandler } from './components/CheckInHandler.js';
 import { checkInConfig, dropInConfig, isCheckInPage, isDropInPage } from './config/checkInConfig.js';
 
 import Alpine from 'alpinejs';
+import datePicker from './components/datePicker.js';
 
 window.Alpine = Alpine;
+window.datePicker = datePicker;
+Alpine.data('datePicker', datePicker);
 
 // Initialize CheckInHandler only on the /check-in page
 if (isCheckInPage()) {

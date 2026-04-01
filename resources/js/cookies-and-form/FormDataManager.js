@@ -909,6 +909,23 @@ class FormDataManager {
     }
 
     /**
+     * Removes pets from the cookie that have all empty info fields.
+     * Called at initialization to clean up any stale or incomplete pet entries.
+     *
+     * @static
+     * @returns {number} Number of empty pets removed
+     *
+     * @example
+     * const removed = FormDataManager.cleanEmptyPets();
+     * if (removed > 0) console.log(`Cleaned ${removed} empty pet(s) from cookie`);
+     *
+     * @see PetManager.cleanEmptyPets
+     */
+    static cleanEmptyPets() {
+        return PetManager.cleanEmptyPets();
+    }
+
+    /**
      * Adds a new item to the inventory list
      *
      * Appends a text description to the inventory items array. Used when

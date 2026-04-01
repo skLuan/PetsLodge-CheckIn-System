@@ -59,6 +59,7 @@ const DEFAULT_CHECKIN_STRUCTURE = {
     groomingDetails: "",
     inventory: [],
     inventoryComplete: false,
+    groomingAcknowledged: false,
     termsAccepted: false,
     lastUpdated: "",
     /**

@@ -1,0 +1,5 @@
+#!/bin/sh
+# Simple PHP-FPM Health Check Script
+
+# Check if PHP-FPM process is running
+pgrep -x php-fpm > /dev/null 2>&1 || exit 1

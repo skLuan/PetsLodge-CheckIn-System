@@ -51,62 +51,101 @@ class SubmissionManager {
             CookieManager.setCookie("user.id", userResult.data.user_id);
             console.log(`💾 [${new Date().toISOString()}] User ID stored in cookie: ${userResult.data.user_id}`);
 
-            // Step 2: Send Pet Info (assuming first pet for now)
-            const petData = checkinData.pets[0]; // TODO: Handle multiple pets
-            console.log(`🐾 [${new Date().toISOString()}] Step 2: Sending pet info for ${petData.info.petName}...`);
-            const petResult = await this.submitPetInfo(userResult.data.user_id, petData.info);
-            if (!petResult.success) {
-                throw new Error(`Step 2 failed: ${petResult.message}`);
+            // Process each pet sequentially (steps 2-5 per pet)
+            const pets = checkinData.pets || [];
+            if (pets.length === 0) {
+                throw new Error("No pets found in check-in data.");
             }
 
-            // Store pet ID in cookie
-            CookieManager.setCookie("pet.info.petid", petResult.data.pet_id);
-            console.log(`💾 [${new Date().toISOString()}] Pet ID stored in cookie: ${petResult.data.pet_id}`);
+            let lastCheckinId = null;
 
-            // Step 3: Send Pet Health, Feeding, and Medication
-            console.log(`🏥 [${new Date().toISOString()}] Step 3: Sending pet health data...`);
-            const healthResult = await this.submitPetHealth(
-                petResult.data.pet_id,
-                petData.health || {},
-                petData.feeding || [],
-                petData.medication || []
-            );
-            if (!healthResult.success) {
-                throw new Error(`Step 3 failed: ${healthResult.message}`);
-            }
+            for (let i = 0; i < pets.length; i++) {
+                const petData = pets[i];
+                const petName = petData?.info?.petName || `Pet ${i + 1}`;
+                console.log(`🐾 [${new Date().toISOString()}] Step 2: Sending pet info for ${petName} (${i + 1}/${pets.length})...`);
 
-            // Step 4: Send Check-In Data
-            console.log(`📋 [${new Date().toISOString()}] Step 4: Sending check-in data...`);
-            const checkinResult = await this.submitCheckInData(petResult.data.pet_id, checkinData);
-            if (!checkinResult.success) {
-                throw new Error(`Step 4 failed: ${checkinResult.message}`);
-            }
+                // Step 2: Send Pet Info
+                const petResult = await this.submitPetInfo(userResult.data.user_id, petData.info);
+                if (!petResult.success) {
+                    throw new Error(`Step 2 failed for ${petName}: ${petResult.message}`);
+                }
 
-            // Store check-in ID in cookie
-            CookieManager.setCookie("dbCheckInId", checkinResult.data.checkin_id);
-            console.log(`💾 [${new Date().toISOString()}] Check-in ID stored in cookie: ${checkinResult.data.checkin_id}`);
+                CookieManager.setCookie("pet.info.petid", petResult.data.pet_id);
+                console.log(`💾 [${new Date().toISOString()}] Pet ID stored in cookie: ${petResult.data.pet_id}`);
 
-            // Step 5: Send Extra Info
-            console.log(`📦 [${new Date().toISOString()}] Step 5: Sending extra info...`);
-            const extraResult = await this.submitExtraInfo(checkinResult.data.checkin_id, {
-                inventory: checkinData.inventory || [],
-                grooming: checkinData.grooming || {}
-            });
-            if (!extraResult.success) {
-                throw new Error(`Step 5 failed: ${extraResult.message}`);
+                // Step 3: Send Pet Health, Feeding, and Medication
+                console.log(`🏥 [${new Date().toISOString()}] Step 3: Sending pet health data for ${petName}...`);
+                const healthResult = await this.submitPetHealth(
+                    petResult.data.pet_id,
+                    petData.health || {},
+                    petData.feeding || [],
+                    petData.medication || []
+                );
+                if (!healthResult.success) {
+                    throw new Error(`Step 3 failed for ${petName}: ${healthResult.message}`);
+                }
+
+                // Step 4: Send Check-In Data
+                console.log(`📋 [${new Date().toISOString()}] Step 4: Sending check-in data for ${petName}...`);
+                const checkinResult = await this.submitCheckInData(petResult.data.pet_id, checkinData);
+                if (!checkinResult.success) {
+                    throw new Error(`Step 4 failed for ${petName}: ${checkinResult.message}`);
+                }
+
+                lastCheckinId = checkinResult.data.checkin_id;
+                CookieManager.setCookie("dbCheckInId", lastCheckinId);
+                console.log(`💾 [${new Date().toISOString()}] Check-in ID stored in cookie: ${lastCheckinId}`);
+
+                // Step 5: Send Extra Info
+                console.log(`📦 [${new Date().toISOString()}] Step 5: Sending extra info for ${petName}...`);
+                const extraResult = await this.submitExtraInfo(lastCheckinId, {
+                    inventory: checkinData.inventory || [],
+                    grooming: checkinData.grooming || {}
+                });
+                if (!extraResult.success) {
+                    throw new Error(`Step 5 failed for ${petName}: ${extraResult.message}`);
+                }
+
+                console.log(`✅ [${new Date().toISOString()}] Pet ${petName} (${i + 1}/${pets.length}) submitted successfully.`);
             }
 
             const endTime = new Date().toISOString();
             console.log(`✅ [${endTime}] Sequential check-in completed successfully!`);
 
+            // CRITICAL FIX: Update server session with newly created check-in data
+            // This ensures the confirmation page loads the correct new check-in, not the old one
+            console.log(`📡 [${new Date().toISOString()}] Updating server session with new check-in data...`);
+            const checkinDataWithId = {
+                ...checkinData,
+                id: lastCheckinId
+            };
+            
+            try {
+                const sessionResponse = await fetch('/api/update-session-checkin', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    },
+                    body: JSON.stringify({ checkin_data: checkinDataWithId })
+                });
+                
+                if (sessionResponse.ok) {
+                    console.log(`✅ [${new Date().toISOString()}] Server session updated with new check-in ID: ${lastCheckinId}`);
+                } else {
+                    console.warn(`⚠️ [${new Date().toISOString()}] Session update response not ok:`, sessionResponse.status);
+                }
+            } catch (sessionError) {
+                console.warn(`⚠️ [${new Date().toISOString()}] Session update failed (non-critical):`, sessionError.message);
+            }
+
             // Clear the cookie after successful submission
             FormDataManager.clearCheckinData();
 
-            // Show success message
-            alert("Check-in completed successfully!");
-
-            // Redirect to success page or dashboard
-            window.location.href = `/view-check-in?phone=${checkinData.user?.info?.phone}`;
+            // Show countdown timer and redirect to home page after 60 seconds
+            window.location.href = '/view-check-in?phone=' + checkinData.user.info.phone;
+            //;
+            //this.showCountdownAndRedirect();
 
         } catch (error) {
             const errorTime = new Date().toISOString();
@@ -121,6 +160,71 @@ class SubmissionManager {
 
             alert(`An error occurred during submission: ${error.message}`);
         }
+    }
+
+    /**
+     * Show countdown timer and redirect to home page after 60 seconds
+     */
+    static showCountdownAndRedirect() {
+        // Create countdown overlay
+        const overlay = document.createElement('div');
+        overlay.id = 'countdown-overlay';
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        `;
+
+        const message = document.createElement('div');
+        message.style.cssText = `
+            font-size: 24px;
+            margin-bottom: 20px;
+            text-align: center;
+        `;
+        message.textContent = 'Check-in completed successfully!';
+
+        const countdown = document.createElement('div');
+        countdown.style.cssText = `
+            font-size: 48px;
+            font-weight: bold;
+            color: #10b981;
+        `;
+        countdown.textContent = '60';
+
+        const redirectText = document.createElement('div');
+        redirectText.style.cssText = `
+            font-size: 16px;
+            margin-top: 20px;
+            color: #9ca3af;
+        `;
+        redirectText.textContent = 'Redirecting to home page...';
+
+        overlay.appendChild(message);
+        overlay.appendChild(countdown);
+        overlay.appendChild(redirectText);
+        document.body.appendChild(overlay);
+
+        // Countdown timer
+        let secondsLeft = 60;
+        const timer = setInterval(() => {
+            secondsLeft--;
+            countdown.textContent = secondsLeft.toString();
+
+            if (secondsLeft <= 0) {
+                clearInterval(timer);
+                window.location.href = '/';
+            }
+        }, 1000);
     }
 
     /**

@@ -10,6 +10,7 @@
 .env
 .env.backup
 .env.production
+.env.docker
 .phpunit.result.cache
 Homestead.json
 Homestead.yaml
@@ -23,3 +24,10 @@ yarn-error.log
 /logs
 /reports
 .kilocodemodes
+
+# Docker files (optional - can be tracked if needed)
+# Dockerfile
+# Dockerfile.nginx
+# docker-compose.yml
+# docker/
+# docker-entrypoint.sh
