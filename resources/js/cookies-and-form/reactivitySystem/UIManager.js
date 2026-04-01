@@ -159,10 +159,17 @@ class UIManager {
                 // Recordar cuál estaba seleccionado antes de limpiar
                 const previouslySelectedIndex = UtilitiesManager.getCurrentSelectedPetIndex();
 
+                let firstPill = null;
                 pets.forEach((pet, index) => {
                     if (pet && pet.info?.petName) {
                         const pill = new Pill(pet.info.petName, pet.info.petType, index);
-                        container.appendChild(pill.render());
+                        const pillElement = pill.render();
+                        container.appendChild(pillElement);
+                        
+                        // Store the first pill in case we need to auto-select it
+                        if (index === 0) {
+                            firstPill = pillElement;
+                        }
                     }
                 });
 
@@ -172,6 +179,11 @@ class UIManager {
                     if (pillToReselect) {
                         pillToReselect.classList.add('selected');
                     }
+                } else if (firstPill) {
+                    // If no previous selection exists, auto-select the first pill
+                    // This ensures a pet is always "current" for feeding/medication operations
+                    console.log("[UIManager] Auto-selecting first pet pill (no previous selection)");
+                    firstPill.classList.add('selected');
                 }
 
                 // Refresh fast check-in pills after rebuilding pet pills
