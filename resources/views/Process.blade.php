@@ -28,6 +28,23 @@
             <div id="step2" class="step w-full">
                 <h2 class="text-center font-bold">Pet Information</h2>
                 <p class="text-lg">General Information of your best friend</p>
+                <div id="fastCheckinPillsSection"
+                     data-db-pets="{{ htmlspecialchars(json_encode(
+                         ($user?->pets ?? collect())->map(fn($p) => [
+                             'id'       => $p->id,
+                             'petName'  => $p->name,
+                             'petType'  => $p->kindOfPet?->name ?? 'other',
+                             'petColor' => $p->color,
+                             'petBreed' => $p->race,
+                             'petAge'   => $p->birth_date,
+                             'petWeight'=> $p->weight,
+                             'petGender'=> $p->gender?->name ?? '',
+                             'petSpayed'=> $p->castrated?->name ?? '',
+                         ])->values()->all()
+                     ), ENT_QUOTES, 'UTF-8') }}">
+                    <p class="text-sm text-gray mb-1">Fast check-in for:</p>
+                    <div id="fastCheckinPillsContainer" class="pills"></div>
+                </div>
                 <x-forms.pet-info />
             </div>
 
@@ -55,7 +72,7 @@
                         <x-check-in-summary :checkinData="session('checkin_data', [])" />
                     </div>
 
-                    <div class="grooming bg-white p-4 rounded-lg border border-gray-300 mb-6">
+                    <div id="groomingPopup" class="grooming bg-white p-4 rounded-lg border border-gray-300 mb-6">
                         <h3 class="font-bold text-lg mb-4">Grooming Options</h3>
                         <div class="mb-4">
                             <div>

@@ -76,11 +76,14 @@ class CheckInPetService
     }
 
     /**
-     * Process pet info for sequential submission (always creates new pet)
+     * Process pet info for sequential submission
+     *
+     * Handles both fast check-in (with existing petId) and sequential form submissions (without petId).
+     * If petId is provided, updates the existing pet record instead of creating a new one.
      *
      * @param \App\Models\User $user The user instance
      * @param array $petInfo The pet information array
-     * @return Pet The created pet instance
+     * @return Pet The created or updated pet instance
      * @throws \Exception If pet data is invalid
      */
     public function processPetInfo($user, array $petInfo): Pet
@@ -89,14 +92,13 @@ class CheckInPetService
         if (empty($petInfo['petName']) || empty($petInfo['petType']) || empty($petInfo['petBreed']) || empty($petInfo['petColor'])) {
             throw new \Exception('Pet name, type, breed, and color are required');
         }
+
         // Get or create related entities
         $gender = Gender::firstOrCreate(['name' => $petInfo['petGender'] ?? 'unknown']);
         $kindOfPet = KindOfPet::firstOrCreate(['name' => $petInfo['petType']]);
         $castrated = Castrated::firstOrCreate(['status' => $petInfo['petSpayed'] ?? 'unknown']);
 
-        // Always create a new pet for sequential submissions
-        $pet = Pet::create([
-            'user_id' => $user->id,
+        $petAttributes = [
             'name' => $petInfo['petName'],
             'birth_date' => isset($petInfo['petAge']) ? date('Y-m-d', strtotime($petInfo['petAge'])) : null,
             'race' => $petInfo['petBreed'],
@@ -108,6 +110,38 @@ class CheckInPetService
             // Health data will be added in step 3
             'health_conditions' => null,
             'warnings' => null,
+        ];
+
+        // Check if updating an existing pet (fast check-in with petId)
+        if (!empty($petInfo['petId'])) {
+            $pet = Pet::where('id', $petInfo['petId'])
+                      ->where('user_id', $user->id)
+                      ->first();
+
+            if ($pet) {
+                // Update existing pet
+                $pet->update($petAttributes);
+                Log::info('CheckInPetService: Updated existing pet via fast check-in', [
+                    'pet_id' => $pet->id,
+                    'user_id' => $user->id
+                ]);
+                return $pet;
+            } else {
+                Log::warning('CheckInPetService: Pet ID provided but pet not found', [
+                    'pet_id' => $petInfo['petId'],
+                    'user_id' => $user->id
+                ]);
+            }
+        }
+
+        // Create a new pet for sequential submissions or if pet not found
+        $petAttributes['user_id'] = $user->id;
+        $pet = Pet::create($petAttributes);
+
+        Log::info('CheckInPetService: Created new pet', [
+            'pet_id' => $pet->id,
+            'user_id' => $user->id,
+            'from_fast_checkin' => !empty($petInfo['petId'])
         ]);
 
         return $pet;

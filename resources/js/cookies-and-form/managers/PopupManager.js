@@ -7,6 +7,7 @@
 
 import { FormDataManager } from "../FormDataManager.js";
 import { FormHandler } from "./FormHandler.js";
+import { FormUpdater } from "../reactivitySystem/FormUpdater.js";
 
 class PopupManager {
     /**
@@ -59,16 +60,27 @@ class PopupManager {
             btn.addEventListener("click", function (e) {
                 e.preventDefault();
                 const period = btn.getAttribute('data-period') || 'morning';
+                console.log("[PopupManager] Add button clicked, period:", period);
 
                 // Pre-select the time in the popup (checkbox instead of radio)
                 const timeCheckbox = document.querySelector(`input[name="day_time[]"][value="${period}"]`);
                 if (timeCheckbox) {
+                    console.log("[PopupManager] Pre-selecting time checkbox for period:", period);
                     timeCheckbox.checked = true;
                     // Trigger change event to update visual feedback
                     timeCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+                } else {
+                    console.warn("[PopupManager] Time checkbox not found for period:", period);
                 }
 
+                // Populate popup with existing data from cookie (for editing)
+                console.log("[PopupManager] Attempting to populate popup with existing data...");
+                const pets = FormDataManager.getAllPetsFromCheckin();
+                console.log("[PopupManager] Pets data:", pets);
+                FormUpdater.populateFeedingMedicationPopup(pets);
+
                 if (popup) {
+                    console.log("[PopupManager] Opening feeding/medication popup");
                     popup.classList.remove("translate-y-[75vh]");
                     popup.classList.add("translate-y-0");
                 }

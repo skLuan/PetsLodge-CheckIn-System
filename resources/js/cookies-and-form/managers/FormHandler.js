@@ -101,9 +101,10 @@ class FormHandler {
             this._populateForm(petForm, petData);
         }
 
-        // Step 2: Feeding/Medication — list rendering handled by UIManager,
-        // but we trigger it here so items show on load
-        this._populateFeedingMedicationUI(checkinData.pets);
+         // Step 2: Feeding/Medication — list rendering is ENTIRELY handled by UIManager
+         // via CookieReactivityManager. Do NOT call _populateFeedingMedicationUI here
+         // as it will create simple text divs that conflict with UIManager's editable items.
+         // this._populateFeedingMedicationUI(checkinData.pets);
 
         // Step 3: Health Info
         const healthForm = forms[3];
@@ -224,7 +225,7 @@ class FormHandler {
                 const container = document.querySelector(`#${feed.day_time}-food-list`);
                 if (container) {
                     const el = document.createElement('div');
-                    el.className = 'text-sm py-1 px-2 bg-blue-50 rounded mb-1';
+                    el.className = 'feeding-item text-sm py-1 px-2 bg-blue-50 rounded mb-1';
                     el.textContent = `${petName}: ${feed.feeding_med_details || ''}`;
                     container.appendChild(el);
                 }
@@ -235,7 +236,7 @@ class FormHandler {
                 const container = document.querySelector(`#${med.day_time}-med-list`);
                 if (container) {
                     const el = document.createElement('div');
-                    el.className = 'text-sm py-1 px-2 bg-red-50 rounded mb-1';
+                    el.className = 'medication-item text-sm py-1 px-2 bg-red-50 rounded mb-1';
                     el.textContent = `${petName}: ${med.feeding_med_details || ''}`;
                     container.appendChild(el);
                 }

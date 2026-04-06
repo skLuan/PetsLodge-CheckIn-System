@@ -57,6 +57,31 @@ class PetManager {
     }
 
     /**
+     * Removes pets from the checkin that have all empty info fields.
+     * A pet is considered empty if every key field in its info object is
+     * an empty string, null, or undefined.
+     * @returns {number} Number of empty pets removed
+     */
+    static cleanEmptyPets() {
+        const currentData = CoreDataManager.getCheckinData();
+        if (!currentData || !currentData.pets) return 0;
+
+        const KEY_FIELDS = ['petName', 'petColor', 'petType', 'petBreed', 'petAge', 'petWeight', 'petGender', 'petSpayed'];
+
+        const cleanedPets = currentData.pets.filter(pet => {
+            const info = pet?.info || {};
+            return KEY_FIELDS.some(field => info[field] !== undefined && info[field] !== null && info[field] !== '');
+        });
+
+        const removed = currentData.pets.length - cleanedPets.length;
+        if (removed > 0) {
+            console.log(`[PetManager] Removed ${removed} empty pet(s) from cookie.`);
+            FormDataManager.updateCheckinData({ pets: cleanedPets });
+        }
+        return removed;
+    }
+
+    /**
      * Elimina una mascota específica del checkin
      */
     static removePetFromCheckin(petIndex) {

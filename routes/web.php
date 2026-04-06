@@ -4,6 +4,7 @@ use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DropInController;
 use App\Http\Controllers\HealthCheckController;
+use App\Http\Controllers\PetStaffDashboardController;
 
 /*
 |--------------------------------------------------------------------------
@@ -35,11 +36,22 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-Route::get('/drop-in', [DropInController::class, 'show'])->name('drop-in.show');
-Route::get('/drop-in/confirmation', [DropInController::class, 'showDropConfirmation'])->name('drop-in.confirmation');
+Route::middleware(['auth', 'pet.staff.only'])->group(function () {
+    Route::get('/drop-in', [DropInController::class, 'show'])->name('drop-in.show');
+    Route::get('/drop-in/confirmation', [DropInController::class, 'showDropConfirmation'])->name('drop-in.confirmation');
+    Route::post('/drop-in/check-user', [DropInController::class, 'checkUser'])->name('drop-in.check-user');
+    
+    // Pet Staff Dashboard
+    Route::get('/pet-staff/dashboard', [PetStaffDashboardController::class, 'index'])->name('pet-staff.dashboard');
+    Route::post('/pet-staff/checkout/{id}', [PetStaffDashboardController::class, 'checkout'])->name('pet-staff.checkout');
+    Route::post('/pet-staff/dropped-in/{id}', [PetStaffDashboardController::class, 'dropped_in'])->name('pet-staff.dropped-in');
+    Route::post('/pet-staff/cancel/{id}', [PetStaffDashboardController::class, 'cancel'])->name('pet-staff.cancel');
+    Route::post('/pet-staff/reprint/{id}', [PetStaffDashboardController::class, 'reprint'])->name('pet-staff.reprint');
+});
+
 Route::redirect('/dropin', '/drop-in');
+Route::redirect('/pet-staff', '/pet-staff/dashboard');
 // -----------------------
-Route::get('/drop-in/check', [DropInController::class, 'checkInfo'])->name('drop-in.check');
 // ---------------------
 // Check-in routes
 Route::get('/new-form', [App\Http\Controllers\CheckInFormController::class, 'newForm'])->name('new-form');
@@ -58,5 +70,3 @@ Route::get('/admin/monitoring-dashboard', function () {
 })->middleware(['auth', 'verified', 'admin.only'])->name('monitoring-dashboard');
 
 require __DIR__.'/auth.php';
-
-Route::post('/drop-in/check-user', [DropInController::class, 'checkUser'])->name('drop-in.check-user');

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\CheckIn;
+use App\Models\Status;
 use App\Services\CheckInService;
 use App\Services\CheckInUserService;
 use App\Services\CheckInPetService;
@@ -209,6 +210,9 @@ class CheckInApiController extends Controller
     /**
      * Step 2: Submit Pet Info
      *
+     * Handles both new pet creation (sequential form submission) and pet updates (fast check-in).
+     * If petId is provided, updates the existing pet instead of creating a new one.
+     *
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
@@ -240,23 +244,28 @@ class CheckInApiController extends Controller
 
             $userId = $request->input('user_id');
             $petInfo = $request->input('pet_info');
+            $petId = $petInfo['petId'] ?? null;
+
             Log::info("CheckInApiController: Step 2 - Processing pet info [{$timestamp}]", [
                 'user_id' => $userId,
+                'pet_id' => $petId,
                 'pet_name' => $petInfo['petName'],
                 'pet_type' => $petInfo['petType'],
-                'pet_breed' => $petInfo['petBreed']
+                'pet_breed' => $petInfo['petBreed'],
+                'is_fast_checkin' => !is_null($petId)
             ]);
 
             // Get user
             $user = \App\Models\User::findOrFail($userId);
 
-            // Process pet using service (always create new for sequential submission)
+            // Process pet using service (creates new or updates existing if petId provided)
             $pet = $this->petService->processPetInfo($user, $petInfo);
 
             Log::info("CheckInApiController: Step 2 - Pet info submitted successfully [{$timestamp}]", [
                 'pet_id' => $pet->id,
                 'pet_name' => $pet->name,
-                'user_id' => $userId
+                'user_id' => $userId,
+                'was_updated' => !is_null($petId)
             ]);
 
             return response()->json([
@@ -339,11 +348,18 @@ class CheckInApiController extends Controller
                 'warnings' => $healthData['warnings'] ?? null,
             ]);
 
+            // Get CHECKED_IN status
+            $checkedInStatus = Status::where('name', 'CHECKED_IN')->first();
+            if (!$checkedInStatus) {
+                throw new \Exception('CHECKED_IN status not found in database');
+            }
+
             // Create a temporary check-in for feeding/medication (will be updated in step 4)
             $tempCheckIn = \App\Models\CheckIn::create([
                 'check_in' => now(),
                 'pet_id' => $petId,
                 'user_id' => $pet->user_id,
+                'status_id' => $checkedInStatus->id,
             ]);
 
             // Process feeding and medication
@@ -548,18 +564,69 @@ class CheckInApiController extends Controller
         }
     }
 
-    /**
-     * Auto-save check-in data (for future implementation)
-     *
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function autoSaveCheckIn(Request $request)
-    {
-        // This could be implemented later for periodic saving
-        return response()->json([
-            'success' => true,
-            'message' => 'Auto-save not implemented yet'
-        ]);
-    }
+     /**
+      * Auto-save check-in (not implemented)
+      *
+      * @param Request $request
+      * @return \Illuminate\Http\JsonResponse
+      */
+     public function autoSaveCheckIn(Request $request)
+     {
+         // This could be implemented later for periodic saving
+         return response()->json([
+             'success' => true,
+             'message' => 'Auto-save not implemented yet'
+         ]);
+     }
+
+     /**
+      * Update server session with newly created check-in data
+      *
+      * This endpoint is called after successful check-in submission to ensure
+      * that the server session contains the newly created check-in data.
+      * This prevents the drop-in confirmation page from loading stale data.
+      *
+      * @param Request $request
+      * @return \Illuminate\Http\JsonResponse
+      */
+     public function updateSessionCheckIn(Request $request)
+     {
+         try {
+             $validated = $request->validate([
+                 'checkin_data' => 'required|array',
+             ]);
+
+             $checkinData = $validated['checkin_data'];
+             $checkinId = $checkinData['id'] ?? null;
+
+             Log::info('CheckInApiController: updateSessionCheckIn', [
+                 'checkin_id' => $checkinId,
+                 'user_phone' => $checkinData['user']['info']['phone'] ?? 'UNKNOWN',
+             ]);
+
+             // Store the check-in data in session
+             session(['checkin_data' => $checkinData]);
+
+             Log::info('CheckInApiController: Session updated with new check-in', [
+                 'checkin_id' => $checkinId,
+                 'session_key' => 'checkin_data'
+             ]);
+
+             return response()->json([
+                 'success' => true,
+                 'message' => 'Session updated with check-in data',
+                 'checkin_id' => $checkinId
+             ]);
+         } catch (\Exception $e) {
+             Log::error('CheckInApiController: updateSessionCheckIn failed', [
+                 'error' => $e->getMessage(),
+                 'trace' => $e->getTraceAsString()
+             ]);
+
+             return response()->json([
+                 'success' => false,
+                 'message' => 'Failed to update session: ' . $e->getMessage()
+             ], 500);
+          }
+      }
 }

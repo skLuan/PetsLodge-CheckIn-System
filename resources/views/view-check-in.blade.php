@@ -180,7 +180,7 @@
                                             @php
                                                 $feedingByTime = [];
                                                 foreach ($checkIn->foods as $food) {
-                                                    $time = $food->moment_of_day->name ?? 'morning';
+                                                    $time = $food->momentOfDay->name ?? $food->moment_of_day_id;
                                                     if (!isset($feedingByTime[$time])) {
                                                         $feedingByTime[$time] = [];
                                                     }
@@ -206,7 +206,7 @@
                                             @php
                                                 $medByTime = [];
                                                 foreach ($checkIn->medicines as $medicine) {
-                                                    $time = $medicine->moment_of_day->name ?? 'morning';
+                                                    $time = $medicine->momentOfDay->name ?? $medicine->moment_of_day_id;
                                                     if (!isset($medByTime[$time])) {
                                                         $medByTime[$time] = [];
                                                     }
@@ -281,14 +281,18 @@
             @else
                 <div class="text-center py-12">
                     <div class="text-gray-500 text-lg mb-4">No active check-ins found</div>
-                    <a href="{{ route('check-in-form') }}"
+                    <a href="{{ route('new-form') }}"
                         class="bg-green hover:bg-green-dark text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200">
                         Create New Check-in
                     </a>
                 </div>
             @endif
         </div>
-        <p class="text-lg text-center py-4">See you later alligator 😄 🐊</p>
+        @if (auth()->check())
+        <a class="p-4 text-center flex w-fit mx-auto rounded-md bg-yellow" href="{{route("drop-in.confirmation", ['phone' => $user->phone])}}">Continue to Drop in</a>
+        @else
+        <p class="text-lg font-bold! text-center py-4">See you later alligator 😄 🐊</p>
+        @endif
 
     </div>
 
