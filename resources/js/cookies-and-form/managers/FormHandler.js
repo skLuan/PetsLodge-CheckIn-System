@@ -91,15 +91,30 @@ class FormHandler {
             }
         }
 
-        // Step 1: Pet Info (first pet or selected pill)
-        const petForm = forms[1];
-        if (petForm) {
-            const selectedPetIndex = document.querySelector(".pill.selected")
-                ? parseInt(document.querySelector(".pill.selected").dataset.index, 10)
-                : 0;
-            const petData = checkinData.pets?.[selectedPetIndex]?.info || {};
-            this._populateForm(petForm, petData);
-        }
+         // Step 1: Pet Info (first pet or selected pill)
+         const petForm = forms[1];
+         if (petForm) {
+             const selectedPetIndex = document.querySelector(".pill.selected")
+                 ? parseInt(document.querySelector(".pill.selected").dataset.index, 10)
+                 : 0;
+             const petData = checkinData.pets?.[selectedPetIndex]?.info || {};
+             this._populateForm(petForm, petData);
+             
+             // Show/hide other species input based on petType value
+             const petTypeSelect = petForm.querySelector('#petType');
+             const otherContainer = petForm.querySelector('#otherSpeciesContainer');
+             const otherInput = petForm.querySelector('#petOtherSpecies');
+             
+             if (petTypeSelect && otherContainer && otherInput) {
+                 if (petTypeSelect.value === 'other') {
+                     otherContainer.style.display = 'block';
+                     otherInput.required = true;
+                 } else {
+                     otherContainer.style.display = 'none';
+                     otherInput.required = false;
+                 }
+             }
+         }
 
          // Step 2: Feeding/Medication — list rendering is ENTIRELY handled by UIManager
          // via CookieReactivityManager. Do NOT call _populateFeedingMedicationUI here

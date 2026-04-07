@@ -66,7 +66,7 @@ class PetManager {
         const currentData = CoreDataManager.getCheckinData();
         if (!currentData || !currentData.pets) return 0;
 
-        const KEY_FIELDS = ['petName', 'petColor', 'petType', 'petBreed', 'petAge', 'petWeight', 'petGender', 'petSpayed'];
+        const KEY_FIELDS = ['petName', 'petColor', 'petType', 'petOtherSpecies', 'petBreed', 'petAge', 'petWeight', 'petGender', 'petSpayed'];
 
         const cleanedPets = currentData.pets.filter(pet => {
             const info = pet?.info || {};

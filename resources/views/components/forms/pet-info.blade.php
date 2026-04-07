@@ -20,6 +20,12 @@
             </select>
         </label>
     </div>
+    <div class="pl-input-container" id="otherSpeciesContainer" style="display: none;">
+        <label for="petOtherSpecies">Species Details
+            <input type="text" id="petOtherSpecies" name="petOtherSpecies" 
+                   placeholder="Please specify species">
+        </label>
+    </div>
     <div class="pl-input-container">
         <label for="petBreed">Breed
             <input type="text" id="petBreed" name="petBreed" placeholder="Your Pet's Breed" required>

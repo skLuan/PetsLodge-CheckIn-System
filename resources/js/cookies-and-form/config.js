@@ -81,6 +81,7 @@ const DEFAULT_PET_STRUCTURE = {
         petName: "",
         petColor: "",
         petType: "",
+        petOtherSpecies: "",
         petBreed: "",
         petAge: "",
         petWeight: "",

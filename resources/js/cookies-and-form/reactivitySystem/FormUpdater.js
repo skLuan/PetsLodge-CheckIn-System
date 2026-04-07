@@ -201,7 +201,7 @@ class FormUpdater {
     static updatePetForm(petData) {
         if (!petData?.info) return;
 
-        const petFields = ['petName', 'petColor', 'petType', 'petBreed', 'petAge', 'petWeight', 'petGender', 'petSpayed'];
+        const petFields = ['petName', 'petColor', 'petType', 'petOtherSpecies', 'petBreed', 'petAge', 'petWeight', 'petGender', 'petSpayed'];
         petFields.forEach(field => {
             const element = document.getElementById(field) || document.querySelector(`[name="${field}"]`);
             if (element && petData.info[field]) {
@@ -213,6 +213,21 @@ class FormUpdater {
                 }
             }
         });
+        
+        // Show/hide other species input based on petType value
+        const petTypeSelect = document.getElementById('petType');
+        const otherContainer = document.getElementById('otherSpeciesContainer');
+        const otherInput = document.getElementById('petOtherSpecies');
+        
+        if (petTypeSelect && otherContainer && otherInput) {
+            if (petTypeSelect.value === 'other') {
+                otherContainer.style.display = 'block';
+                otherInput.required = true;
+            } else {
+                otherContainer.style.display = 'none';
+                otherInput.required = false;
+            }
+        }
     }
 
     /**

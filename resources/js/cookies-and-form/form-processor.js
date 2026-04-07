@@ -138,7 +138,7 @@ document.addEventListener("DOMContentLoaded", async function () {
             const data = extractFormInputValues(form);
 
             // Guard: skip saving if the pet has no meaningful data (all fields empty)
-            const _KEY_FIELDS = ['petName', 'petColor', 'petType', 'petBreed', 'petAge', 'petWeight', 'petGender', 'petSpayed'];
+            const _KEY_FIELDS = ['petName', 'petColor', 'petType', 'petOtherSpecies', 'petBreed', 'petAge', 'petWeight', 'petGender', 'petSpayed'];
             const _hasData = _KEY_FIELDS.some(field => data[field] !== undefined && data[field] !== null && data[field] !== '');
             if (!_hasData) {
                 console.warn('[petInfoForm] Skipped saving: all pet fields are empty.');
@@ -155,30 +155,55 @@ document.addEventListener("DOMContentLoaded", async function () {
         });
     }
 
-    // Handle pet info form submission
-    const petInfoForm = document.querySelector("#petInfoForm");
-    if (petInfoForm) {
-        petInfoForm.addEventListener("submit", function (e) {
-            e.preventDefault();
-            const data = FormHandler.extractFormInputValues(petInfoForm);
+     // Species select change handler - show/hide other species input
+     const petTypeSelect = document.getElementById('petType');
+     if (petTypeSelect) {
+         petTypeSelect.addEventListener('change', function() {
+             const otherContainer = document.getElementById('otherSpeciesContainer');
+             const otherInput = document.getElementById('petOtherSpecies');
+             
+             if (this.value === 'other') {
+                 otherContainer.style.display = 'block';
+                 otherInput.required = true;
+             } else {
+                 otherContainer.style.display = 'none';
+                 otherInput.value = '';
+                 otherInput.required = false;
+             }
+         });
+     }
 
-            // Guard: skip saving if the pet has no meaningful data (all fields empty)
-            const KEY_FIELDS = ['petName', 'petColor', 'petType', 'petBreed', 'petAge', 'petWeight', 'petGender', 'petSpayed'];
-            const hasData = KEY_FIELDS.some(field => data[field] !== undefined && data[field] !== null && data[field] !== '');
-            if (!hasData) {
-                console.warn('[petInfoForm] Skipped saving: all pet fields are empty.');
-                return;
-            }
+     // Handle pet info form submission
+     const petInfoForm = document.querySelector("#petInfoForm");
+     if (petInfoForm) {
+         petInfoForm.addEventListener("submit", function (e) {
+             e.preventDefault();
+             const data = FormHandler.extractFormInputValues(petInfoForm);
 
-            // Use the same method as the "next" button for consistency
-            FormDataManager.handleFormStep(1, data, null); // step 1 = PET_INFO, selectedPetIndex = null to add new
-            petInfoForm.reset();
-            scrollTo({ top: 0, behavior: "smooth" });
-            setTimeout(() => {
-                PetPillManager.addPetPillsToContainer();
-            }, 500);
-        });
-    }
+             // Guard: skip saving if the pet has no meaningful data (all fields empty)
+             const KEY_FIELDS = ['petName', 'petColor', 'petType', 'petOtherSpecies', 'petBreed', 'petAge', 'petWeight', 'petGender', 'petSpayed'];
+             const hasData = KEY_FIELDS.some(field => data[field] !== undefined && data[field] !== null && data[field] !== '');
+             if (!hasData) {
+                 console.warn('[petInfoForm] Skipped saving: all pet fields are empty.');
+                 return;
+             }
+
+             // Use the same method as the "next" button for consistency
+             FormDataManager.handleFormStep(1, data, null); // step 1 = PET_INFO, selectedPetIndex = null to add new
+             petInfoForm.reset();
+             
+             // Hide other species container after reset
+             const otherContainer = document.getElementById('otherSpeciesContainer');
+             if (otherContainer) {
+                 otherContainer.style.display = 'none';
+             }
+             
+             scrollTo({ top: 0, behavior: "smooth" });
+             setTimeout(() => {
+                 PetPillManager.addPetPillsToContainer();
+             }, 500);
+         });
+     }
 
     // Handle next step navigation
     const nextButton = document.querySelector("#nextStep");

@@ -24,7 +24,7 @@ yarn-error.log
 /logs
 /reports
 .kilocodemodes
-
+.kilo/
 # Docker files (optional - can be tracked if needed)
 # Dockerfile
 # Dockerfile.nginx
