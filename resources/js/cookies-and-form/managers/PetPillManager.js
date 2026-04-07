@@ -58,6 +58,17 @@ class PetPillManager {
         if (firstPill) {
             console.log("[PetPillManager] Auto-selecting first pet pill");
             firstPill.classList.add("selected");
+            // Hide ADD PET button when in edit mode (pill selected)
+            const addPetButton = document.querySelector("#petInfoForm x-primary-button, #petInfoForm [type='submit']");
+            if (addPetButton) {
+                addPetButton.style.display = 'none';
+            }
+        } else {
+            // Show ADD PET button when no pets exist (add mode)
+            const addPetButton = document.querySelector("#petInfoForm x-primary-button, #petInfoForm [type='submit']");
+            if (addPetButton) {
+                addPetButton.style.display = '';
+            }
         }
 
         console.log(`Added ${pets.length} pet pills to #petPillsContainer.`);

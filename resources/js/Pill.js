@@ -62,12 +62,22 @@ class Pill {
             // Optionally clear the form fields here if needed
             const form = document.querySelector("#petInfoForm");
             form.reset();
+            // Show ADD PET button when deselected
+            const addPetButton = document.querySelector("#petInfoForm x-primary-button, #petInfoForm [type='submit']");
+            if (addPetButton) {
+                addPetButton.style.display = '';
+            }
             return;
         }
         document.querySelectorAll(".pill.selected").forEach((pill) => {
             pill.classList.remove("selected");
         });
         this.pillElement.classList.add("selected");
+        // Hide ADD PET button when in edit mode
+        const addPetButton = document.querySelector("#petInfoForm x-primary-button, #petInfoForm [type='submit']");
+        if (addPetButton) {
+            addPetButton.style.display = 'none';
+        }
         // Populate form with this pet's data
         const petData = FormDataManager.getAllPetsFromCheckin()[this.index];
         if (petData) {

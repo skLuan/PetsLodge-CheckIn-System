@@ -146,12 +146,17 @@ document.addEventListener("DOMContentLoaded", async function () {
             }
 
             // Use the same method as the "next" button for consistency
-            FormDataManager.handleFormStep(1, data, null); // step 1 = PET_INFO, selectedPetIndex = null to add new
-            form.reset();
-            scrollTo({ top: 0, behavior: "smooth" });
-            setTimeout(() => {
-                addPetPillsToContainer();
-            }, 500);
+             FormDataManager.handleFormStep(1, data, null); // step 1 = PET_INFO, selectedPetIndex = null to add new
+             form.reset();
+             // Show ADD PET button again after adding new pet
+             const addPetButton = document.querySelector("#petInfoForm x-primary-button, #petInfoForm [type='submit']");
+             if (addPetButton) {
+                 addPetButton.style.display = '';
+             }
+             scrollTo({ top: 0, behavior: "smooth" });
+             setTimeout(() => {
+                 addPetPillsToContainer();
+             }, 500);
         });
     }
 
@@ -171,12 +176,17 @@ document.addEventListener("DOMContentLoaded", async function () {
             }
 
             // Use the same method as the "next" button for consistency
-            FormDataManager.handleFormStep(1, data, null); // step 1 = PET_INFO, selectedPetIndex = null to add new
-            petInfoForm.reset();
-            scrollTo({ top: 0, behavior: "smooth" });
-            setTimeout(() => {
-                PetPillManager.addPetPillsToContainer();
-            }, 500);
+             FormDataManager.handleFormStep(1, data, null); // step 1 = PET_INFO, selectedPetIndex = null to add new
+             petInfoForm.reset();
+             // Show ADD PET button again after adding new pet
+             const addPetButton = document.querySelector("#petInfoForm x-primary-button, #petInfoForm [type='submit']");
+             if (addPetButton) {
+                 addPetButton.style.display = '';
+             }
+             scrollTo({ top: 0, behavior: "smooth" });
+             setTimeout(() => {
+                 PetPillManager.addPetPillsToContainer();
+             }, 500);
         });
     }
 
