@@ -28,7 +28,7 @@ document.addEventListener("DOMContentLoaded", async function () {
      // CRITICAL FIX #1: Extract editing mode flags BEFORE FormDataManager.initialize()
      // This ensures editing mode is preserved during cookie initialization
      
-     const stepContainer = document.querySelector('[data-session-checkin]');
+     const stepContainer = document.querySelector('[data-session_checkin]');
      let isEditingMode = false;
      let editingCheckInId = null;
      let sessionData = null;
@@ -148,10 +148,13 @@ document.addEventListener("DOMContentLoaded", async function () {
             // Use the same method as the "next" button for consistency
              FormDataManager.handleFormStep(1, data, null); // step 1 = PET_INFO, selectedPetIndex = null to add new
              form.reset();
-             // Show ADD PET button again after adding new pet
+             // Show ADD PET button again after adding new pet (only if no pill is selected/editing)
              const addPetButton = document.querySelector("#petInfoForm x-primary-button, #petInfoForm [type='submit']");
              if (addPetButton) {
-                 addPetButton.style.display = '';
+                 const selectedPill = document.querySelector("#petPillsContainer .pill.selected");
+                 if (!selectedPill) {
+                     addPetButton.style.display = '';
+                 }
              }
              scrollTo({ top: 0, behavior: "smooth" });
              setTimeout(() => {
@@ -178,10 +181,13 @@ document.addEventListener("DOMContentLoaded", async function () {
             // Use the same method as the "next" button for consistency
              FormDataManager.handleFormStep(1, data, null); // step 1 = PET_INFO, selectedPetIndex = null to add new
              petInfoForm.reset();
-             // Show ADD PET button again after adding new pet
+             // Show ADD PET button again after adding new pet (only if no pill is selected/editing)
              const addPetButton = document.querySelector("#petInfoForm x-primary-button, #petInfoForm [type='submit']");
              if (addPetButton) {
-                 addPetButton.style.display = '';
+                 const selectedPill = document.querySelector("#petPillsContainer .pill.selected");
+                 if (!selectedPill) {
+                     addPetButton.style.display = '';
+                 }
              }
              scrollTo({ top: 0, behavior: "smooth" });
              setTimeout(() => {
