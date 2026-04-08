@@ -112,7 +112,7 @@ class CheckInTransformer
             'groomingDetails' => '', // Not stored separately
             'inventoryComplete' => count($inventoryData) > 0,
             'termsAccepted' => false,
-            'date' => $checkIn->check_in ? $checkIn->check_in->toDateString() : now()->toDateString(),
+            'date' => $checkIn->check_in ? $checkIn->check_in->toDateString() : null,
             'id' => $checkIn->id,
         ];
     }

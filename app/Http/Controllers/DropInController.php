@@ -174,6 +174,14 @@ class DropInController extends Controller
 
             // Generate PDF only if not already stored
             if (!$pdfUri) {
+                // Set check_in date at print time if not already set
+                if ($checkInId) {
+                    $checkIn = \App\Models\CheckIn::find($checkInId);
+                    if ($checkIn && !$checkIn->check_in) {
+                        $checkIn->update(['check_in' => now()]);
+                    }
+                }
+
                 $pdfService = new PdfService();
                 $pdfUri = $pdfService->generatePdf($validated['info']);  // Devuelve URI (e.g., S3 URL)
 

@@ -220,7 +220,7 @@
                 @if (isset($checkinData['id']))
                     <span><strong>Receipt ID:</strong> {{ $checkinData['id'] }}</span>
                 @endif
-                @if (isset($checkinData['date']))
+                @if (!empty($checkinData['date']))
                     <span><strong>Date:</strong> {{ \Carbon\Carbon::parse($checkinData['date'])->toFormattedDateString() }}</span>
                 @else
                     <span><strong>Date:</strong> {{ now()->toFormattedDateString() }}</span>

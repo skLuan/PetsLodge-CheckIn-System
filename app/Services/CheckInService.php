@@ -38,14 +38,13 @@ class CheckInService
         if ($existingCheckIn) {
             // Update existing check-in
             $existingCheckIn->update([
-                'check_in' => now(),
                 'status_id' => $checkedInStatus->id,
             ]);
             return $existingCheckIn;
         } else {
-            // Create new check-in with CHECKED_IN status
+            // Create new check-in with CHECKED_IN status (no check_in date yet)
             return CheckIn::create([
-                'check_in' => now(),
+                'check_in' => null,
                 'pet_id' => $pet->id,
                 'user_id' => $user->id,
                 'status_id' => $checkedInStatus->id,
