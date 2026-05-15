@@ -356,7 +356,7 @@ class CheckInApiController extends Controller
 
             // Create a temporary check-in for feeding/medication (will be updated in step 4)
             $tempCheckIn = \App\Models\CheckIn::create([
-                'check_in' => null,
+                'check_in' => now(),
                 'pet_id' => $petId,
                 'user_id' => $pet->user_id,
                 'status_id' => $checkedInStatus->id,

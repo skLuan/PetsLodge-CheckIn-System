@@ -16,6 +16,18 @@ class CheckIn extends Model
         'check_out' => 'datetime',
     ];
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Ensure check_in timestamp is always set before saving
+        static::saving(function ($checkIn) {
+            if (empty($checkIn->check_in)) {
+                $checkIn->check_in = now();
+            }
+        });
+    }
+
     public function pet()
     {
         return $this->belongsTo(Pet::class);

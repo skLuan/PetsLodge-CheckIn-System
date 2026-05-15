@@ -36,15 +36,16 @@ class CheckInService
                                  ->first();
 
         if ($existingCheckIn) {
-            // Update existing check-in
+            // Update existing check-in and ensure check_in timestamp is set
             $existingCheckIn->update([
                 'status_id' => $checkedInStatus->id,
+                'check_in' => $existingCheckIn->check_in ?? now(),
             ]);
             return $existingCheckIn;
         } else {
-            // Create new check-in with CHECKED_IN status (no check_in date yet)
+            // Create new check-in with CHECKED_IN status and current timestamp
             return CheckIn::create([
-                'check_in' => null,
+                'check_in' => now(),
                 'pet_id' => $pet->id,
                 'user_id' => $user->id,
                 'status_id' => $checkedInStatus->id,
