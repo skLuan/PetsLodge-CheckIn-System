@@ -72,7 +72,9 @@ class NavigationManager {
         const label = document.getElementById('petPillsLabel');
         if (!label) return;
 
-        const hasChildren = container && container.children.length > 0;
+        // If the pills container itself is hidden, always hide the label too
+        const containerVisible = container && !container.classList.contains('hidden');
+        const hasChildren = containerVisible && container.children.length > 0;
         label.classList.toggle('hidden', !hasChildren);
     }
 
@@ -84,6 +86,16 @@ class NavigationManager {
         const nowEditContainer = document.getElementById('nowEditContainer');
         const nowEditingName = document.getElementById('nowEditingName');
         if (!nowEditContainer || !nowEditingName) return;
+
+        const pillsContainer = document.getElementById('petPillsContainer');
+        const containerVisible = pillsContainer && !pillsContainer.classList.contains('hidden');
+
+        // If the pills container is hidden, always hide the now-editing banner
+        if (!containerVisible) {
+            nowEditingName.textContent = '';
+            nowEditContainer.classList.add('hidden');
+            return;
+        }
 
         const selectedPill = document.querySelector('#petPillsContainer .pill.selected');
         if (selectedPill) {
@@ -162,14 +174,21 @@ class NavigationManager {
             }
         } else {
             // Show next button for other steps
-
-            // Hide thank you title, show pet pills container; label visibility
-            // is managed dynamically by syncPetPillsLabel via MutationObserver
             if (thankYouTitle) thankYouTitle.classList.add('hidden');
-            if (petPillsContainer) petPillsContainer.classList.remove('hidden');
-            this.syncPetPillsLabel();
-            this.syncNowEditingLabel();
-            
+
+            if (currentStep === FORM_CONFIG.STEPS.INVENTORY - 1) {
+                // Inventory step — hide pet pills, label, and now-editing banner
+                if (petPillsContainer) petPillsContainer.classList.add('hidden');
+                if (petPillsLabel) petPillsLabel.classList.add('hidden');
+                const nowEditContainerInv = document.getElementById('nowEditContainer');
+                if (nowEditContainerInv) nowEditContainerInv.classList.add('hidden');
+            } else {
+                // All other steps — show pet pills container; label/banner managed dynamically
+                if (petPillsContainer) petPillsContainer.classList.remove('hidden');
+                this.syncPetPillsLabel();
+                this.syncNowEditingLabel();
+            }
+
             if (currentStep === FORM_CONFIG.STEPS.INVENTORY - 1) {
                 // Inventory step - change to "Complete Inventory"
                 nextButton.innerHTML = 'Complete Inventory <iconify-icon class="text-3xl" icon="fluent:next-frame-20-filled"></iconify-icon>';
