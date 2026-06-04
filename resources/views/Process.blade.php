@@ -11,10 +11,12 @@
     <div class="container px-4 pb-8 max-w-screen-sm mx-auto">
         <div class="sticky top-0 z-20 bg-green-lightest py-3 border-b border-b-green">
             <x-progress.bar />
-            <div id="petPillsContainer" class="pills"></div>
+            <span id="petPillsLabel">Choose your pet to edit:</span>
+            <div id="petPillsContainer" class="pills">
+            </div>
             <h2 id="thankYouTitle" class="text-2xl text-center font-bold mb-4 hidden">Thank You!</h2>
-
         </div>
+        <div id="nowEditContainer" class="nowEdit flex hidden"><span class="ml-auto">Now editing: <span id="nowEditingName"></span></span></div>
         <div id="stepContainer" class="py-4 overflow-hidden relative min-h-[568px]" 
              data-session-checkin="{{ htmlspecialchars(json_encode(session('checkin_data', null)), ENT_QUOTES, 'UTF-8') }}"
              data-editing-mode="{{ session('editing_mode', false) ? 'true' : 'false' }}"
