@@ -1,3 +1,6 @@
+import { HealthFormManager } from "./cookies-and-form/managers/HealthFormManager.js";
+import { PetPillManager } from "./cookies-and-form/managers/PetPillManager.js";
+
 const progressBar = document.getElementById("stepProgress");
 if(progressBar){
     progressBar.addEventListener("click", function (event) {
@@ -16,6 +19,14 @@ document.getElementById("prevStep").addEventListener("click", function (e) {
    e.preventDefault();
     // Logic to go to the previous step
     let currentStep = getCurrentStep();
+
+    // Persist the current step's form before navigating back.
+    // Step 4 (1-based) is the health-info step; save the selected pet's health.
+    if (currentStep === 4) {
+        const selectedPetIndex = PetPillManager.getSelectedPetIndex();
+        HealthFormManager.saveCurrentPetHealth(selectedPetIndex !== null ? selectedPetIndex : 0);
+    }
+
     if (currentStep > 1) {
         showStep(currentStep - 1);
     }

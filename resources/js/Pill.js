@@ -1,4 +1,5 @@
 import { FormDataManager } from "./cookies-and-form/FormDataManager.js";
+import { HealthFormManager } from "./cookies-and-form/managers/HealthFormManager.js";
 class Pill {
     constructor(name, type, index) {
         this.name = name;
@@ -56,14 +57,30 @@ class Pill {
 
     select() {
         if (!this.pillElement) return;
+
+        // Capture the previously selected pet before changing selection so we
+        // can persist its current health-form values.
+        const prevPill = document.querySelector(".pill.selected");
+        const prevIndex = prevPill ? parseInt(prevPill.dataset.index, 10) : null;
+
         const isSelected = this.pillElement.classList.contains("selected");
         if (isSelected) {
+            // Deselecting the current pill: save its health data before clearing.
+            HealthFormManager.saveCurrentPetHealth(prevIndex);
             this.pillElement.classList.remove("selected");
             // Optionally clear the form fields here if needed
             const form = document.querySelector("#petInfoForm");
             form.reset();
+            // Clear the health form too (no pet selected).
+            HealthFormManager.loadPetHealth(null);
             return;
         }
+
+        // Switching to a different pet: persist the outgoing pet's health first.
+        if (prevIndex !== null && prevIndex !== this.index) {
+            HealthFormManager.saveCurrentPetHealth(prevIndex);
+        }
+
         document.querySelectorAll(".pill.selected").forEach((pill) => {
             pill.classList.remove("selected");
         });
@@ -82,6 +99,9 @@ class Pill {
                 }
             });
         }
+
+        // Load the incoming pet's health data into #healthInfoForm.
+        HealthFormManager.loadPetHealth(this.index);
     }
     deselect() {
         if (this.pillElement) {
