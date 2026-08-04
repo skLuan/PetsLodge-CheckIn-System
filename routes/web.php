@@ -42,15 +42,15 @@ Route::middleware(['auth', 'pet.staff.only'])->group(function () {
     Route::post('/drop-in/check-user', [DropInController::class, 'checkUser'])->name('drop-in.check-user');
     
     // Pet Staff Dashboard
-    Route::get('/pet-staff/dashboard', [PetStaffDashboardController::class, 'index'])->name('pet-staff.dashboard');
-    Route::post('/pet-staff/checkout/{id}', [PetStaffDashboardController::class, 'checkout'])->name('pet-staff.checkout');
-    Route::post('/pet-staff/dropped-in/{id}', [PetStaffDashboardController::class, 'dropped_in'])->name('pet-staff.dropped-in');
-    Route::post('/pet-staff/cancel/{id}', [PetStaffDashboardController::class, 'cancel'])->name('pet-staff.cancel');
-    Route::post('/pet-staff/reprint/{id}', [PetStaffDashboardController::class, 'reprint'])->name('pet-staff.reprint');
+    Route::get('/petstaff/dashboard', [PetStaffDashboardController::class, 'index'])->name('pet-staff.dashboard');
+    Route::post('/petstaff/checkout/{id}', [PetStaffDashboardController::class, 'checkout'])->name('pet-staff.checkout');
+    Route::post('/petstaff/dropped-in/{id}', [PetStaffDashboardController::class, 'dropped_in'])->name('pet-staff.dropped-in');
+    Route::post('/petstaff/cancel/{id}', [PetStaffDashboardController::class, 'cancel'])->name('pet-staff.cancel');
+    Route::post('/petstaff/reprint/{id}', [PetStaffDashboardController::class, 'reprint'])->name('pet-staff.reprint');
 });
 
 Route::redirect('/dropin', '/drop-in');
-Route::redirect('/pet-staff', '/pet-staff/dashboard');
+Route::redirect('/petstaff', '/petstaff/dashboard');
 // -----------------------
 // ---------------------
 // Check-in routes
