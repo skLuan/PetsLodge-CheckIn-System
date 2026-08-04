@@ -17,6 +17,7 @@
 7. [UI Update Methods](#ui-update-methods)
 8. [Utility Methods](#utility-methods)
 9. [Deprecated Methods](#deprecated-methods)
+10. [HTTP Endpoints](#http-endpoints)
 
 ---
 
@@ -1213,6 +1214,49 @@ static getPetsFromCookies(): Array
 ```javascript
 static updatePetInCookies(petIndex: number, data: Object): boolean
 ```
+
+---
+
+## HTTP Endpoints
+
+Backend routes that the front-end talks to directly (see `routes/api.php` and
+`routes/web.php` for the full list).
+
+### GET `/api/terms/active`
+
+Returns the Terms & Conditions version currently shown to clients. Public — no auth,
+because the check-in form is used by walk-in clients.
+
+**Response `200`**
+
+```json
+{
+  "title": "Terms & Conditions",
+  "content": "<p class=\"text-gray-700 leading-relaxed\">...</p>",
+  "version": 1
+}
+```
+
+`content` is sanitized HTML, safe to inject with `innerHTML` / `{!! !!}`.
+
+**Response `404`** — no active version exists (nothing seeded, or every version was
+deactivated). The check-in popup falls back to rendering empty rather than erroring.
+
+> The popup itself does **not** call this endpoint — it is server-rendered via the view
+> composer in `AppServiceProvider`. The endpoint exists for JS consumers and for the
+> signature module (Plan 03), which needs to record the accepted version.
+
+### Terms & Conditions editor (pet staff)
+
+| Method | URL | Route name | Middleware |
+|---|---|---|---|
+| GET | `/petstaff/terms` | `pet-staff.terms.edit` | `auth`, `pet.staff.only` |
+| PUT | `/petstaff/terms` | `pet-staff.terms.update` | `auth`, `pet.staff.only` |
+
+`PUT` accepts `title` (optional, max 255) and `content` (required, max 200KB of HTML).
+Saving never overwrites: `TermsAndConditions::publishNewVersion()` inserts version N+1,
+deactivates N, and records `updated_by`. Old rows stay intact as the audit trail that
+signed agreements point at.
 
 ---
 

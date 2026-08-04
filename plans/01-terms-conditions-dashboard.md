@@ -88,3 +88,71 @@ Each step has a **gate**: the listed tests/checks must pass before moving to the
 - [ ] Guests and non-staff users cannot access the editor.
 - [ ] Check-in popup shows identical legal text as before migration (diff the seeded content).
 - [ ] All step gates passed in order; full test suite green at the end.
+
+---
+
+## Execution notes — 2026-08-04
+
+**Branch:** `feature/01-terms-dashboard` · **Result:** all acceptance criteria met.
+Full session context (environment quirks, baseline test state) is in `JOURNAL.md`.
+
+### Files added
+| File | Purpose |
+|---|---|
+| `database/migrations/2026_08_04_000000_create_terms_and_conditions_table.php` | Schema as specified, plus `unique(version)`, `index(is_active)`, `nullOnDelete()` on `updated_by`. |
+| `app/Models/TermsAndConditions.php` | `active()` scope, `publishNewVersion()`, `updatedBy()` relation. |
+| `database/seeders/TermsAndConditionsSeeder.php` | Version 1 = the legal text lifted verbatim from the blade. Idempotent. |
+| `app/Http/Controllers/TermsAndConditionsController.php` | `edit` / `update` / `show` + allowlist sanitizer. |
+| `resources/views/pet-staff/terms-edit.blade.php` | Textarea + Alpine live preview + version banner. |
+| `tests/Feature/TermsAndConditionsTest.php` | 18 tests, written first. |
+
+### Files changed
+- `routes/web.php`, `routes/api.php` — editor routes + `GET /api/terms/active`.
+- `app/Providers/AppServiceProvider.php` — view composer supplying `$activeTerms`.
+- `resources/views/components/pop-ups/terms-conditions.blade.php` — 143 lines of hardcoded HTML → `{!! $activeTerms->content ?? "" !!}`.
+- `resources/views/pet-staff/dashboard.blade.php` — "Edit Terms & Conditions" button.
+- `database/seeders/DatabaseSeeder.php` — registers the new seeder.
+- `database/factories/UserFactory.php` — repaired (see deviations) + `petStaff()` / `superAdmin()` states.
+- `docs/API_REFERENCE.md`, `AGENTS.md` — documented.
+
+### Deviations from the plan (and why)
+
+1. **URLs are `/petstaff/terms`, not `/pet-staff/terms`.** Every existing staff route
+   uses `/petstaff/*` with `pet-staff.*` route *names*. Matching the plan literally
+   would have introduced a second, inconsistent URL prefix.
+2. **Non-staff users get a redirect, not a 403.** `PetStaffOnly` middleware redirects to
+   `/` with a flash error. Tests assert the real behaviour rather than forcing a
+   middleware change that would affect every other staff route.
+3. **The popup is on `/new-form`, not `/check-in`.** `/check-in` is only the phone-entry
+   page; `<x-pop-ups.terms-conditions />` is included from `Process.blade.php`, served at
+   `/new-form`, `/new-form-pre-filled` and `/edit-check-in/{id}`. Tests target `/new-form`.
+4. **No `mews/purifier` dependency.** Sanitization is `strip_tags` against a tag allowlist,
+   preceded by whole-block removal of `script`/`style`/`iframe`/`object`/`embed` (strip_tags
+   alone leaves inner JS as text) and followed by stripping `on*=` handlers and
+   `javascript:`/`data:` URLs. No new composer package needed.
+5. **Migration rollback is verified by CLI, not by a test.** A rollback assertion fights
+   `RefreshDatabase`. Verified with `migrate:rollback --step=1 --env=testing` → clean, then
+   re-migrate → clean.
+6. **`UserFactory` was repaired as a prerequisite.** It omitted `phone`/`address`/`role`,
+   all `NOT NULL`, so *every* test touching `User::factory()` failed. 23 failures → 4.
+
+### Gate results
+
+| Step | Gate | Result |
+|---|---|---|
+| 1 | Suite red for the right reasons | ✅ 18 red — missing seeder/model/route classes only. |
+| 2 | Schema/model/seeder green; rollback clean | ✅ 5 green; rollback + re-migrate clean. |
+| 3 | Auth matrix, PUT versioning, JSON shape | ✅ green. |
+| 4 | Popup renders seeded text; content matches pre-migration | ✅ green + whitespace-insensitive diff of old blade vs. seeded content: **identical** (7219 chars each). |
+| 5 | Dashboard link + editor | ✅ feature test green. |
+| 6 | Full suite, no new failures | ✅ 42 passed / 4 pre-existing failures (unchanged from baseline). |
+
+### Verified in the running app (`http://127.0.0.1:8000`)
+- `/new-form` popup renders all 7 legal headings from the DB; no console errors.
+- `GET /api/terms/active` → `{version: 1, title: "Terms & Conditions", content: 8868 chars}`.
+- `/petstaff/terms` **not** verified visually — it needs a staff login, which the session
+  could not perform. Covered by feature tests (200 + version banner + dashboard link).
+
+### Left for a human
+- Eyeball `/petstaff/terms` logged in as pet staff, especially the Alpine live preview.
+- Update the Notion card (agents don't touch Notion).

@@ -1,8 +1,10 @@
 # AGENTS.md — Guide for AI Coding Agents
 
-> **Read this file first.** It is the shortcut map of the PetsLodge project so you
-> (an AI coding agent) don't have to re-read the whole codebase every session.
-> When something here goes stale, update it as part of your change.
+> **Read this file first, then `JOURNAL.md`.** This file is the shortcut map of the
+> PetsLodge project so you (an AI coding agent) don't have to re-read the whole codebase
+> every session; `JOURNAL.md` is the running log of what previous sessions actually did.
+> When something here goes stale, update it as part of your change — and append your
+> session to `JOURNAL.md` before you finish.
 
 This file is written for two audiences:
 - **The AI agent** doing the work — file map, commands, conventions, gotchas.
@@ -74,6 +76,15 @@ npm run build        # production build
 
 ## 4. How to test & format
 
+> ⚠️ **Tests need a separate database.** They use `RefreshDatabase`, which drops every
+> table on the configured connection. `phpunit.xml` sets no DB (the sqlite lines are
+> commented out and the sqlite PHP extension isn't installed), so tests fall back to
+> whatever `.env` points at — i.e. they would **wipe the dev database**.
+> A gitignored `.env.testing` pointing at a `petslodge_testing` schema is what keeps that
+> from happening; Laravel loads it automatically because `phpunit.xml` sets `APP_ENV=testing`.
+> If you clone fresh, recreate both:
+> `CREATE DATABASE petslodge_testing;` + copy `.env` → `.env.testing` and change `DB_DATABASE`.
+
 ```bash
 # PHP tests
 docker compose exec app php artisan test        # or: php artisan test
@@ -88,6 +99,10 @@ php artisan test --filter=SomeTest              # single test
 > ⚠️ There is **no automated JS test suite**. For frontend changes, verify manually
 > in the browser (see the debug helpers in §8) and check the browser console for errors.
 
+**Known-red tests (pre-existing, not your change):** `ExampleTest`, `Auth\RegistrationTest
+> new users can register`, and both `CheckInSubmissionTest` cases. See `JOURNAL.md` for
+causes. The practical gate is "**no new failures**", not "all green".
+
 ---
 
 ## 5. Project map — where things live
@@ -100,6 +115,7 @@ php artisan test --filter=SomeTest              # single test
 | `app/Http/Controllers/CheckInController.php`     | Check-in web controller. |
 | `app/Http/Controllers/DropInController.php`      | Drop-in flow (staff-only). |
 | `app/Http/Controllers/PetStaffDashboardController.php` | Staff dashboard: checkout, cancel, reprint. |
+| `app/Http/Controllers/TermsAndConditionsController.php` | T&C editor for pet staff (`/petstaff/terms`) + public `GET /api/terms/active`. |
 | `app/Http/Controllers/HealthCheckController.php` | `/health` monitoring endpoints. |
 | `app/Services/CheckInTransformer.php`   | **Converts** between DB format ⇄ cookie/form format (null-safe). |
 | `app/Services/CheckInDataValidator.php` | Validates check-in data structure & required fields. |
@@ -107,7 +123,8 @@ php artisan test --filter=SomeTest              # single test
 | `app/Services/CheckInPetService.php`    | Pet-related operations. |
 | `app/Services/CheckInUserService.php`   | User/owner operations. |
 | `app/Services/PdfService.php` / `PrintNodeService.php` | PDF generation & physical printing. |
-| `app/Models/` | Eloquent models: `CheckIn`, `Pet`, `EmergencyContact`, `Food`, `Medicine`, `Item`, `ExtraService`, `KindOfPet`, `Gender`, `Castrated`, `MomentOfDay`, `Status`, `User`. |
+| `app/Models/` | Eloquent models: `CheckIn`, `Pet`, `EmergencyContact`, `Food`, `Medicine`, `Item`, `ExtraService`, `KindOfPet`, `Gender`, `Castrated`, `MomentOfDay`, `Status`, `TermsAndConditions`, `User`. |
+| `app/Providers/AppServiceProvider.php` | View composer that injects `$activeTerms` into the T&C popup. |
 | `app/Http/Middleware/AdminOnly.php`, `PetStaffOnly.php` | Role gates (`admin.only`, `pet.staff.only`). |
 
 ### Frontend JS (`resources/js/`)
@@ -147,15 +164,21 @@ The heart of the app. **`cookies-and-form/` is where most feature work happens.*
 | `components/progress/` | Progress bar / circle. |
 | `components/tabbar.blade.php`, `CheckInSummary.blade.php` | Tab bar, summary. |
 | `pet-staff/dashboard.blade.php`, `Drop-in*.blade.php` | Staff dashboard, drop-in pages. |
+| `pet-staff/terms-edit.blade.php` | T&C editor (HTML textarea + Alpine live preview). |
 | `pdf-for-print.blade.php` | The PDF/print template. |
 | `admin/monitoring-dashboard.blade.php` | Admin monitoring view. |
 | `layouts/`, `auth/`, `profile/` | Layouts, Breeze auth pages, profile pages. |
 
 ### Routes
-- `routes/web.php` — pages: `/check-in` (home), `/new-form`, `/edit-check-in/{id}`,
-  `/view-check-in`, `/drop-in`, `/pet-staff/dashboard`, `/health`, admin monitoring.
+- `routes/web.php` — pages: `/check-in` (phone entry), `/new-form` (the actual multi-step
+  form), `/edit-check-in/{id}`, `/view-check-in`, `/drop-in`, `/petstaff/dashboard`,
+  `/petstaff/terms`, `/health`, admin monitoring.
 - `routes/api.php` — form API: `/api/checkin/submit`, `/api/checkin/autosave`,
-  per-step `/api/checkin/step1..step5/...`, `/api/update-session-checkin`, `/api/check-user`.
+  per-step `/api/checkin/step1..step5/...`, `/api/update-session-checkin`, `/api/check-user`,
+  `/api/terms/active`.
+
+> ⚠️ Staff URLs are `/petstaff/*` (no hyphen) while their **route names** are
+> `pet-staff.*` (with hyphen). Easy to get wrong — always use `route()`.
 - `routes/auth.php` — Breeze auth routes.
 
 ### Other
@@ -234,6 +257,8 @@ Common symptoms → look here:
 
 | File | When to read it |
 |------|-----------------|
+| `JOURNAL.md` | **Read at the start of every session.** What previous agent sessions did, what worked, what didn't, and known-broken things deliberately left alone. |
+| `AIplans/00-MASTER-PLAN-v1.0-beta.md` | Roadmap to v1.0-beta and the phase order. |
 | `README.md` | Full feature list, setup, troubleshooting. |
 | `docs/DATA_FLOW.md` | Complete architecture of the cookie data flow. |
 | `docs/DEVELOPER_GUIDE.md` | FormDataManager API usage & examples. |

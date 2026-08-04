@@ -13,7 +13,11 @@ Ship **v1.0-beta**: all features below implemented, tested, and tagged. From tha
 1. **Plans live in `AIplans/`.** One file per feature. Each plan is self-contained: architecture, files to touch, migrations, tests, acceptance criteria.
 2. **Executed plans move to `plans/`.** When a plan is fully done, move its file to `plans/` and append an "Execution notes" section (what was done, deviations, gotchas). `plans/` is the historical record.
 3. **Test-first.** Every plan starts by writing/extending PHPUnit tests (`tests/Feature`, `tests/Unit`). Run with `docker compose exec app php artisan test`. A plan is not done with failing tests.
-4. **Journal.** Update `DEPLOYMENT_LOG.md` (or the plan's Execution notes) with what worked and what didn't.
+4. **Journal.** Append your session to **`JOURNAL.md`** (repo root) — what you did, what
+   worked, what didn't, what you deliberately left alone. Read it before starting.
+   Detailed per-plan notes still go in the plan's "Execution notes" section.
+   ⚠️ `plans/` is **gitignored** — archive with `git mv` (not `mv`) so the plan stays
+   tracked. `JOURNAL.md` is the always-tracked record.
 5. **Keep `AGENTS.md` fresh** — if a change makes it stale, update it in the same session.
 6. **Git:** one branch per plan (`feature/01-terms-dashboard`, `fix/05-add-pet-edit-mode`). Merge to main when acceptance criteria pass. Tag `v1.0-beta` when Phases 1–4 are merged.
 7. **Human-readable code**, commented, docs in `docs/` updated when APIs change.
@@ -22,7 +26,7 @@ Ship **v1.0-beta**: all features below implemented, tested, and tagged. From tha
 
 | Phase | Plan file | What | Who | Status |
 |---|---|---|---|---|
-| 1 | `01-terms-conditions-dashboard.md` | T&C: migration, editable from pet-staff dashboard (`pet-staff/*`) | Us (now) | Pending |
+| 1 | `01-terms-conditions-dashboard.md` → `plans/` | T&C: migration, editable from pet-staff dashboard (`petstaff/*`) | Us | **Done** 2026-08-04 (`feature/01-terms-dashboard`) |
 | 2 | `02-transactional-emails.md` | Emails via Hostinger SMTP: check-in, drop-in, drop-out + templates | Us | Pending |
 | 3 (parallel) | `05-cookie-stabilization-bugs.md` | Cookie system stabilization + backend/UI bugs (incl. add-pet stuck in edit) | Mid dev | Pending |
 | 4 | `03-signature-module.md` | Signature pad for drop-in, stored in storage + URL in DB | Us | Pending |
