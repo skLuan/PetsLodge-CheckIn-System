@@ -40,8 +40,12 @@ single source of truth, with automatic UI updates when the data changes.
 
 ## 3. How to run it (Docker is the primary way)
 
-The project runs in Docker. `docker-compose.yml` defines three services: `app`
-(Laravel on port **8080** → container 8000), `mysql` (3306), `redis` (6379).
+The project runs in Docker. `docker-compose.yml` defines five services: `app`
+(Laravel on port **8080** → container 8000), `queue` (the mail worker), `mysql` (3306),
+`redis` (6379), and `mailpit` (catches local email — UI on **http://localhost:8025**).
+
+> ⚠️ Client emails are **queued**. If the `queue` service isn't running, no email is
+> ever delivered — the job just sits in Redis. `docker compose logs -f queue` to check.
 
 ```bash
 # Start everything (app, MySQL, Redis)
@@ -100,8 +104,13 @@ php artisan test --filter=SomeTest              # single test
 > in the browser (see the debug helpers in §8) and check the browser console for errors.
 
 **Known-red tests (pre-existing, not your change):** `ExampleTest`, `Auth\RegistrationTest
-> new users can register`, and both `CheckInSubmissionTest` cases. See `JOURNAL.md` for
-causes. The practical gate is "**no new failures**", not "all green".
+> new users can register`, and both `CheckInSubmissionTest` cases. The practical gate is
+"**no new failures**", not "all green". Current baseline: **62 passed / 4 failed**.
+
+> The two `CheckInSubmissionTest` failures are caused by `CheckInApiController::submitCheckIn`
+> calling `CheckInService::submitCheckIn()`, **a method that does not exist** — so
+> `/api/checkin/submit` always returns 500. (Confirmed 2026-08-04; an earlier guess that
+> blamed missing seed data was wrong.) Fixing it belongs to Plan 05.
 
 ---
 
@@ -125,7 +134,11 @@ causes. The practical gate is "**no new failures**", not "all green".
 | `app/Services/PdfService.php` / `PrintNodeService.php` | PDF generation & physical printing. |
 | `app/Models/` | Eloquent models: `CheckIn`, `Pet`, `EmergencyContact`, `Food`, `Medicine`, `Item`, `ExtraService`, `KindOfPet`, `Gender`, `Castrated`, `MomentOfDay`, `Status`, `TermsAndConditions`, `User`. |
 | `app/Providers/AppServiceProvider.php` | View composer that injects `$activeTerms` into the T&C popup. |
+| `app/Providers/EventServiceProvider.php` | Maps the check-in/drop-in/drop-out events to their queued mail listeners. |
 | `app/Http/Middleware/AdminOnly.php`, `PetStaffOnly.php` | Role gates (`admin.only`, `pet.staff.only`). |
+| `app/Events/` | `CheckInCompleted`, `PetDroppedIn`, `PetDroppedOut` — each carries a `CheckIn`. |
+| `app/Listeners/` | `SendCheckInConfirmation` (coalesces multi-pet bookings into one email), `SendDropInNotification`, `SendDropOutNotification`. All `ShouldQueue`. |
+| `app/Mail/` | `CheckInConfirmationMail` (takes a **Collection** of check-ins), `DropInMail`, `DropOutMail`. |
 
 ### Frontend JS (`resources/js/`)
 The heart of the app. **`cookies-and-form/` is where most feature work happens.**
@@ -165,6 +178,8 @@ The heart of the app. **`cookies-and-form/` is where most feature work happens.*
 | `components/tabbar.blade.php`, `CheckInSummary.blade.php` | Tab bar, summary. |
 | `pet-staff/dashboard.blade.php`, `Drop-in*.blade.php` | Staff dashboard, drop-in pages. |
 | `pet-staff/terms-edit.blade.php` | T&C editor (HTML textarea + Alpine live preview). |
+| `emails/layouts/base.blade.php` | Shared branded email shell (inline CSS + tables — email clients ignore external CSS). |
+| `emails/check-in-confirmation.blade.php`, `drop-in.blade.php`, `drop-out.blade.php` | The three client emails. |
 | `pdf-for-print.blade.php` | The PDF/print template. |
 | `admin/monitoring-dashboard.blade.php` | Admin monitoring view. |
 | `layouts/`, `auth/`, `profile/` | Layouts, Breeze auth pages, profile pages. |
@@ -210,6 +225,34 @@ Rules that keep this from breaking:
 
 If you touch form state, go through **`FormDataManager`** rather than writing cookies
 directly.
+
+---
+
+## 6b. The second concept: transactional emails
+
+Three emails go to clients, all fired as **events → queued listeners → mailables**:
+
+| Trigger | Fired from | Event → Listener → Mail |
+|---|---|---|
+| Check-in finished | `CheckInApiController::submitExtraInfo` (**step 5**) | `CheckInCompleted` → `SendCheckInConfirmation` → `CheckInConfirmationMail` |
+| Pet arrived | `PetStaffDashboardController::dropped_in` | `PetDroppedIn` → `SendDropInNotification` → `DropInMail` |
+| Pet picked up | `PetStaffDashboardController::checkout` | `PetDroppedOut` → `SendDropOutNotification` → `DropOutMail` |
+
+Rules that keep this from breaking:
+
+1. **Steps 2–5 run once per pet** (`SubmissionManager.submitSequentialCheckIn`), so a
+   3-pet booking fires `CheckInCompleted` three times. `SendCheckInConfirmation` runs on
+   a **~2-minute delay**, then claims every un-announced check-in for that owner
+   (`check_ins.confirmation_sent_at IS NULL`) and sends **one** email listing them all.
+   Sibling jobs find nothing left to claim and exit. Don't "fix" the delay away.
+2. **Never let mail break the flow.** Every dispatch is wrapped in try/catch +
+   `Log::warning`. A dead SMTP server must not 500 a check-in or a checkout.
+3. **Invalid/missing owner email is a skip, not an error** — guarded in each listener.
+4. **Inline CSS + tables only** in `resources/views/emails/`. Email clients discard
+   `<style>` blocks and external stylesheets.
+5. **`/api/checkin/submit` is dead code** — it calls `CheckInService::submitCheckIn()`,
+   which does not exist, so it always 500s. Don't wire anything new to it; the live
+   path is step1→step5.
 
 ---
 

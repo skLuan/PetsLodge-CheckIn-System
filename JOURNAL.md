@@ -8,6 +8,132 @@
 
 ---
 
+## Session 2026-08-04 (2) — Plan 02: Transactional emails (check-in / drop-in / drop-out)
+
+**Branch:** `feature/02-transactional-emails` (branched off `feature/01-terms-dashboard`,
+**not** `develop` — Plan 01 is still unmerged and its `UserFactory` fix is required by
+these tests).
+**Plan:** `AIplans/02-transactional-emails.md`
+**Status:** ✅ code complete, tests green, verified end-to-end over real SMTP.
+❗ **One item open:** no email has been sent through *Hostinger* yet — credentials
+were not provided before the session ended. See "Not verified" below.
+
+### The finding that changed the plan
+
+The plan said to hang the confirmation email off `CheckInApiController::submitCheckIn`
+(`/api/checkin/submit`). **That endpoint is dead code.** It calls
+`CheckInService::submitCheckIn()`, a method that **does not exist** on the service —
+every call throws `BadMethodCallException`, is swallowed by the controller's try/catch,
+and returns 500.
+
+> This also **corrects the previous session's journal entry**, which guessed the two
+> red `CheckInSubmissionTest` cases were failing due to unseeded lookup tables. They
+> aren't — it's the missing method. Verified in `storage/logs/laravel.log`:
+> `Call to undefined method App\Services\CheckInService::submitCheckIn()`.
+> Real fix belongs to Plan 05; left alone here (scope).
+
+The **live** submission path is `SubmissionManager.submitSequentialCheckIn()` →
+step1…step5. So the confirmation fires at the **end of step 5** (`submitExtraInfo`).
+
+### The multi-pet problem (and the agreed solution)
+
+Steps 2–5 run **inside a per-pet loop**. A 3-pet booking therefore creates 3 `check_ins`
+rows and would fire 3 confirmation emails — contradicting the plan's "exactly once".
+
+Decision (confirmed with the user): **one email per submission, listing every pet.**
+
+Implementation — a coalescing queued listener:
+1. New column `check_ins.confirmation_sent_at` (nullable timestamp).
+2. `SendCheckInConfirmation` runs on a **120-second delay** (`withDelay()`), by which
+   point every pet's row exists.
+3. It claims each un-announced check-in for that owner **row by row** with a
+   conditional `UPDATE ... WHERE confirmation_sent_at IS NULL`, so under concurrency
+   each row lands in exactly one email.
+4. Sibling jobs find nothing to claim and exit silently.
+5. A 30-minute window stops it sweeping up an unrelated older booking whose email failed.
+
+`CheckInConfirmationMail` therefore takes a **`Collection` of check-ins**, not one.
+
+### What was built
+
+| Area | Files |
+|---|---|
+| Events | `app/Events/CheckInCompleted.php`, `PetDroppedIn.php`, `PetDroppedOut.php` |
+| Listeners (all `ShouldQueue`, tries=3, backoff=30) | `app/Listeners/SendCheckInConfirmation.php`, `SendDropInNotification.php`, `SendDropOutNotification.php` |
+| Mailables (all `ShouldQueue`) | `app/Mail/CheckInConfirmationMail.php`, `DropInMail.php`, `DropOutMail.php` |
+| Templates | `resources/views/emails/layouts/base.blade.php` + `check-in-confirmation`, `drop-in`, `drop-out` |
+| Migration | `2026_08_04_120000_add_confirmation_sent_at_to_check_ins_table.php` |
+| Config | `config/lodge.php` (footer contact details) |
+| Wiring | `EventServiceProvider` map; dispatches in `CheckInApiController::submitExtraInfo` and `PetStaffDashboardController::dropped_in` / `checkout` |
+| Infra | `docker-compose.yml`: new `queue` **and** `mailpit` services |
+
+Every dispatch is wrapped in try/catch + `Log::warning` — a dead SMTP server can never
+500 a check-in or a checkout. Listeners skip (and log) owners with missing/malformed
+email rather than erroring.
+
+### Traps worth remembering
+
+1. **`docker-compose.yml` had no mailpit service** even though `.env` pointed
+   `MAIL_HOST=mailpit`. Local mail could never have worked. Added it (UI :8025).
+2. **There was no queue worker.** `QUEUE_CONNECTION=redis` was already set on the `app`
+   service, so queued mail would have silently piled up in Redis forever. Added a
+   `queue` service — **without it, no email is ever delivered.**
+3. **No booking date range exists in the DB.** `check_ins.check_in` is the *creation*
+   timestamp and `check_out` is only set at pickup — there is no stored departure date.
+   The confirmation email therefore shows "Checked in: <date>", **not** a date range.
+   If a real arrival/departure range is wanted, that's a schema change (future plan).
+4. **`dropped_in()` sets `check_out = now()`** — same as `checkout()`. That looks wrong
+   (a pet *arriving* shouldn't get a check-out time) but it is pre-existing behaviour;
+   left alone deliberately. Candidate for Plan 05.
+5. **No lodge contact details exist anywhere in the codebase.** Rather than invent an
+   address/phone, `config/lodge.php` reads them from `.env` and the footer **omits any
+   blank line**, so nothing fake can reach a client. The user must fill `LODGE_*` in.
+6. Pint rewrites `new Foo()` → `new Foo` and `'a' . 'b'` → `'a'.'b'`; it touched
+   pre-existing lines in `PetStaffDashboardController::reprint`. Expected, not a bug.
+
+### Verification performed
+
+- **Tests:** `--filter=TransactionalEmailTest` → **20 passed**. Full suite →
+  **62 passed / 4 failed** — the same 4 pre-existing failures, **no new ones**
+  (baseline was 42 passed / 4 failed; 42 + 20 = 62).
+- **Migration reversible:** `migrate:rollback --step=1 --env=testing` then re-migrate,
+  both clean.
+- **Real SMTP end-to-end** (not just `Mail::fake`): ran mailpit in Docker, dispatched
+  the real events against the testing DB with a genuine SMTP transport.
+  A **3-pet booking + drop-in + drop-out produced exactly 3 messages** —
+  `Booking confirmed for Luna, Rocky & Milo`, `Luna has arrived safely`,
+  `Thank you for visiting — Luna`. Confirmation body contained all 3 pets, the
+  grooming appointment day, and the footer address/phone. `confirmation_sent_at`
+  left 0 rows unannounced.
+- **Rendered previews** (open in a browser) in this session's scratchpad:
+  `confirmation-single.html`, `confirmation-multi.html`, `drop-in.html`, `drop-out.html`.
+
+### Not verified / left for a human
+
+- ❗ **No mail has gone through Hostinger.** Needs a real mailbox + password in the
+  production `.env`, then the send test in
+  `docs/DEPLOYMENT_GUIDE.md → Transactional Email & Queue Setup §4`.
+  Also still to confirm on the real domain: **SPF/DKIM** (`dig TXT`) and that
+  **`APP_URL` is the public https URL** — the header logo is an `asset()` link and
+  breaks in every client if `APP_URL` is still `http://localhost`.
+- `LODGE_ADDRESS` / `LODGE_PHONE` / `LODGE_EMAIL` / `LODGE_WEBSITE` are **empty**;
+  until filled, emails ship with a footer containing only the lodge name.
+- Emails were not opened in Gmail/Outlook/Apple Mail — rendering checked in a browser
+  and in mailpit only.
+- Nothing committed; changes sit on `feature/02-transactional-emails`.
+- Notion card for Phase 2 still needs a human.
+
+### Environment notes (differs again from last session)
+
+- Docker Desktop was **down at session start**, then the user started a standalone
+  `mysql_general` container (`mysql:latest`, 3306). The project's compose stack was
+  **never** running — app/artisan ran on the Windows host (PHP 8.1.10 CLI).
+- `.env.testing` → `petslodge_testing` still works and is still what protects the dev DB.
+- `php artisan test` errors with `Access denied for user 'root'@'172.19.0.1'` if the
+  MySQL container isn't up yet. Start MySQL first.
+
+---
+
 ## Session 2026-08-04 — Plan 01: Terms & Conditions DB-backed + dashboard editor
 
 **Branch:** `feature/01-terms-dashboard`

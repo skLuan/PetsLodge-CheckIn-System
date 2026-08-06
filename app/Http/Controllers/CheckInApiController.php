@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\CheckInCompleted;
 use App\Models\User;
 use App\Models\CheckIn;
 use App\Models\Status;
@@ -536,6 +537,19 @@ class CheckInApiController extends Controller
                 'processed_inventory' => count($extraData['inventory'] ?? []),
                 'processed_grooming' => count($extraData['grooming'] ?? [])
             ]);
+
+            // Step 5 is the last call of the submission sequence, so this is the
+            // point where the check-in is genuinely complete. The listener is
+            // queued and coalesces multi-pet submissions into one email.
+            // Never let a mail problem turn a saved check-in into a 500.
+            try {
+                CheckInCompleted::dispatch($checkIn);
+            } catch (\Throwable $mailError) {
+                Log::warning("CheckInApiController: check-in confirmation failed to dispatch [{$timestamp}]", [
+                    'checkin_id' => $checkinId,
+                    'error' => $mailError->getMessage(),
+                ]);
+            }
 
             return response()->json([
                 'success' => true,

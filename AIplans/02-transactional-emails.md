@@ -81,7 +81,71 @@ Use `Mail::fake()` / `Event::fake()`:
 
 ## Acceptance criteria
 
-- [ ] All 3 emails send in production via Hostinger, branded, correct data.
-- [ ] Sending is queued; a dead SMTP does not break check-in/checkout endpoints.
-- [ ] `Mail::fake` tests green.
-- [ ] Credentials documented (location, not values) in DEPLOYMENT_GUIDE.
+- [ ] **All 3 emails send in production via Hostinger**, branded, correct data.
+      → *Blocked: credentials not yet supplied. All 3 verified over real SMTP
+      (mailpit) instead; only the Hostinger leg is unproven.*
+- [x] Sending is queued; a dead SMTP does not break check-in/checkout endpoints.
+- [x] `Mail::fake` tests green (20 tests).
+- [x] Credentials documented (location, not values) in DEPLOYMENT_GUIDE.
+
+---
+
+## Execution notes (2026-08-04, branch `feature/02-transactional-emails`)
+
+**Status: code complete, 1 acceptance criterion open (production Hostinger send).**
+This plan stays in `AIplans/` until that is done — move it to `plans/` with `git mv`
+once a real Hostinger email has been received.
+
+### Deviations from the plan as written
+
+1. **The plan's main trigger point was wrong.** It proposed hanging the confirmation off
+   `CheckInApiController::submitCheckIn` (`/api/checkin/submit`). That endpoint is **dead
+   code** — it calls `CheckInService::submitCheckIn()`, which does not exist, so it always
+   500s. (This is also the true cause of the two red `CheckInSubmissionTest` cases, which
+   an earlier session had misattributed to unseeded lookup tables.) The live path is
+   step1→step5, so the event fires at the **end of step 5** (`submitExtraInfo`).
+   Fixing the dead endpoint is left to Plan 05.
+
+2. **"Exactly once" required a coalescing design.** Steps 2–5 run in a **per-pet loop**,
+   so a 3-pet booking fires `CheckInCompleted` 3×. Per the product decision, the owner
+   gets **one** email listing every pet:
+   - new column `check_ins.confirmation_sent_at`;
+   - `SendCheckInConfirmation` runs on a **120s delay** (`withDelay()`), then claims each
+     un-announced check-in for that owner with a conditional row-by-row `UPDATE`, so under
+     concurrency each row lands in exactly one email;
+   - a 30-minute window prevents sweeping in an unrelated older failed booking;
+   - `CheckInConfirmationMail` takes a **`Collection`** of check-ins, not a single one.
+
+3. **Two pieces of infrastructure the plan assumed existed, didn't:**
+   - there was **no queue worker** anywhere (queued mail would have piled up in Redis
+     forever) → added a `queue` service to `docker-compose.yml`;
+   - there was **no mailpit service**, despite `.env` pointing `MAIL_HOST=mailpit`
+     → added it (UI on :8025).
+
+4. **No booking date range exists in the schema.** The plan asked for "check-in/check-out
+   dates" in the confirmation. `check_ins.check_in` is the creation timestamp and
+   `check_out` is only written at pickup — there is no stored departure date. The email
+   shows "Checked in: <date>" instead. A real arrival/departure range is a schema change
+   and a separate plan.
+
+5. **Lodge contact details did not exist in the codebase.** Rather than invent an address
+   or phone number, added `config/lodge.php` driven by `LODGE_*` env vars; the footer
+   omits any blank field, so no placeholder text can ever reach a client. **These are
+   still empty and need filling in.**
+
+### Verification
+
+- 20 tests in `tests/Feature/TransactionalEmailTest.php`, all green. Full suite
+  62 passed / 4 failed — same 4 pre-existing failures, no new ones.
+- Migration rollback + re-migrate verified by CLI.
+- **Real SMTP end-to-end** via mailpit: a 3-pet booking + drop-in + drop-out produced
+  exactly **3** messages, with all 3 pets in the single confirmation.
+
+### Still to do
+
+- Put the Hostinger credentials in the production `.env` and run the send test in
+  `docs/DEPLOYMENT_GUIDE.md → Transactional Email & Queue Setup §4`.
+- Verify SPF/DKIM on the live domain (`dig TXT`) and set `APP_URL` to the public https
+  URL — the header logo is an `asset()` link and breaks otherwise.
+- Fill in `LODGE_ADDRESS` / `LODGE_PHONE` / `LODGE_EMAIL` / `LODGE_WEBSITE`.
+- Run the `queue` container in production (`php artisan queue:restart` after each deploy).
