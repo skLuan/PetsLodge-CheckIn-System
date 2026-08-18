@@ -1,0 +1,17 @@
+.git
+.gitignore
+node_modules
+vendor
+.env
+.env.*
+!.env.docker
+storage/logs
+storage/framework/cache
+storage/framework/sessions
+storage/framework/views
+docker-compose.yml
+*.md
+openspec/
+docs/
+scripts/
+screenshots/
