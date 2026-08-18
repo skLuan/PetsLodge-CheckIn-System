@@ -17,6 +17,8 @@
 </head>
 
 <body class="antialiased min-h-screen">
+    <x-app-loader />
+
     {{-- @include('layouts.navigation') --}}
 
     <!-- Page Heading -->

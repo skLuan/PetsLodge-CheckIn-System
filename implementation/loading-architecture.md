@@ -1,14 +1,13 @@
 # Implementation — Loading Architecture (FOUC Prevention)
 
-**Status:** Proposed spec (no code changes applied)
+**Status:** Implemented (2026-08-18)
 **Date:** 2026-08-18
 **Scope:** Frontend only — Blade layouts + one new Blade component.
 **Goal:** Prevent the Flash-of-Unstyled-Content (FOUC) that currently makes the page
 "pop" from raw HTML into styled HTML on first load.
 
-> This file is the implementation spec for the loading architecture. It is **not yet
-> wired into the codebase** — the "File changes" section lists the exact edits to make
-> when the feature is implemented.
+> This file is the implementation spec for the loading architecture. It has been
+> **implemented** — the "File changes" section lists the edits that were applied.
 
 ---
 

@@ -41,14 +41,19 @@ else
     echo "Database already seeded (users: ${USERS_COUNT}) — skipping seed."
 fi
 
-# 4. Clear caches (do NOT config:cache — compose injects env vars at runtime,
+# 4. Ensure storage framework dirs exist. They are excluded by .dockerignore
+#    (and empty dirs aren't copied into the image), which otherwise makes
+#    `php artisan view:clear` fail with "View path not found".
+mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views
+
+# 5. Clear caches (do NOT config:cache — compose injects env vars at runtime,
 #    so we want Laravel to read them live).
 echo "Clearing caches..."
 php artisan config:clear
 php artisan route:clear
 php artisan view:clear
 
-# 5. Ensure the public/storage symlink exists (PdfService serves printed PDFs from it).
+# 6. Ensure the public/storage symlink exists (PdfService serves printed PDFs from it).
 if [ ! -L public/storage ]; then
     echo "Creating storage symlink..."
     php artisan storage:link

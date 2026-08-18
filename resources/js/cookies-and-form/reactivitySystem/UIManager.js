@@ -154,10 +154,10 @@ class UIManager {
         if (isPetInfoStep) {
             const container = document.querySelector("#petPillsContainer");
             if (container) {
-                container.innerHTML = "";
-
-                // Recordar cuál estaba seleccionado antes de limpiar
+                // Recordar cuál estaba seleccionado ANTES de limpiar
                 const previouslySelectedIndex = UtilitiesManager.getCurrentSelectedPetIndex();
+
+                container.innerHTML = "";
 
                 let firstPill = null;
                 pets.forEach((pet, index) => {
