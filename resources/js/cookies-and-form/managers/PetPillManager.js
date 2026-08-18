@@ -16,17 +16,21 @@ class PetPillManager {
      * This fixes the issue where the feeding/medication popup wouldn't populate
      * because no pet index was selected.
      */
-    static addPetPillsToContainer() {
+    static addPetPillsToContainer(preserveSelection = true) {
         const pets = FormDataManager.getAllPetsFromCheckin();
         const container = document.querySelector("#petPillsContainer");
         console.log("addPetPillsToContainer called");
 
-        if (container) {
-            container.innerHTML = "";
-        } else {
+        if (!container) {
             console.warn("No #petPillsContainer found in the DOM.");
             return;
         }
+
+        // Remember the selected pet BEFORE clearing so the rebuild can restore it
+        // (avoids snapping the highlight back to the first pet).
+        const selectedIndex = this.getSelectedPetIndex();
+
+        container.innerHTML = "";
 
         if (pets.length === 0) {
             console.log("No pets found in cookies, skipping pill creation.");
@@ -53,9 +57,15 @@ class PetPillManager {
             }
         });
 
-        // Auto-select the first pill to ensure a pet is always current
-        // This ensures that the feeding/medication popup can find the current pet
-        if (firstPill) {
+        // Restore the previous selection when possible, otherwise auto-select the
+        // first pill so a pet is always "current" for feeding/medication operations.
+        let pillToSelect = null;
+        if (preserveSelection && selectedIndex !== null && selectedIndex < pets.length) {
+            pillToSelect = container.querySelector(`[data-index="${selectedIndex}"]`);
+        }
+        if (pillToSelect) {
+            pillToSelect.classList.add("selected");
+        } else if (firstPill) {
             console.log("[PetPillManager] Auto-selecting first pet pill");
             firstPill.classList.add("selected");
         }
@@ -70,6 +80,14 @@ class PetPillManager {
     static getSelectedPetIndex() {
         const selectedPill = document.querySelector(".pill.selected");
         return selectedPill ? parseInt(selectedPill.dataset.index, 10) : null;
+    }
+
+    /**
+     * Deselects every pet pill in the container.
+     */
+    static deselectAll() {
+        document.querySelectorAll("#petPillsContainer .pill.selected")
+            .forEach((pill) => pill.classList.remove("selected"));
     }
 }
 

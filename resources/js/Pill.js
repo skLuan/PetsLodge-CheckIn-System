@@ -1,5 +1,6 @@
 import { FormDataManager } from "./cookies-and-form/FormDataManager.js";
 import { HealthFormManager } from "./cookies-and-form/managers/HealthFormManager.js";
+import { FormUpdater } from "./cookies-and-form/reactivitySystem/FormUpdater.js";
 class Pill {
     constructor(name, type, index) {
         this.name = name;
@@ -85,19 +86,15 @@ class Pill {
             pill.classList.remove("selected");
         });
         this.pillElement.classList.add("selected");
-        // Populate form with this pet's data
+
+        // Reset the pet form, then populate it with this pet's data.
+        // FormUpdater.updatePetForm handles radios/selects correctly (unlike a
+        // naive Object.entries loop that checks the first radio regardless of value).
+        const form = document.querySelector("#petInfoForm");
+        if (form) form.reset();
         const petData = FormDataManager.getAllPetsFromCheckin()[this.index];
         if (petData) {
-            Object.entries(petData).forEach(([key, value]) => {
-                const input = document.querySelector(`[name="${key}"]`);
-                if (input) {
-                    if (input.type === "radio") {
-                        input.checked = value;
-                    } else {
-                        input.value = value;
-                    }
-                }
-            });
+            FormUpdater.updatePetForm(petData);
         }
 
         // Load the incoming pet's health data into #healthInfoForm.

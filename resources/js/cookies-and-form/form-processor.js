@@ -129,33 +129,27 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
 
     //------------------------------------------------
+    // Pet form: "+ New Pet" reset button (top of the form)
     //------------------------------------------------
-    // Save form data on submit
-    const form = document.querySelector("#petInfoForm");
-    if (form) {
-        form.addEventListener("submit", function (e) {
-            e.preventDefault();
-            const data = extractFormInputValues(form);
+    const newPetBtn = document.querySelector("#newPetBtn");
+    if (newPetBtn) {
+        newPetBtn.addEventListener("click", function () {
+            // Deselect the current pet and clear the forms so the user can start a
+            // fresh entry. Saving still happens via the bottom "Add Pet" submit.
+            PetPillManager.deselectAll();
+            const petInfoForm = document.querySelector("#petInfoForm");
+            if (petInfoForm) petInfoForm.reset();
+            HealthFormManager.loadPetHealth(null);
+            NavigationManager.syncNowEditingLabel();
 
-            // Guard: skip saving if the pet has no meaningful data (all fields empty)
-            const _KEY_FIELDS = ['petName', 'petColor', 'petType', 'petBreed', 'petAge', 'petWeight', 'petGender', 'petSpayed'];
-            const _hasData = _KEY_FIELDS.some(field => data[field] !== undefined && data[field] !== null && data[field] !== '');
-            if (!_hasData) {
-                console.warn('[petInfoForm] Skipped saving: all pet fields are empty.');
-                return;
-            }
-
-            // Use the same method as the "next" button for consistency
-            FormDataManager.handleFormStep(1, data, null); // step 1 = PET_INFO, selectedPetIndex = null to add new
-            form.reset();
-            scrollTo({ top: 0, behavior: "smooth" });
-            setTimeout(() => {
-                addPetPillsToContainer();
-            }, 500);
+            const petNameInput = document.querySelector("#petName");
+            if (petNameInput) petNameInput.focus();
         });
     }
 
-    // Handle pet info form submission
+    //------------------------------------------------
+    // Pet form: submit (add a new pet OR update the selected pet)
+    //------------------------------------------------
     const petInfoForm = document.querySelector("#petInfoForm");
     if (petInfoForm) {
         petInfoForm.addEventListener("submit", function (e) {
@@ -170,13 +164,22 @@ document.addEventListener("DOMContentLoaded", async function () {
                 return;
             }
 
-            // Use the same method as the "next" button for consistency
-            FormDataManager.handleFormStep(1, data, null); // step 1 = PET_INFO, selectedPetIndex = null to add new
-            petInfoForm.reset();
-            scrollTo({ top: 0, behavior: "smooth" });
-            setTimeout(() => {
-                PetPillManager.addPetPillsToContainer();
-            }, 500);
+            const selectedPetIndex = PetPillManager.getSelectedPetIndex();
+
+            if (selectedPetIndex !== null) {
+                // Editing an existing pet: update it. The cookie write triggers
+                // reactivity which re-populates the form with the updated info, so
+                // we deliberately do NOT reset the form here.
+                FormDataManager.handleFormStep(1, data, selectedPetIndex);
+            } else {
+                // Adding a new pet: save, clear the form, and rebuild the pills.
+                FormDataManager.handleFormStep(1, data, null);
+                petInfoForm.reset();
+                scrollTo({ top: 0, behavior: "smooth" });
+                setTimeout(() => {
+                    PetPillManager.addPetPillsToContainer();
+                }, 500);
+            }
         });
     }
 
