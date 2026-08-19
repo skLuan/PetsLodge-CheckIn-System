@@ -1,11 +1,4 @@
 <form id="petInfoForm" action="">
-    <div class="flex justify-end mb-4">
-        <button type="button" id="newPetBtn"
-                class="inline-flex items-center gap-1 px-4 py-2 bg-green text-white font-bold rounded-full transition-all duration-300 hover:shadow">
-            <iconify-icon icon="mdi:plus" aria-hidden="true"></iconify-icon>
-            New Pet
-        </button>
-    </div>
     <div class="pl-input-container">
         <label for="petName">Pet Name
             <input type="text" id="petName" name="petName" placeholder="Your Pet's Name" required>

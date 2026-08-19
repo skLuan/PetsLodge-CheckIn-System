@@ -5,7 +5,8 @@ const FORM_CONFIG = {
         FEEDING_MEDICATION: 3,
         HEALTH_INFO: 4,
         INVENTORY: 5,
-        THANKS: 6,
+        GROOMING: 6,
+        THANKS: 7,
     },
     COOKIE_PREFIX: "formStep",
     DEFAULT_COOKIE_DAYS: 7, // Cambiar a 7 días para mayor persistencia
@@ -55,6 +56,7 @@ const DEFAULT_CHECKIN_STRUCTURE = {
         nails: false,
         grooming: false,
         appointmentDay: "",
+        pets: [],
     },
     groomingDetails: "",
     inventory: [],

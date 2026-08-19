@@ -129,26 +129,7 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
 
     //------------------------------------------------
-    // Pet form: "+ New Pet" reset button (top of the form)
-    //------------------------------------------------
-    const newPetBtn = document.querySelector("#newPetBtn");
-    if (newPetBtn) {
-        newPetBtn.addEventListener("click", function () {
-            // Deselect the current pet and clear the forms so the user can start a
-            // fresh entry. Saving still happens via the bottom "Add Pet" submit.
-            PetPillManager.deselectAll();
-            const petInfoForm = document.querySelector("#petInfoForm");
-            if (petInfoForm) petInfoForm.reset();
-            HealthFormManager.loadPetHealth(null);
-            NavigationManager.syncNowEditingLabel();
-
-            const petNameInput = document.querySelector("#petName");
-            if (petNameInput) petNameInput.focus();
-        });
-    }
-
-    //------------------------------------------------
-    // Pet form: submit (add a new pet OR update the selected pet)
+    // Pet form: submit (add a new pet)
     //------------------------------------------------
     const petInfoForm = document.querySelector("#petInfoForm");
     if (petInfoForm) {
@@ -164,22 +145,43 @@ document.addEventListener("DOMContentLoaded", async function () {
                 return;
             }
 
-            const selectedPetIndex = PetPillManager.getSelectedPetIndex();
+            // Add a new pet, then clear the form for the next one. The reactivity
+            // system rebuilds the (delete-only) pet pills automatically.
+            FormDataManager.handleFormStep(1, data, null);
+            petInfoForm.reset();
+            scrollTo({ top: 0, behavior: "smooth" });
+        });
+    }
 
-            if (selectedPetIndex !== null) {
-                // Editing an existing pet: update it. The cookie write triggers
-                // reactivity which re-populates the form with the updated info, so
-                // we deliberately do NOT reset the form here.
-                FormDataManager.handleFormStep(1, data, selectedPetIndex);
-            } else {
-                // Adding a new pet: save, clear the form, and rebuild the pills.
-                FormDataManager.handleFormStep(1, data, null);
-                petInfoForm.reset();
-                scrollTo({ top: 0, behavior: "smooth" });
-                setTimeout(() => {
-                    PetPillManager.addPetPillsToContainer();
-                }, 500);
+    //------------------------------------------------
+    // Delete pet confirmation modal
+    //------------------------------------------------
+    let pendingDeletePetIndex = null;
+    const confirmDeleteModal = document.getElementById("confirmDeleteModal");
+    const confirmDeletePetName = document.getElementById("confirmDeletePetName");
+
+    document.addEventListener("pet:delete-request", function (e) {
+        pendingDeletePetIndex = e.detail.index;
+        if (confirmDeletePetName) confirmDeletePetName.textContent = e.detail.name;
+        if (confirmDeleteModal) confirmDeleteModal.classList.remove("hidden");
+    });
+
+    const confirmDeleteBtn = document.getElementById("confirmDeleteBtn");
+    if (confirmDeleteBtn) {
+        confirmDeleteBtn.addEventListener("click", function () {
+            if (pendingDeletePetIndex !== null) {
+                FormDataManager.removePetFromCheckin(pendingDeletePetIndex);
             }
+            pendingDeletePetIndex = null;
+            if (confirmDeleteModal) confirmDeleteModal.classList.add("hidden");
+        });
+    }
+
+    const confirmDeleteCancel = document.getElementById("confirmDeleteCancel");
+    if (confirmDeleteCancel) {
+        confirmDeleteCancel.addEventListener("click", function () {
+            pendingDeletePetIndex = null;
+            if (confirmDeleteModal) confirmDeleteModal.classList.add("hidden");
         });
     }
 
@@ -191,9 +193,7 @@ document.addEventListener("DOMContentLoaded", async function () {
             const forms = FormHandler.getForms();
             const data = FormHandler.extractFormInputValues(forms[step]);
 
-            const selectedPetIndex = PetPillManager.getSelectedPetIndex();
-
-            const success = SubmissionManager.handleNextStep(step, data, selectedPetIndex);
+            const success = SubmissionManager.handleNextStep(step, data, null);
 
             // Note: Automatic submission removed. Final submission should only happen
             // when explicitly triggered from a submit button (e.g., in THANKS step)

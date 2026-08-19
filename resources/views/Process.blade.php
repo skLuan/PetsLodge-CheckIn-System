@@ -11,12 +11,11 @@
     <div class="container px-4 pb-8 max-w-screen-sm mx-auto">
         <div class="sticky top-0 z-20 bg-green-lightest py-3 border-b border-b-green">
             <x-progress.bar />
-            <span id="petPillsLabel">Choose your pet to edit:</span>
+            <span id="petPillsLabel">Your pets:</span>
             <div id="petPillsContainer" class="pills">
             </div>
             <h2 id="thankYouTitle" class="text-2xl text-center font-bold mb-4 hidden">Thank You!</h2>
         </div>
-        <div id="nowEditContainer" class="nowEdit flex hidden"><span class="ml-auto">Now editing: <span id="nowEditingName"></span></span></div>
         <div id="stepContainer" class="py-4 overflow-hidden relative min-h-[568px]" 
              data-session-checkin="{{ htmlspecialchars(json_encode(session('checkin_data', null)), ENT_QUOTES, 'UTF-8') }}"
              data-editing-mode="{{ session('editing_mode', false) ? 'true' : 'false' }}"
@@ -65,41 +64,42 @@
             </div>
 
             <div id="step6" class="step w-full">
-                <div class="text-center">
-                    <p class="text-lg text-gray-700 mb-6">Please review your information and submit your check-in when
-                        ready.
-                    </p>
-                    <div class="bg-white p-4 rounded-lg mb-6 border border-green border-opacity-40">
-                        <h3 class="font-bold text-lg">Check-in Receipt</h3>
-                        <x-check-in-summary :checkinData="session('checkin_data', [])" />
+                <h2 class="text-center font-bold">Grooming</h2>
+                <p class="text-lg text-center">Optional — choose grooming services and which mascot(s) take them.</p>
+                <div id="groomingPopup" class="grooming bg-white p-4 rounded-lg border border-gray-300">
+                    <h3 class="font-bold text-lg mb-4">Grooming Options</h3>
+                    <div class="mb-4">
+                        <div>
+                            <h4 class="text-base font-semibold text-gray-700">Want grooming before picking up?</h4>
+                            <h3 class="mt-1 mb-3 text-sm">Take the service with 10% discount!</h3>
+                        </div>
+                        <div class="flex flex-col gap-3">
+                            <label class="flex items-center">
+                                <input type="checkbox" name="groomingOptions[]" value="bath" class="mr-3 w-5 h-5">
+                                <span class="text-sm font-medium">Bath</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" name="groomingOptions[]" value="nails" class="mr-3 w-5 h-5">
+                                <span class="text-sm font-medium">Nails</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" name="groomingOptions[]" value="grooming" class="mr-3 w-5 h-5">
+                                <span class="text-sm font-medium">Grooming</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" name="groomingOptions[]" value="no" class="mr-3 w-5 h-5">
+                                <span class="text-sm font-medium">No</span>
+                            </label>
+                        </div>
                     </div>
 
-                    <div id="groomingPopup" class="grooming bg-white p-4 rounded-lg border border-gray-300 mb-6">
-                        <h3 class="font-bold text-lg mb-4">Grooming Options</h3>
-                        <div class="mb-4">
-                            <div>
-                                <h4 class="text-base font-semibold text-gray-700">Want grooming before picking up?</h4>
-                                <h3 class="mt-1 mb-3 text-sm">Take the service with 10% discount!</h3>
-                            </div>
-                            <div class="flex flex-col gap-3">
-                                <label class="flex items-center">
-                                    <input type="checkbox" name="groomingOptions[]" value="bath" class="mr-3 w-5 h-5">
-                                    <span class="text-sm font-medium">Bath</span>
-                                </label>
-                                <label class="flex items-center">
-                                    <input type="checkbox" name="groomingOptions[]" value="nails" class="mr-3 w-5 h-5">
-                                    <span class="text-sm font-medium">Nails</span>
-                                </label>
-                                <label class="flex items-center">
-                                    <input type="checkbox" name="groomingOptions[]" value="grooming" class="mr-3 w-5 h-5">
-                                    <span class="text-sm font-medium">Grooming</span>
-                                </label>
-                                <label class="flex items-center">
-                                    <input type="checkbox" name="groomingOptions[]" value="no" class="mr-3 w-5 h-5">
-                                    <span class="text-sm font-medium">No</span>
-                                </label>
-                            </div>
+                    <!-- Which mascot(s) take the service -->
+                    <div class="mb-4">
+                        <h4 class="text-base font-semibold text-gray-700 mb-2">Which mascot(s) take the service?</h4>
+                        <div id="groomingPetSelector" class="flex flex-col gap-2">
+                            <!-- Populated dynamically per pet -->
                         </div>
+                    </div>
 
                         <!-- Conditional grooming appointment day -->
                         <div class="conditional-grooming-appointment-popup mb-4" style="display: none;">
@@ -143,7 +143,19 @@
                                 <span class="text-sm text-gray-700">I confirm my grooming preferences above</span>
                             </label>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">Please confirm your grooming preferences before submitting.</p>
+                        <p class="text-xs text-gray-500 mt-2">Grooming is optional — leave all options blank to skip.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="step7" class="step w-full">
+                <div class="text-center">
+                    <p class="text-lg text-gray-700 mb-6">Please review your information and submit your check-in when
+                        ready.
+                    </p>
+                    <div class="bg-white p-4 rounded-lg mb-6 border border-green border-opacity-40">
+                        <h3 class="font-bold text-lg">Check-in Receipt</h3>
+                        <x-check-in-summary :checkinData="session('checkin_data', [])" />
                     </div>
 
                     <div class="bg-white p-4 rounded-lg border border-gray-300 mb-6">
@@ -175,6 +187,7 @@
         </div>
         <x-pop-ups.feeding-medication />
         <x-pop-ups.terms-conditions />
+        <x-pop-ups.confirm-delete />
         <x-tabbar />
     </div>
 </x-app-layout>

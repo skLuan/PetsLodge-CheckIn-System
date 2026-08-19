@@ -91,8 +91,8 @@ class CheckInService
 
         foreach ($checkIns as $checkIn) {
             foreach ($groomingData as $service => $enabled) {
-                // Skip non-service keys like 'appointmentDay'
-                if ($service === 'appointmentDay' || !$enabled) {
+                // Skip non-service keys like 'appointmentDay' and the per-pet selector 'pets'
+                if (in_array($service, ['appointmentDay', 'pets'], true) || !$enabled) {
                     continue;
                 }
 

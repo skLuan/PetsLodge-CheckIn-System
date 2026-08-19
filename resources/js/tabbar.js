@@ -1,5 +1,4 @@
 import { HealthFormManager } from "./cookies-and-form/managers/HealthFormManager.js";
-import { PetPillManager } from "./cookies-and-form/managers/PetPillManager.js";
 
 const progressBar = document.getElementById("stepProgress");
 if(progressBar){
@@ -23,8 +22,7 @@ document.getElementById("prevStep").addEventListener("click", function (e) {
     // Persist the current step's form before navigating back.
     // Step 4 (1-based) is the health-info step; save the selected pet's health.
     if (currentStep === 4) {
-        const selectedPetIndex = PetPillManager.getSelectedPetIndex();
-        HealthFormManager.saveCurrentPetHealth(selectedPetIndex !== null ? selectedPetIndex : 0);
+        HealthFormManager.saveAllPetsHealth();
     }
 
     if (currentStep > 1) {
@@ -42,11 +40,8 @@ document.getElementById("nextStep").addEventListener("click", async function (e)
         const currentForm = forms[currentStep];
         const data = currentForm ? extractFormInputValues(currentForm) : {};
 
-        // Get selected pet index if applicable
-        const selectedPetIndex = window.PetPillManager ? window.PetPillManager.getSelectedPetIndex() : null;
-
-        // Save form data to cookies
-        const success = window.SubmissionManager.handleNextStep(currentStep, data, selectedPetIndex);
+        // Save form data to cookies (bulk edit: apply to all pets)
+        const success = window.SubmissionManager.handleNextStep(currentStep, data, null);
 
         if (!success) {
             // If saving failed, don't proceed to next step

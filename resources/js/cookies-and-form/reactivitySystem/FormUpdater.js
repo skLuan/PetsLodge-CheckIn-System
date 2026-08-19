@@ -164,11 +164,8 @@ class FormUpdater {
     static updateHealthInfoForm(pets, grooming, groomingDetails) {
         if (!pets || !Array.isArray(pets) || pets.length === 0) return;
 
-        // Get the currently selected pet
-        const currentPetIndex = this.getCurrentSelectedPetIndex();
-        if (currentPetIndex === null || !pets[currentPetIndex]) return;
-
-        const currentPet = pets[currentPetIndex];
+        // Bulk edit: use the first pet as the template for the shared health form.
+        const currentPet = pets[0];
 
         // Update unusual health behavior radio buttons.
         // Reset both radios first so switching to a pet with no entry doesn't

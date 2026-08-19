@@ -104,13 +104,9 @@ class PopupManager {
 
             console.log("Saving feeding/medication data for times:", data.day_time);
 
-            // Get selected pet or first pet
-            const selectedPill = document.querySelector(".pill.selected");
-            const petIndex = selectedPill ? parseInt(selectedPill.dataset.index, 10) : 0;
-
-            // Check if "same feeding for all" is checked and it's food
-            const sameFeedingCheckbox = document.getElementById("sameFeedingForAll");
-            const isSameFeedingForAll = sameFeedingCheckbox && sameFeedingCheckbox.checked && data.type === "food";
+            // Bulk edit: apply feeding/medication to every pet.
+            const allPets = FormDataManager.getAllPetsFromCheckin();
+            const feedingType = data.type === "food" ? "feeding" : "medication";
 
             // Create an entry for each selected time
             data.day_time.forEach((time) => {
@@ -122,16 +118,9 @@ class PopupManager {
 
                 console.log("Creating entry for time:", time, "with data:", itemData);
 
-                if (isSameFeedingForAll) {
-                    // Add to all pets
-                    const allPets = FormDataManager.getAllPetsFromCheckin();
-                    allPets.forEach((_, index) => {
-                        FormDataManager.addPetFeedingOrMedication(index, "feeding", itemData);
-                    });
-                } else {
-                    // Add to selected pet
-                    FormDataManager.addPetFeedingOrMedication(petIndex, data.type === "food" ? "feeding" : "medication", itemData);
-                }
+                allPets.forEach((_, index) => {
+                    FormDataManager.addPetFeedingOrMedication(index, feedingType, itemData);
+                });
             });
 
             // Reset form after successful submission
