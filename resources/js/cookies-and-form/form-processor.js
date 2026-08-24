@@ -17,6 +17,7 @@ import {
     FastCheckinManager
 } from "./managers/index.js";
 import { FormDataManager } from "./FormDataManager.js";
+import { FormUpdater } from "./reactivitySystem/FormUpdater.js";
 import config from "./config.js";
 
 const { FORM_CONFIG } = config;
@@ -129,33 +130,15 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
 
     //------------------------------------------------
+    // Pet form: submit (add a new pet or update the selected one)
     //------------------------------------------------
-    // Save form data on submit
-    const form = document.querySelector("#petInfoForm");
-    if (form) {
-        form.addEventListener("submit", function (e) {
-            e.preventDefault();
-            const data = extractFormInputValues(form);
+    const setPetSubmitButtonLabel = (editing) => {
+        const addPetBtn = document.getElementById("addPetBtn");
+        if (addPetBtn) {
+            addPetBtn.textContent = editing ? "Save Pet" : "Add Pet";
+        }
+    };
 
-            // Guard: skip saving if the pet has no meaningful data (all fields empty)
-            const _KEY_FIELDS = ['petName', 'petColor', 'petType', 'petBreed', 'petAge', 'petWeight', 'petGender', 'petSpayed'];
-            const _hasData = _KEY_FIELDS.some(field => data[field] !== undefined && data[field] !== null && data[field] !== '');
-            if (!_hasData) {
-                console.warn('[petInfoForm] Skipped saving: all pet fields are empty.');
-                return;
-            }
-
-            // Use the same method as the "next" button for consistency
-            FormDataManager.handleFormStep(1, data, null); // step 1 = PET_INFO, selectedPetIndex = null to add new
-            form.reset();
-            scrollTo({ top: 0, behavior: "smooth" });
-            setTimeout(() => {
-                addPetPillsToContainer();
-            }, 500);
-        });
-    }
-
-    // Handle pet info form submission
     const petInfoForm = document.querySelector("#petInfoForm");
     if (petInfoForm) {
         petInfoForm.addEventListener("submit", function (e) {
@@ -170,15 +153,74 @@ document.addEventListener("DOMContentLoaded", async function () {
                 return;
             }
 
-            // Use the same method as the "next" button for consistency
-            FormDataManager.handleFormStep(1, data, null); // step 1 = PET_INFO, selectedPetIndex = null to add new
+            // If a pet pill is selected, update that pet; otherwise add a new one.
+            const selectedIndex = FormDataManager.getCurrentSelectedPetIndex();
+            FormDataManager.handleFormStep(1, data, selectedIndex);
+
+            // Clear the form and deselect so the next submit adds a new pet again.
             petInfoForm.reset();
+            document.querySelectorAll("#petPillsContainer .pill.selected")
+                .forEach((p) => p.classList.remove("selected"));
+            setPetSubmitButtonLabel(false);
+
             scrollTo({ top: 0, behavior: "smooth" });
-            setTimeout(() => {
-                PetPillManager.addPetPillsToContainer();
-            }, 500);
         });
     }
+
+    //------------------------------------------------
+    // Delete pet confirmation modal
+    //------------------------------------------------
+    let pendingDeletePetIndex = null;
+    const confirmDeleteModal = document.getElementById("confirmDeleteModal");
+    const confirmDeletePetName = document.getElementById("confirmDeletePetName");
+
+    document.addEventListener("pet:delete-request", function (e) {
+        pendingDeletePetIndex = e.detail.index;
+        if (confirmDeletePetName) confirmDeletePetName.textContent = e.detail.name;
+        if (confirmDeleteModal) confirmDeleteModal.classList.remove("hidden");
+    });
+
+    const confirmDeleteBtn = document.getElementById("confirmDeleteBtn");
+    if (confirmDeleteBtn) {
+        confirmDeleteBtn.addEventListener("click", function () {
+            if (pendingDeletePetIndex !== null) {
+                FormDataManager.removePetFromCheckin(pendingDeletePetIndex);
+            }
+            pendingDeletePetIndex = null;
+            if (confirmDeleteModal) confirmDeleteModal.classList.add("hidden");
+        });
+    }
+
+    const confirmDeleteCancel = document.getElementById("confirmDeleteCancel");
+    if (confirmDeleteCancel) {
+        confirmDeleteCancel.addEventListener("click", function () {
+            pendingDeletePetIndex = null;
+            if (confirmDeleteModal) confirmDeleteModal.classList.add("hidden");
+        });
+    }
+
+    //------------------------------------------------
+    // Pet pill selection: load the selected pet into the form for editing
+    //------------------------------------------------
+    document.addEventListener("pet:select-request", function (e) {
+        const { index, selected } = e.detail;
+        const form = document.getElementById("petInfoForm");
+
+        if (selected) {
+            const pets = FormDataManager.getAllPetsFromCheckin();
+            const pet = pets[index];
+            if (pet && form) {
+                form.reset();
+                FormUpdater.updatePetForm(pet);
+            }
+            setPetSubmitButtonLabel(true);
+        } else if (form) {
+            form.reset();
+            setPetSubmitButtonLabel(false);
+        }
+
+        NavigationManager.syncNowEditingLabel();
+    });
 
     // Handle next step navigation
     const nextButton = document.querySelector("#nextStep");
@@ -188,9 +230,7 @@ document.addEventListener("DOMContentLoaded", async function () {
             const forms = FormHandler.getForms();
             const data = FormHandler.extractFormInputValues(forms[step]);
 
-            const selectedPetIndex = PetPillManager.getSelectedPetIndex();
-
-            const success = SubmissionManager.handleNextStep(step, data, selectedPetIndex);
+            const success = SubmissionManager.handleNextStep(step, data, null);
 
             // Note: Automatic submission removed. Final submission should only happen
             // when explicitly triggered from a submit button (e.g., in THANKS step)

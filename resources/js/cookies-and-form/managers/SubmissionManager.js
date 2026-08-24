@@ -98,9 +98,17 @@ class SubmissionManager {
 
                 // Step 5: Send Extra Info
                 console.log(`📦 [${new Date().toISOString()}] Step 5: Sending extra info for ${petName}...`);
+
+                // Grooming is per-mascot: only submit it for pets selected in grooming.pets.
+                const grooming = checkinData.grooming || {};
+                const selectedGroomingPets = grooming.pets;
+                const petTakesGrooming = Array.isArray(selectedGroomingPets)
+                    ? selectedGroomingPets.includes(i)
+                    : true; // backward-compat: no pets array → apply to all
+
                 const extraResult = await this.submitExtraInfo(lastCheckinId, {
                     inventory: checkinData.inventory || [],
-                    grooming: checkinData.grooming || {}
+                    grooming: petTakesGrooming ? grooming : {}
                 });
                 if (!extraResult.success) {
                     throw new Error(`Step 5 failed for ${petName}: ${extraResult.message}`);

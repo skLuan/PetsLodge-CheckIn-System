@@ -82,6 +82,28 @@ class HealthFormManager {
     }
 
     /**
+     * Saves the current #healthInfoForm values to EVERY pet (bulk edit).
+     */
+    static saveAllPetsHealth() {
+        const healthInfoForm = document.getElementById('healthInfoForm');
+        if (!healthInfoForm) return;
+
+        const formData = FormHandler.extractFormInputValues('#healthInfoForm');
+        const healthData = {
+            unusualHealthBehavior: formData.unusualHealthBehavior === 'yes',
+            healthBehaviors: formData.healthBehaviorDetails || '',
+            warnings: formData.warnings || '',
+        };
+
+        const checkinData = FormDataManager.getCheckinData();
+        if (checkinData && checkinData.pets) {
+            checkinData.pets.forEach((_, index) => {
+                FormDataManager.updatePetHealthInfo(index, healthData);
+            });
+        }
+    }
+
+    /**
      * Resets the #healthInfoForm and repopulates it from the given pet's health.
      *
      * Always clears the form fields first (radios, "Which?" details, warnings,

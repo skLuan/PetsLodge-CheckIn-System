@@ -20,14 +20,14 @@
             </div>
             <p>Hint: Use the Key "enter" to add a new item</p>
             <button type="button" id="addInventoryItem"
-                class="bg-green-dark self-end text-white px-4 py-2 rounded-full hover:bg-green-900">
+                class="bg-green-dark self-end text-white px-4 py-2 rounded-full hover:bg-green-900 cursor-pointer">
                 Add Item
             </button>
         </div>
 
         <!-- Confirmation Checkbox -->
         <div class="mt-8 pt-4 border-t border-gray-200">
-            <label class="flex items-center justify-center">
+            <label class="flex items-center justify-center cursor-pointer">
                 <input type="checkbox" id="inventoryComplete" name="inventoryComplete" class="mr-3 w-5 h-5 mb-0">
                 <span class="text-sm font-bold">Im not leaving anything in the inventory</span>
             </label>

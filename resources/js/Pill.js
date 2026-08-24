@@ -1,5 +1,3 @@
-import { FormDataManager } from "./cookies-and-form/FormDataManager.js";
-import { HealthFormManager } from "./cookies-and-form/managers/HealthFormManager.js";
 class Pill {
     constructor(name, type, index) {
         this.name = name;
@@ -14,9 +12,11 @@ class Pill {
         closeIcon.setAttribute("icon", "material-symbols:close");
         closeIcon.setAttribute("aria-label", `Remove ${this.name}`);
 
-        closeIcon.addEventListener("click", () => {
-            this.removePet(this.index);
-            this.pillElement.remove();
+        closeIcon.addEventListener("click", (e) => {
+            e.stopPropagation();
+            document.dispatchEvent(new CustomEvent("pet:delete-request", {
+                detail: { index: this.index, name: this.name }
+            }));
         });
 
         const petTypeIcons = {
@@ -46,81 +46,26 @@ class Pill {
             this.pillElement.appendChild(closeIcon);
         }, 0);
 
+        // Click the pill body to select this pet for editing (only one selected at a time).
+        // The close icon stops propagation, so delete stays independent of select.
         this.pillElement.addEventListener("click", () => {
-            this.select();
+            const wasSelected = this.pillElement.classList.contains("selected");
+
+            document.querySelectorAll("#petPillsContainer .pill.selected")
+                .forEach((p) => p.classList.remove("selected"));
+
+            if (!wasSelected) {
+                this.pillElement.classList.add("selected");
+            }
+
+            document.dispatchEvent(new CustomEvent("pet:select-request", {
+                detail: { index: this.index, name: this.name, selected: !wasSelected }
+            }));
         });
     }
 
     render() {
         return this.pillElement;
-    }
-
-    select() {
-        if (!this.pillElement) return;
-
-        // Capture the previously selected pet before changing selection so we
-        // can persist its current health-form values.
-        const prevPill = document.querySelector(".pill.selected");
-        const prevIndex = prevPill ? parseInt(prevPill.dataset.index, 10) : null;
-
-        const isSelected = this.pillElement.classList.contains("selected");
-        if (isSelected) {
-            // Deselecting the current pill: save its health data before clearing.
-            HealthFormManager.saveCurrentPetHealth(prevIndex);
-            this.pillElement.classList.remove("selected");
-            // Optionally clear the form fields here if needed
-            const form = document.querySelector("#petInfoForm");
-            form.reset();
-            // Clear the health form too (no pet selected).
-            HealthFormManager.loadPetHealth(null);
-            return;
-        }
-
-        // Switching to a different pet: persist the outgoing pet's health first.
-        if (prevIndex !== null && prevIndex !== this.index) {
-            HealthFormManager.saveCurrentPetHealth(prevIndex);
-        }
-
-        document.querySelectorAll(".pill.selected").forEach((pill) => {
-            pill.classList.remove("selected");
-        });
-        this.pillElement.classList.add("selected");
-        // Populate form with this pet's data
-        const petData = FormDataManager.getAllPetsFromCheckin()[this.index];
-        if (petData) {
-            Object.entries(petData).forEach(([key, value]) => {
-                const input = document.querySelector(`[name="${key}"]`);
-                if (input) {
-                    if (input.type === "radio") {
-                        input.checked = value;
-                    } else {
-                        input.value = value;
-                    }
-                }
-            });
-        }
-
-        // Load the incoming pet's health data into #healthInfoForm.
-        HealthFormManager.loadPetHealth(this.index);
-    }
-    deselect() {
-        if (this.pillElement) {
-            this.pillElement.classList.remove("selected");
-        }
-    }
-
-    /**
-     * Removes a pet from cookies and updates pills.
-     * @param {number} index - The pet index to remove.
-     */
-    removePet(index) {
-        console.log(`Removing pet at index ${index}`);
-        FormDataManager.removePetFromCheckin(index);
-        // The UI will be updated automatically via cookie reactivity
-    }
-
-    getCloseIcon() {
-        return this.pillElement.querySelector(".close-icon");
     }
 }
 export default Pill;

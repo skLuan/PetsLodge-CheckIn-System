@@ -55,6 +55,15 @@ class PopupManager {
             });
         });
 
+        // "Same feeding for all" checkbox: highlight all pet pills when checked.
+        const sameFeedingForAllCheckbox = document.getElementById("sameFeedingForAll");
+        if (sameFeedingForAllCheckbox) {
+            sameFeedingForAllCheckbox.addEventListener("change", function () {
+                document.querySelectorAll("#petPillsContainer .pill")
+                    .forEach((pill) => pill.classList.toggle("selected", this.checked));
+            });
+        }
+
         // Handle popup opening
         addFeedMedButtons.forEach((btn) => {
             btn.addEventListener("click", function (e) {
@@ -104,13 +113,24 @@ class PopupManager {
 
             console.log("Saving feeding/medication data for times:", data.day_time);
 
-            // Get selected pet or first pet
-            const selectedPill = document.querySelector(".pill.selected");
-            const petIndex = selectedPill ? parseInt(selectedPill.dataset.index, 10) : 0;
+            // Determine target pets: "same feeding for all" → every pet, else the selected pet.
+            const allPets = FormDataManager.getAllPetsFromCheckin();
+            const feedingType = data.type === "food" ? "feeding" : "medication";
+            const applyToAll = sameFeedingForAllCheckbox ? sameFeedingForAllCheckbox.checked : false;
 
-            // Check if "same feeding for all" is checked and it's food
-            const sameFeedingCheckbox = document.getElementById("sameFeedingForAll");
-            const isSameFeedingForAll = sameFeedingCheckbox && sameFeedingCheckbox.checked && data.type === "food";
+            let targetIndexes;
+            if (applyToAll) {
+                targetIndexes = allPets.map((_, index) => index);
+            } else if (allPets.length === 1) {
+                targetIndexes = [0]; // single pet: no selection needed
+            } else {
+                const selectedIndex = FormDataManager.getCurrentSelectedPetIndex();
+                if (selectedIndex === null) {
+                    alert("Please select a pet to apply this feeding/medication to, or check 'Same feeding for all'.");
+                    return;
+                }
+                targetIndexes = [selectedIndex];
+            }
 
             // Create an entry for each selected time
             data.day_time.forEach((time) => {
@@ -120,18 +140,11 @@ class PopupManager {
                     feeding_med_details: data.feeding_med_details.trim()
                 };
 
-                console.log("Creating entry for time:", time, "with data:", itemData);
+                console.log("Creating entry for time:", time, "with data:", itemData, "targets:", targetIndexes);
 
-                if (isSameFeedingForAll) {
-                    // Add to all pets
-                    const allPets = FormDataManager.getAllPetsFromCheckin();
-                    allPets.forEach((_, index) => {
-                        FormDataManager.addPetFeedingOrMedication(index, "feeding", itemData);
-                    });
-                } else {
-                    // Add to selected pet
-                    FormDataManager.addPetFeedingOrMedication(petIndex, data.type === "food" ? "feeding" : "medication", itemData);
-                }
+                targetIndexes.forEach((index) => {
+                    FormDataManager.addPetFeedingOrMedication(index, feedingType, itemData);
+                });
             });
 
             // Reset form after successful submission

@@ -147,13 +147,13 @@ class NavigationManager {
 
         if (!nextButton) return;
 
-        // Update grooming summary when reaching final step
-        if (currentStep === FORM_CONFIG.STEPS.INVENTORY) {
+        // Update grooming summary when reaching the grooming or final step
+        if (currentStep === FORM_CONFIG.STEPS.INVENTORY || currentStep === FORM_CONFIG.STEPS.THANKS - 1) {
             PopupManager.updateGroomingSummary();
         }
 
         // Toggle thank you title and pet pills container
-        if (currentStep === FORM_CONFIG.STEPS.INVENTORY) { // Step 6 (0-based: 5)
+        if (currentStep === FORM_CONFIG.STEPS.THANKS - 1) { // Final step (0-based: 6)
             // Hide next button in final step
             nextButton.style.display = 'none';
 
@@ -172,8 +172,22 @@ class NavigationManager {
             if (cookieData) {
                 SummaryRenderer.updateCheckinSummary(cookieData);
             }
+
+            // Update submit button state based on grooming acknowledgment AND terms acceptance
+            const groomingAcknowledged = cookieData?.groomingAcknowledged;
+            const termsAccepted = cookieData?.termsAccepted;
+            const finalSubmitButton = document.querySelector("#finalSubmit");
+            if (finalSubmitButton) {
+                finalSubmitButton.disabled = !groomingAcknowledged || !termsAccepted;
+                if (finalSubmitButton.disabled) {
+                    finalSubmitButton.classList.add('opacity-50', 'cursor-not-allowed');
+                } else {
+                    finalSubmitButton.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
+            }
         } else {
             // Show next button for other steps
+            nextButton.style.display = '';
             if (thankYouTitle) thankYouTitle.classList.add('hidden');
 
             if (currentStep === FORM_CONFIG.STEPS.INVENTORY - 1) {
@@ -252,24 +266,8 @@ class NavigationManager {
                 } else {
                     nextButton.classList.remove('opacity-50', 'cursor-not-allowed');
                 }
-            } else if (currentStep === FORM_CONFIG.STEPS.INVENTORY) { // Step 6 - Final step
-                // In final step, check grooming acknowledgment and terms acceptance
-                const checkinData = FormDataManager.getCheckinData();
-                const groomingAcknowledged = checkinData?.groomingAcknowledged;
-                const termsAccepted = checkinData?.termsAccepted;
-
-                // Update submit button state based on grooming acknowledgment AND terms acceptance
-                const finalSubmitButton = document.querySelector("#finalSubmit");
-                if (finalSubmitButton) {
-                    finalSubmitButton.disabled = !groomingAcknowledged || !termsAccepted;
-                    if (finalSubmitButton.disabled) {
-                        finalSubmitButton.classList.add('opacity-50', 'cursor-not-allowed');
-                    } else {
-                        finalSubmitButton.classList.remove('opacity-50', 'cursor-not-allowed');
-                    }
-                }
             } else {
-                // Other steps - normal "Next"
+                // Other steps (incl. grooming) - normal "Next"
                 nextButton.innerHTML = 'Next <iconify-icon class="text-3xl" icon="fluent:next-frame-20-filled"></iconify-icon>';
                 nextButton.disabled = false;
                 nextButton.classList.remove('opacity-50', 'cursor-not-allowed');
@@ -290,7 +288,7 @@ class NavigationManager {
      * @returns {boolean} True if current step is the final step
      */
     static isFinalStep() {
-        return this.getCurrentStep() === (FORM_CONFIG.STEPS.INVENTORY - 1);
+        return this.getCurrentStep() === (FORM_CONFIG.STEPS.THANKS - 1);
     }
 }
 

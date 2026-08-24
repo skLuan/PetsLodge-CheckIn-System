@@ -150,51 +150,23 @@ class UIManager {
         const currentStep = NavigationManager.getCurrentStep();
         const isPetInfoStep = currentStep === (FORM_CONFIG.STEPS.PET_INFO - 1); // step 1
 
-        // Solo actualizar pills completamente en el paso de mascotas
+        // Rebuild the pet pills (delete-only chips) on the pet-info step.
         if (isPetInfoStep) {
             const container = document.querySelector("#petPillsContainer");
             if (container) {
                 container.innerHTML = "";
 
-                // Recordar cuál estaba seleccionado antes de limpiar
-                const previouslySelectedIndex = UtilitiesManager.getCurrentSelectedPetIndex();
-
-                let firstPill = null;
                 pets.forEach((pet, index) => {
                     if (pet && pet.info?.petName) {
                         const pill = new Pill(pet.info.petName, pet.info.petType, index);
-                        const pillElement = pill.render();
-                        container.appendChild(pillElement);
+                        container.appendChild(pill.render());
                         
-                        // Store the first pill in case we need to auto-select it
-                        if (index === 0) {
-                            firstPill = pillElement;
-                        }
                     }
                 });
-
-                // Re-select the previously selected pill if it still exists
-                if (previouslySelectedIndex !== null && previouslySelectedIndex < pets.length) {
-                    const pillToReselect = container.querySelector(`[data-index="${previouslySelectedIndex}"]`);
-                    if (pillToReselect) {
-                        pillToReselect.classList.add('selected');
-                    }
-                } else if (firstPill) {
-                    // If no previous selection exists, auto-select the first pill
-                    // This ensures a pet is always "current" for feeding/medication operations
-                    console.log("[UIManager] Auto-selecting first pet pill (no previous selection)");
-                    firstPill.classList.add('selected');
-                }
 
                 // Refresh fast check-in pills after rebuilding pet pills
                 FastCheckinManager.refresh();
             }
-        }
-
-        // Siempre actualizar el formulario de la mascota seleccionada si existe
-        const currentPetIndex = UtilitiesManager.getCurrentSelectedPetIndex();
-        if (currentPetIndex !== null && pets[currentPetIndex]) {
-            FormUpdater.updatePetForm(pets[currentPetIndex]);
         }
     }
 

@@ -56,9 +56,10 @@ COPY docker/php/local.ini /usr/local/etc/php/conf.d/local.ini
 COPY docker/php/php-fpm-healthcheck /usr/local/bin/php-fpm-healthcheck
 RUN chmod +x /usr/local/bin/php-fpm-healthcheck
 
-# Copy Docker entrypoint script
-COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+# NOTE: Database migrations + seeding run at CONTAINER STARTUP via
+# docker-entrypoint.sh (below), NOT during `docker build` — MySQL only exists
+# at runtime. Do NOT add a `RUN php artisan migrate` here; it would fail the build.
+COPY --chmod=0755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # Expose port 9000
 EXPOSE 9000

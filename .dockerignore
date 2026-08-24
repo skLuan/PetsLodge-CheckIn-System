@@ -1,0 +1,22 @@
+.git
+.gitignore
+node_modules
+vendor
+.env
+.env.*
+!.env.docker
+storage/logs
+storage/framework/cache
+storage/framework/sessions
+storage/framework/views
+public/storage
+# Generated PDFs (storage/app/public) should not be baked into the image;
+# keep the .gitignore placeholder so the directory survives.
+storage/app/public/*
+!storage/app/public/.gitignore
+docker-compose.yml
+*.md
+openspec/
+docs/
+scripts/
+screenshots/

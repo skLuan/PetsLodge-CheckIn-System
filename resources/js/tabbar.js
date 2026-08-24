@@ -1,5 +1,4 @@
 import { HealthFormManager } from "./cookies-and-form/managers/HealthFormManager.js";
-import { PetPillManager } from "./cookies-and-form/managers/PetPillManager.js";
 
 const progressBar = document.getElementById("stepProgress");
 if(progressBar){
@@ -23,8 +22,7 @@ document.getElementById("prevStep").addEventListener("click", function (e) {
     // Persist the current step's form before navigating back.
     // Step 4 (1-based) is the health-info step; save the selected pet's health.
     if (currentStep === 4) {
-        const selectedPetIndex = PetPillManager.getSelectedPetIndex();
-        HealthFormManager.saveCurrentPetHealth(selectedPetIndex !== null ? selectedPetIndex : 0);
+        HealthFormManager.saveAllPetsHealth();
     }
 
     if (currentStep > 1) {
@@ -42,11 +40,8 @@ document.getElementById("nextStep").addEventListener("click", async function (e)
         const currentForm = forms[currentStep];
         const data = currentForm ? extractFormInputValues(currentForm) : {};
 
-        // Get selected pet index if applicable
-        const selectedPetIndex = window.PetPillManager ? window.PetPillManager.getSelectedPetIndex() : null;
-
-        // Save form data to cookies
-        const success = window.SubmissionManager.handleNextStep(currentStep, data, selectedPetIndex);
+        // Save form data to cookies (bulk edit: apply to all pets)
+        const success = window.SubmissionManager.handleNextStep(currentStep, data, null);
 
         if (!success) {
             // If saving failed, don't proceed to next step
@@ -56,7 +51,7 @@ document.getElementById("nextStep").addEventListener("click", async function (e)
 
     // Logic to go to the next step
     let currentStep = getCurrentStep();
-    if (currentStep < 6) {
+    if (currentStep < 7) {
         showStep(currentStep + 1);
     }
 });
@@ -88,7 +83,7 @@ function extractFormInputValues(formElement) {
 }
 
 function getCurrentStep() {
-    for (let i = 1; i <= 6; i++) {
+    for (let i = 1; i <= 7; i++) {
         if (document.getElementById(`step${i}`).classList.contains("active")) {
             return i;
         }
@@ -97,7 +92,7 @@ function getCurrentStep() {
 }
 
 function deactivateAllSteps() {
-    for (let i = 1; i <= 6; i++) {
+    for (let i = 1; i <= 7; i++) {
         document.getElementById(`step${i}`).classList.remove("active");
         document.getElementById(`step${i}`).classList.add("inactive-right");
     }
@@ -109,7 +104,7 @@ function deactivateAllSteps() {
 
 function showStep(step) {
     deactivateAllSteps();
-    for (let i = 1; i <= 6; i++) {
+    for (let i = 1; i <= 7; i++) {
         document
             .getElementById(`step${i}`)
             .classList.toggle("inactive-left", i < step);
