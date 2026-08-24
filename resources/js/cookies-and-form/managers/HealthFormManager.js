@@ -104,6 +104,19 @@ class HealthFormManager {
     }
 
     /**
+     * Saves the current #healthInfoForm to the selected pet (or to every pet
+     * when no pet is selected).
+     */
+    static saveHealthForSelectedOrAll() {
+        const selectedIndex = FormDataManager.getCurrentSelectedPetIndex();
+        if (selectedIndex !== null) {
+            this.saveCurrentPetHealth(selectedIndex);
+        } else {
+            this.saveAllPetsHealth();
+        }
+    }
+
+    /**
      * Resets the #healthInfoForm and repopulates it from the given pet's health.
      *
      * Always clears the form fields first (radios, "Which?" details, warnings,
