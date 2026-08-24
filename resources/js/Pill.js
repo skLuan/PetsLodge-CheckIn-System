@@ -46,7 +46,22 @@ class Pill {
             this.pillElement.appendChild(closeIcon);
         }, 0);
 
-        // Pills are delete-only: no click-to-edit behavior.
+        // Click the pill body to select this pet for editing (only one selected at a time).
+        // The close icon stops propagation, so delete stays independent of select.
+        this.pillElement.addEventListener("click", () => {
+            const wasSelected = this.pillElement.classList.contains("selected");
+
+            document.querySelectorAll("#petPillsContainer .pill.selected")
+                .forEach((p) => p.classList.remove("selected"));
+
+            if (!wasSelected) {
+                this.pillElement.classList.add("selected");
+            }
+
+            document.dispatchEvent(new CustomEvent("pet:select-request", {
+                detail: { index: this.index, name: this.name, selected: !wasSelected }
+            }));
+        });
     }
 
     render() {

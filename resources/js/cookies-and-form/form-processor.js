@@ -17,6 +17,7 @@ import {
     FastCheckinManager
 } from "./managers/index.js";
 import { FormDataManager } from "./FormDataManager.js";
+import { FormUpdater } from "./reactivitySystem/FormUpdater.js";
 import config from "./config.js";
 
 const { FORM_CONFIG } = config;
@@ -129,8 +130,15 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
 
     //------------------------------------------------
-    // Pet form: submit (add a new pet)
+    // Pet form: submit (add a new pet or update the selected one)
     //------------------------------------------------
+    const setPetSubmitButtonLabel = (editing) => {
+        const addPetBtn = document.getElementById("addPetBtn");
+        if (addPetBtn) {
+            addPetBtn.textContent = editing ? "Save Pet" : "Add Pet";
+        }
+    };
+
     const petInfoForm = document.querySelector("#petInfoForm");
     if (petInfoForm) {
         petInfoForm.addEventListener("submit", function (e) {
@@ -145,10 +153,16 @@ document.addEventListener("DOMContentLoaded", async function () {
                 return;
             }
 
-            // Add a new pet, then clear the form for the next one. The reactivity
-            // system rebuilds the (delete-only) pet pills automatically.
-            FormDataManager.handleFormStep(1, data, null);
+            // If a pet pill is selected, update that pet; otherwise add a new one.
+            const selectedIndex = FormDataManager.getCurrentSelectedPetIndex();
+            FormDataManager.handleFormStep(1, data, selectedIndex);
+
+            // Clear the form and deselect so the next submit adds a new pet again.
             petInfoForm.reset();
+            document.querySelectorAll("#petPillsContainer .pill.selected")
+                .forEach((p) => p.classList.remove("selected"));
+            setPetSubmitButtonLabel(false);
+
             scrollTo({ top: 0, behavior: "smooth" });
         });
     }
@@ -184,6 +198,29 @@ document.addEventListener("DOMContentLoaded", async function () {
             if (confirmDeleteModal) confirmDeleteModal.classList.add("hidden");
         });
     }
+
+    //------------------------------------------------
+    // Pet pill selection: load the selected pet into the form for editing
+    //------------------------------------------------
+    document.addEventListener("pet:select-request", function (e) {
+        const { index, selected } = e.detail;
+        const form = document.getElementById("petInfoForm");
+
+        if (selected) {
+            const pets = FormDataManager.getAllPetsFromCheckin();
+            const pet = pets[index];
+            if (pet && form) {
+                form.reset();
+                FormUpdater.updatePetForm(pet);
+            }
+            setPetSubmitButtonLabel(true);
+        } else if (form) {
+            form.reset();
+            setPetSubmitButtonLabel(false);
+        }
+
+        NavigationManager.syncNowEditingLabel();
+    });
 
     // Handle next step navigation
     const nextButton = document.querySelector("#nextStep");

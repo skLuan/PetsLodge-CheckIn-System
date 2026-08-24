@@ -30,6 +30,13 @@
     input {
         @apply transition-all ease-in-out !border text-green-950 font-normal !border-green-30 !rounded-lg p-2 w-full placeholder:text-gray-light mb-2;
     }
+    button:not(:disabled),
+    [role="button"]:not(:disabled),
+    select:not(:disabled),
+    input[type="radio"],
+    input[type="checkbox"] {
+        @apply cursor-pointer;
+    }
 }
 
 @layer components {

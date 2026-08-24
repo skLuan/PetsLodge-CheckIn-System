@@ -55,6 +55,15 @@ class PopupManager {
             });
         });
 
+        // "Same feeding for all" checkbox: highlight all pet pills when checked.
+        const sameFeedingForAllCheckbox = document.getElementById("sameFeedingForAll");
+        if (sameFeedingForAllCheckbox) {
+            sameFeedingForAllCheckbox.addEventListener("change", function () {
+                document.querySelectorAll("#petPillsContainer .pill")
+                    .forEach((pill) => pill.classList.toggle("selected", this.checked));
+            });
+        }
+
         // Handle popup opening
         addFeedMedButtons.forEach((btn) => {
             btn.addEventListener("click", function (e) {
@@ -104,9 +113,24 @@ class PopupManager {
 
             console.log("Saving feeding/medication data for times:", data.day_time);
 
-            // Bulk edit: apply feeding/medication to every pet.
+            // Determine target pets: "same feeding for all" → every pet, else the selected pet.
             const allPets = FormDataManager.getAllPetsFromCheckin();
             const feedingType = data.type === "food" ? "feeding" : "medication";
+            const applyToAll = sameFeedingForAllCheckbox ? sameFeedingForAllCheckbox.checked : false;
+
+            let targetIndexes;
+            if (applyToAll) {
+                targetIndexes = allPets.map((_, index) => index);
+            } else if (allPets.length === 1) {
+                targetIndexes = [0]; // single pet: no selection needed
+            } else {
+                const selectedIndex = FormDataManager.getCurrentSelectedPetIndex();
+                if (selectedIndex === null) {
+                    alert("Please select a pet to apply this feeding/medication to, or check 'Same feeding for all'.");
+                    return;
+                }
+                targetIndexes = [selectedIndex];
+            }
 
             // Create an entry for each selected time
             data.day_time.forEach((time) => {
@@ -116,9 +140,9 @@ class PopupManager {
                     feeding_med_details: data.feeding_med_details.trim()
                 };
 
-                console.log("Creating entry for time:", time, "with data:", itemData);
+                console.log("Creating entry for time:", time, "with data:", itemData, "targets:", targetIndexes);
 
-                allPets.forEach((_, index) => {
+                targetIndexes.forEach((index) => {
                     FormDataManager.addPetFeedingOrMedication(index, feedingType, itemData);
                 });
             });

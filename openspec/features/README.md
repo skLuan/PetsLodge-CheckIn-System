@@ -12,6 +12,7 @@ the deeper, per-feature reference.
 | Feature | File | Summary |
 |---------|------|---------|
 | Check-In | [check-in.md](check-in.md) | Multi-step (5-step) check-in flow with cookie as single source of truth. |
+| Check-In Form Steps | [check-in-form-steps.md](check-in-form-steps.md) | Field-level, step-by-step walkthrough of the check-in form (Owner → Pet → Feeding/Med → Health → Inventory). |
 | Pet Profile Management | [pet-profile-management.md](pet-profile-management.md) | Detailed pet records (breed, gender, castrated, weight, health, warnings). |
 | Owner (User) Management | [owner-user-management.md](owner-user-management.md) | Owner contact data + emergency contacts; phone-based lookup. |
 | Services & Inventory | [services-and-inventory.md](services-and-inventory.md) | Grooming, feeding, medication schedules, and inventory items. |

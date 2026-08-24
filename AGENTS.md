@@ -143,6 +143,9 @@ The heart of the app. **`cookies-and-form/` is where most feature work happens.*
 | `checkIn.blade.php` | Main check-in page (route `/check-in`). |
 | `view-check-in.blade.php`, `Process.blade.php` | View / process a check-in. |
 | `components/forms/` | Form partials: `pet-info`, `health-info`, `food-medication`, `inventory`, `owner-info`. |
+| `components/steps/` | One component per wizard step: `owner-info`, `pet-info`, `feeding-medication`, `health-info`, `inventory`, `grooming`, `review-submit`. |
+| `components/ui/` | Shared form/visual primitives: `input`, `select`, `radio`, `checkbox`, `date-picker`, `field`, `card`. |
+| `components/wizard/` | Sticky wizard header (progress bar + pet pills). |
 | `components/pop-ups/` | Modals: `feeding-medication`, `grooming`, `terms-conditions`. |
 | `components/progress/` | Progress bar / circle. |
 | `components/tabbar.blade.php`, `CheckInSummary.blade.php` | Tab bar, summary. |

@@ -51,7 +51,7 @@ document.getElementById("nextStep").addEventListener("click", async function (e)
 
     // Logic to go to the next step
     let currentStep = getCurrentStep();
-    if (currentStep < 6) {
+    if (currentStep < 7) {
         showStep(currentStep + 1);
     }
 });
@@ -83,7 +83,7 @@ function extractFormInputValues(formElement) {
 }
 
 function getCurrentStep() {
-    for (let i = 1; i <= 6; i++) {
+    for (let i = 1; i <= 7; i++) {
         if (document.getElementById(`step${i}`).classList.contains("active")) {
             return i;
         }
@@ -92,7 +92,7 @@ function getCurrentStep() {
 }
 
 function deactivateAllSteps() {
-    for (let i = 1; i <= 6; i++) {
+    for (let i = 1; i <= 7; i++) {
         document.getElementById(`step${i}`).classList.remove("active");
         document.getElementById(`step${i}`).classList.add("inactive-right");
     }
@@ -104,7 +104,7 @@ function deactivateAllSteps() {
 
 function showStep(step) {
     deactivateAllSteps();
-    for (let i = 1; i <= 6; i++) {
+    for (let i = 1; i <= 7; i++) {
         document
             .getElementById(`step${i}`)
             .classList.toggle("inactive-left", i < step);

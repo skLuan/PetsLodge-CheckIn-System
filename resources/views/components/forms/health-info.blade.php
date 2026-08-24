@@ -1,15 +1,9 @@
 <form id="healthInfoForm" action="">
     <div class="pl-input-container">
         <h3 class="text-lg font-bold text-gray mb-2">Did you notice unusual health behavior such as Vomiting, Diarrhea, Heart Conditions, Physical Condition, Seizure, others?</h3>
-        <div class="flex items-center">
-            <label class="mr-6">
-                <input type="radio" name="unusualHealthBehavior" value="yes" class="mr-2">
-                Yes
-            </label>
-            <label>
-                <input type="radio" name="unusualHealthBehavior" value="no" class="mr-2">
-                No
-            </label>
+        <div class="flex items-center gap-6">
+            <x-ui.radio name="unusualHealthBehavior" value="yes" input-class="mr-2">Yes</x-ui.radio>
+            <x-ui.radio name="unusualHealthBehavior" value="no" input-class="mr-2">No</x-ui.radio>
         </div>
     </div>
 
