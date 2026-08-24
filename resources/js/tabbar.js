@@ -20,9 +20,9 @@ document.getElementById("prevStep").addEventListener("click", function (e) {
     let currentStep = getCurrentStep();
 
     // Persist the current step's form before navigating back.
-    // Step 4 (1-based) is the health-info step; save the selected pet's health.
+    // Step 4 (1-based) is the health-info step; save to the selected pet (or all).
     if (currentStep === 4) {
-        HealthFormManager.saveAllPetsHealth();
+        HealthFormManager.saveHealthForSelectedOrAll();
     }
 
     if (currentStep > 1) {

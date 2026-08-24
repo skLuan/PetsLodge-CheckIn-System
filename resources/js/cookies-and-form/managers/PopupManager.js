@@ -21,6 +21,8 @@ class PopupManager {
         const submitPopBtn = popup.querySelector("button[type='submit']");
         const dayTimeCheckboxes = popup.querySelectorAll('input[name="day_time[]"]');
         const typeRadios = popup.querySelectorAll('input[name="type"]');
+        const feedingApplyTo = popup.querySelector("#feedingApplyTo");
+        const feedingApplyToContainer = popup.querySelector("#feedingApplyToContainer");
 
         // Handle day_time checkbox changes for visual feedback
         dayTimeCheckboxes.forEach(checkbox => {
@@ -55,12 +57,53 @@ class PopupManager {
             });
         });
 
-        // "Same feeding for all" checkbox: highlight all pet pills when checked.
+        // "Same feeding for all" checkbox: highlight all pet pills when checked,
+        // and hide the per-pet "Apply to" selector (not needed when applying to all).
         const sameFeedingForAllCheckbox = document.getElementById("sameFeedingForAll");
+        const syncApplyToVisibility = () => {
+            if (feedingApplyToContainer) {
+                const applyToAll = sameFeedingForAllCheckbox ? sameFeedingForAllCheckbox.checked : false;
+                feedingApplyToContainer.classList.toggle("hidden", applyToAll);
+            }
+        };
         if (sameFeedingForAllCheckbox) {
             sameFeedingForAllCheckbox.addEventListener("change", function () {
                 document.querySelectorAll("#petPillsContainer .pill")
                     .forEach((pill) => pill.classList.toggle("selected", this.checked));
+                syncApplyToVisibility();
+            });
+        }
+
+        // "Apply to" selector: re-populate the popup with the chosen pet's existing data.
+        if (feedingApplyTo) {
+            feedingApplyTo.addEventListener("change", function () {
+                const pets = FormDataManager.getAllPetsFromCheckin();
+                const chosenIndex = parseInt(feedingApplyTo.value, 10);
+
+                // Clear current selections + visual feedback first.
+                dayTimeCheckboxes.forEach((cb) => {
+                    cb.checked = false;
+                    const div = cb.closest('label').querySelector('.btn-day-time');
+                    if (div) {
+                        div.classList.remove('bg-blue-500', 'text-white');
+                        div.classList.add('bg-gray-100', 'text-gray-700');
+                    }
+                });
+                typeRadios.forEach((r) => {
+                    r.checked = false;
+                    const div = r.closest('label').querySelector('div');
+                    if (div) {
+                        div.classList.remove('bg-blue-500', 'text-white');
+                        div.classList.add('bg-gray-lightest', 'text-gray');
+                    }
+                });
+                const detailsField = popup.querySelector('[name="feeding_med_details"]');
+                if (detailsField) detailsField.value = '';
+
+                FormUpdater.populateFeedingMedicationPopup(
+                    pets,
+                    Number.isInteger(chosenIndex) ? chosenIndex : null
+                );
             });
         }
 
@@ -88,6 +131,25 @@ class PopupManager {
                 console.log("[PopupManager] Pets data:", pets);
                 FormUpdater.populateFeedingMedicationPopup(pets);
 
+                // Populate the "Apply to" pet selector
+                if (feedingApplyTo) {
+                    feedingApplyTo.innerHTML = "";
+                    pets.forEach((pet, index) => {
+                        const option = document.createElement("option");
+                        option.value = index;
+                        option.textContent = pet.petName || `Pet ${index + 1}`;
+                        feedingApplyTo.appendChild(option);
+                    });
+
+                    // Pre-select the currently selected pet pill (if any)
+                    const selectedIndex = FormDataManager.getCurrentSelectedPetIndex();
+                    if (selectedIndex !== null) {
+                        feedingApplyTo.value = selectedIndex;
+                    }
+
+                    syncApplyToVisibility();
+                }
+
                 if (popup) {
                     console.log("[PopupManager] Opening feeding/medication popup");
                     popup.classList.remove("translate-y-[75vh]");
@@ -113,7 +175,7 @@ class PopupManager {
 
             console.log("Saving feeding/medication data for times:", data.day_time);
 
-            // Determine target pets: "same feeding for all" → every pet, else the selected pet.
+            // Determine target pets: "same feeding for all" → every pet, else the pet chosen in "Apply to".
             const allPets = FormDataManager.getAllPetsFromCheckin();
             const feedingType = data.type === "food" ? "feeding" : "medication";
             const applyToAll = sameFeedingForAllCheckbox ? sameFeedingForAllCheckbox.checked : false;
@@ -121,15 +183,9 @@ class PopupManager {
             let targetIndexes;
             if (applyToAll) {
                 targetIndexes = allPets.map((_, index) => index);
-            } else if (allPets.length === 1) {
-                targetIndexes = [0]; // single pet: no selection needed
             } else {
-                const selectedIndex = FormDataManager.getCurrentSelectedPetIndex();
-                if (selectedIndex === null) {
-                    alert("Please select a pet to apply this feeding/medication to, or check 'Same feeding for all'.");
-                    return;
-                }
-                targetIndexes = [selectedIndex];
+                const chosenIndex = feedingApplyTo ? parseInt(feedingApplyTo.value, 10) : 0;
+                targetIndexes = [Number.isInteger(chosenIndex) ? chosenIndex : 0];
             }
 
             // Create an entry for each selected time

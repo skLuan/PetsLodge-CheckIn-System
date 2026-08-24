@@ -42,6 +42,12 @@
                 </div>
             </label>
         </div>
+        <div id="feedingApplyToContainer" class="pb-4 border-b border-l-gray-light mb-4">
+            <label for="feedingApplyTo" class="block text-sm font-medium text-gray-700 mb-1">Apply to pet:</label>
+            <select id="feedingApplyTo" name="feedingApplyTo" class="w-full rounded-md">
+                {{-- Populated dynamically per pet --}}
+            </select>
+        </div>
         <label for="feeding-med-input">
             <span>Feeding/Medication Details</span>
             <input type="text" id="feeding-med-input" name="feeding_med_details" placeholder="1 cup dry food" value="">

@@ -294,7 +294,7 @@ class FormUpdater {
      * - Pre-selects type radio based on most recent item
      * - Populates feeding_med_details field
      */
-    static populateFeedingMedicationPopup(pets) {
+    static populateFeedingMedicationPopup(pets, petIndex = null) {
         if (!Array.isArray(pets)) {
             console.warn("[populateFeedingMedicationPopup] pets is not an array", pets);
             return false;
@@ -306,8 +306,10 @@ class FormUpdater {
             return false;
         }
 
-        // Get the currently selected pet
-        const currentPetIndex = this.getCurrentSelectedPetIndex();
+        // Use the explicitly provided pet index, or fall back to the selected pet pill.
+        const currentPetIndex = (petIndex !== null && petIndex !== undefined)
+            ? petIndex
+            : this.getCurrentSelectedPetIndex();
         console.log("[populateFeedingMedicationPopup] Current pet index:", currentPetIndex);
         if (currentPetIndex === null || !pets[currentPetIndex]) {
             console.warn("[populateFeedingMedicationPopup] Current pet not found at index", currentPetIndex);
