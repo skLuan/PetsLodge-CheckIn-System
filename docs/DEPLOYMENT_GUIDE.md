@@ -15,6 +15,118 @@
 5. [Monitoring Checklist](#monitoring-checklist)
 6. [Troubleshooting](#troubleshooting)
 7. [Post-Deployment Tasks](#post-deployment-tasks)
+8. [Transactional Email & Queue Setup](#transactional-email--queue-setup)
+
+---
+
+## Transactional Email & Queue Setup
+
+Clients receive three automated emails: **booking confirmation** (end of check-in),
+**drop-in** (pet arrived), **drop-out** (pet picked up). All three are **queued** —
+a slow or dead mail server must never block the check-in flow.
+
+### 1. Where the credentials live
+
+> **Never commit credentials.** They belong in the production `.env` only, which is
+> gitignored. `.env.example` documents the *keys*, never the values.
+
+Production uses **Hostinger SMTP**. Get the values from Hostinger hPanel →
+**Emails → your mailbox → Connect Devices / Configure Desktop App**:
+
+| Key | Production value |
+|---|---|
+| `MAIL_MAILER` | `smtp` |
+| `MAIL_HOST` | `smtp.hostinger.com` |
+| `MAIL_PORT` | `465` (SSL) — or `587` with `MAIL_ENCRYPTION=tls` |
+| `MAIL_ENCRYPTION` | `ssl` (or `tls` on 587) |
+| `MAIL_USERNAME` | the full mailbox address, e.g. `no-reply@yourdomain.com` |
+| `MAIL_PASSWORD` | that mailbox's password (from hPanel) |
+| `MAIL_FROM_ADDRESS` | same as `MAIL_USERNAME` — must match, or mail gets rejected/spam-filed |
+| `MAIL_FROM_NAME` | `"Pet Lodge & Spa"` |
+
+Prerequisites, in order:
+1. The mailbox exists in Hostinger (hPanel → Emails → Create mailbox).
+2. SPF/DKIM DNS records exist. Hostinger adds these automatically for its own mail
+   service; verify before going live:
+   ```bash
+   dig TXT yourdomain.com +short            # expect v=spf1 include:_spf.mail.hostinger.com ...
+   dig TXT hostingermail._domainkey.yourdomain.com +short   # expect a DKIM key
+   ```
+   Without these, Gmail and Outlook will spam-file or reject the mail.
+3. `APP_URL` is set to the **public https URL**. The email header logo is loaded via
+   `asset()` — if `APP_URL` is still `http://localhost`, the logo silently breaks in
+   every client.
+
+### 2. Lodge contact details (email footer)
+
+The footer renders only the fields you fill in, so nothing fake is ever sent:
+
+```env
+LODGE_NAME="Pet Lodge & Spa"
+LODGE_ADDRESS="123 Example St, City, State ZIP"
+LODGE_PHONE="+1 555 555 5555"
+LODGE_EMAIL="hello@yourdomain.com"
+LODGE_WEBSITE="https://yourdomain.com"
+```
+
+Leave a line blank and it is omitted from the footer entirely.
+
+### 3. Queue worker (required — no worker means no email)
+
+```env
+QUEUE_CONNECTION=redis
+```
+
+The worker must run as a long-lived process. With Docker it is already defined:
+
+```bash
+docker compose up -d queue          # the petslodge-queue service
+docker compose logs -f queue
+```
+
+Outside Docker, use supervisor (or systemd):
+
+```ini
+[program:petslodge-queue]
+command=php /path/to/artisan queue:work --tries=3 --backoff=30 --sleep=3 --max-time=3600
+autostart=true
+autorestart=true
+user=www-data
+numprocs=1
+redirect_stderr=true
+stdout_logfile=/path/to/storage/logs/queue.log
+stopwaitsecs=3600
+```
+
+> ⚠️ **Restart the worker after every deploy** (`php artisan queue:restart`) — workers
+> hold the old code in memory and will keep running it otherwise.
+
+### 4. Verifying after deploy
+
+```bash
+# 1. Confirm config is live (should print the Hostinger host, not mailpit)
+php artisan tinker --execute="echo config('mail.mailers.smtp.host');"
+
+# 2. Send a real test email to yourself
+php artisan tinker --execute="Mail::raw('PetsLodge SMTP test', fn(\$m) => \$m->to('you@yourdomain.com')->subject('SMTP test'));"
+
+# 3. Watch the queue drain
+php artisan queue:work --once -v
+
+# 4. Anything that failed
+php artisan queue:failed
+php artisan queue:retry all
+```
+
+Check-in confirmations are deliberately delayed **~2 minutes**: a booking with several
+pets writes one check-in row per pet, and the delay lets the job coalesce them into a
+single email. A confirmation that hasn't arrived yet is normal for the first two
+minutes; drop-in and drop-out emails go out immediately.
+
+### 5. Local development
+
+Local mail must never reach real clients. `docker compose up -d` starts **mailpit**,
+which captures everything: **http://localhost:8025**.
 
 ---
 

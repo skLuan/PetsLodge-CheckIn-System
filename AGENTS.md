@@ -1,8 +1,10 @@
 # AGENTS.md — Guide for AI Coding Agents
 
-> **Read this file first.** It is the shortcut map of the PetsLodge project so you
-> (an AI coding agent) don't have to re-read the whole codebase every session.
-> When something here goes stale, update it as part of your change.
+> **Read this file first, then `JOURNAL.md`.** This file is the shortcut map of the
+> PetsLodge project so you (an AI coding agent) don't have to re-read the whole codebase
+> every session; `JOURNAL.md` is the running log of what previous sessions actually did.
+> When something here goes stale, update it as part of your change — and append your
+> session to `JOURNAL.md` before you finish.
 
 This file is written for two audiences:
 - **The AI agent** doing the work — file map, commands, conventions, gotchas.
@@ -38,8 +40,12 @@ single source of truth, with automatic UI updates when the data changes.
 
 ## 3. How to run it (Docker is the primary way)
 
-The project runs in Docker. `docker-compose.yml` defines three services: `app`
-(Laravel on port **8080** → container 8000), `mysql` (3306), `redis` (6379).
+The project runs in Docker. `docker-compose.yml` defines five services: `app`
+(Laravel on port **8080** → container 8000), `queue` (the mail worker), `mysql` (3306),
+`redis` (6379), and `mailpit` (catches local email — UI on **http://localhost:8025**).
+
+> ⚠️ Client emails are **queued**. If the `queue` service isn't running, no email is
+> ever delivered — the job just sits in Redis. `docker compose logs -f queue` to check.
 
 ```bash
 # Start everything (app, MySQL, Redis)
@@ -74,6 +80,15 @@ npm run build        # production build
 
 ## 4. How to test & format
 
+> ⚠️ **Tests need a separate database.** They use `RefreshDatabase`, which drops every
+> table on the configured connection. `phpunit.xml` sets no DB (the sqlite lines are
+> commented out and the sqlite PHP extension isn't installed), so tests fall back to
+> whatever `.env` points at — i.e. they would **wipe the dev database**.
+> A gitignored `.env.testing` pointing at a `petslodge_testing` schema is what keeps that
+> from happening; Laravel loads it automatically because `phpunit.xml` sets `APP_ENV=testing`.
+> If you clone fresh, recreate both:
+> `CREATE DATABASE petslodge_testing;` + copy `.env` → `.env.testing` and change `DB_DATABASE`.
+
 ```bash
 # PHP tests
 docker compose exec app php artisan test        # or: php artisan test
@@ -88,6 +103,15 @@ php artisan test --filter=SomeTest              # single test
 > ⚠️ There is **no automated JS test suite**. For frontend changes, verify manually
 > in the browser (see the debug helpers in §8) and check the browser console for errors.
 
+**Known-red tests (pre-existing, not your change):** `ExampleTest`, `Auth\RegistrationTest
+> new users can register`, and both `CheckInSubmissionTest` cases. The practical gate is
+"**no new failures**", not "all green". Current baseline: **62 passed / 4 failed**.
+
+> The two `CheckInSubmissionTest` failures are caused by `CheckInApiController::submitCheckIn`
+> calling `CheckInService::submitCheckIn()`, **a method that does not exist** — so
+> `/api/checkin/submit` always returns 500. (Confirmed 2026-08-04; an earlier guess that
+> blamed missing seed data was wrong.) Fixing it belongs to Plan 05.
+
 ---
 
 ## 5. Project map — where things live
@@ -100,6 +124,7 @@ php artisan test --filter=SomeTest              # single test
 | `app/Http/Controllers/CheckInController.php`     | Check-in web controller. |
 | `app/Http/Controllers/DropInController.php`      | Drop-in flow (staff-only). |
 | `app/Http/Controllers/PetStaffDashboardController.php` | Staff dashboard: checkout, cancel, reprint. |
+| `app/Http/Controllers/TermsAndConditionsController.php` | T&C editor for pet staff (`/petstaff/terms`) + public `GET /api/terms/active`. |
 | `app/Http/Controllers/HealthCheckController.php` | `/health` monitoring endpoints. |
 | `app/Services/CheckInTransformer.php`   | **Converts** between DB format ⇄ cookie/form format (null-safe). |
 | `app/Services/CheckInDataValidator.php` | Validates check-in data structure & required fields. |
@@ -107,8 +132,13 @@ php artisan test --filter=SomeTest              # single test
 | `app/Services/CheckInPetService.php`    | Pet-related operations. |
 | `app/Services/CheckInUserService.php`   | User/owner operations. |
 | `app/Services/PdfService.php` / `PrintNodeService.php` | PDF generation & physical printing. |
-| `app/Models/` | Eloquent models: `CheckIn`, `Pet`, `EmergencyContact`, `Food`, `Medicine`, `Item`, `ExtraService`, `KindOfPet`, `Gender`, `Castrated`, `MomentOfDay`, `Status`, `User`. |
+| `app/Models/` | Eloquent models: `CheckIn`, `Pet`, `EmergencyContact`, `Food`, `Medicine`, `Item`, `ExtraService`, `KindOfPet`, `Gender`, `Castrated`, `MomentOfDay`, `Status`, `TermsAndConditions`, `User`. |
+| `app/Providers/AppServiceProvider.php` | View composer that injects `$activeTerms` into the T&C popup. |
+| `app/Providers/EventServiceProvider.php` | Maps the check-in/drop-in/drop-out events to their queued mail listeners. |
 | `app/Http/Middleware/AdminOnly.php`, `PetStaffOnly.php` | Role gates (`admin.only`, `pet.staff.only`). |
+| `app/Events/` | `CheckInCompleted`, `PetDroppedIn`, `PetDroppedOut` — each carries a `CheckIn`. |
+| `app/Listeners/` | `SendCheckInConfirmation` (coalesces multi-pet bookings into one email), `SendDropInNotification`, `SendDropOutNotification`. All `ShouldQueue`. |
+| `app/Mail/` | `CheckInConfirmationMail` (takes a **Collection** of check-ins), `DropInMail`, `DropOutMail`. |
 
 ### Frontend JS (`resources/js/`)
 The heart of the app. **`cookies-and-form/` is where most feature work happens.**
@@ -150,15 +180,23 @@ The heart of the app. **`cookies-and-form/` is where most feature work happens.*
 | `components/progress/` | Progress bar / circle. |
 | `components/tabbar.blade.php`, `CheckInSummary.blade.php` | Tab bar, summary. |
 | `pet-staff/dashboard.blade.php`, `Drop-in*.blade.php` | Staff dashboard, drop-in pages. |
+| `pet-staff/terms-edit.blade.php` | T&C editor (HTML textarea + Alpine live preview). |
+| `emails/layouts/base.blade.php` | Shared branded email shell (inline CSS + tables — email clients ignore external CSS). |
+| `emails/check-in-confirmation.blade.php`, `drop-in.blade.php`, `drop-out.blade.php` | The three client emails. |
 | `pdf-for-print.blade.php` | The PDF/print template. |
 | `admin/monitoring-dashboard.blade.php` | Admin monitoring view. |
 | `layouts/`, `auth/`, `profile/` | Layouts, Breeze auth pages, profile pages. |
 
 ### Routes
-- `routes/web.php` — pages: `/check-in` (home), `/new-form`, `/edit-check-in/{id}`,
-  `/view-check-in`, `/drop-in`, `/pet-staff/dashboard`, `/health`, admin monitoring.
+- `routes/web.php` — pages: `/check-in` (phone entry), `/new-form` (the actual multi-step
+  form), `/edit-check-in/{id}`, `/view-check-in`, `/drop-in`, `/petstaff/dashboard`,
+  `/petstaff/terms`, `/health`, admin monitoring.
 - `routes/api.php` — form API: `/api/checkin/submit`, `/api/checkin/autosave`,
-  per-step `/api/checkin/step1..step5/...`, `/api/update-session-checkin`, `/api/check-user`.
+  per-step `/api/checkin/step1..step5/...`, `/api/update-session-checkin`, `/api/check-user`,
+  `/api/terms/active`.
+
+> ⚠️ Staff URLs are `/petstaff/*` (no hyphen) while their **route names** are
+> `pet-staff.*` (with hyphen). Easy to get wrong — always use `route()`.
 - `routes/auth.php` — Breeze auth routes.
 
 ### Other
@@ -190,6 +228,34 @@ Rules that keep this from breaking:
 
 If you touch form state, go through **`FormDataManager`** rather than writing cookies
 directly.
+
+---
+
+## 6b. The second concept: transactional emails
+
+Three emails go to clients, all fired as **events → queued listeners → mailables**:
+
+| Trigger | Fired from | Event → Listener → Mail |
+|---|---|---|
+| Check-in finished | `CheckInApiController::submitExtraInfo` (**step 5**) | `CheckInCompleted` → `SendCheckInConfirmation` → `CheckInConfirmationMail` |
+| Pet arrived | `PetStaffDashboardController::dropped_in` | `PetDroppedIn` → `SendDropInNotification` → `DropInMail` |
+| Pet picked up | `PetStaffDashboardController::checkout` | `PetDroppedOut` → `SendDropOutNotification` → `DropOutMail` |
+
+Rules that keep this from breaking:
+
+1. **Steps 2–5 run once per pet** (`SubmissionManager.submitSequentialCheckIn`), so a
+   3-pet booking fires `CheckInCompleted` three times. `SendCheckInConfirmation` runs on
+   a **~2-minute delay**, then claims every un-announced check-in for that owner
+   (`check_ins.confirmation_sent_at IS NULL`) and sends **one** email listing them all.
+   Sibling jobs find nothing left to claim and exit. Don't "fix" the delay away.
+2. **Never let mail break the flow.** Every dispatch is wrapped in try/catch +
+   `Log::warning`. A dead SMTP server must not 500 a check-in or a checkout.
+3. **Invalid/missing owner email is a skip, not an error** — guarded in each listener.
+4. **Inline CSS + tables only** in `resources/views/emails/`. Email clients discard
+   `<style>` blocks and external stylesheets.
+5. **`/api/checkin/submit` is dead code** — it calls `CheckInService::submitCheckIn()`,
+   which does not exist, so it always 500s. Don't wire anything new to it; the live
+   path is step1→step5.
 
 ---
 
@@ -237,6 +303,8 @@ Common symptoms → look here:
 
 | File | When to read it |
 |------|-----------------|
+| `JOURNAL.md` | **Read at the start of every session.** What previous agent sessions did, what worked, what didn't, and known-broken things deliberately left alone. |
+| `AIplans/00-MASTER-PLAN-v1.0-beta.md` | Roadmap to v1.0-beta and the phase order. |
 | `README.md` | Full feature list, setup, troubleshooting. |
 | `docs/DATA_FLOW.md` | Complete architecture of the cookie data flow. |
 | `docs/DEVELOPER_GUIDE.md` | FormDataManager API usage & examples. |

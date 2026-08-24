@@ -29,7 +29,65 @@ services:
       - CACHE_DRIVER=redis
       - SESSION_DRIVER=redis
       - QUEUE_CONNECTION=redis
+      # Local mail goes to mailpit (UI on http://localhost:8025), never to real clients.
+      - MAIL_MAILER=smtp
+      - MAIL_HOST=mailpit
+      - MAIL_PORT=1025
+      - MAIL_ENCRYPTION=null
+      - MAIL_FROM_ADDRESS=no-reply@petlodge.local
+      - MAIL_FROM_NAME=Pet Lodge & Spa
     command: php artisan serve --host=0.0.0.0 --port=8000
+    networks:
+      - petslodge-network
+
+  # Queue worker — transactional emails are queued, so without this container
+  # running no client email is ever actually delivered.
+  queue:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: petslodge-queue
+    restart: no
+    working_dir: /var/www
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - APP_KEY=base64:s12COBNOF0DKWXWTo7709hGBJ31sAhwQLjbvzPQH09M=
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - APP_URL=http://localhost:8080
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=petslodge
+      - DB_USERNAME=petslodge
+      - DB_PASSWORD=petslodge_secret
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CACHE_DRIVER=redis
+      - SESSION_DRIVER=redis
+      - QUEUE_CONNECTION=redis
+      - MAIL_MAILER=smtp
+      - MAIL_HOST=mailpit
+      - MAIL_PORT=1025
+      - MAIL_ENCRYPTION=null
+      - MAIL_FROM_ADDRESS=no-reply@petlodge.local
+      - MAIL_FROM_NAME=Pet Lodge & Spa
+    command: php artisan queue:work --tries=3 --backoff=30 --sleep=3 --max-time=3600
+    networks:
+      - petslodge-network
+
+  # Mailpit — catches every locally sent email so nothing reaches real clients.
+  # Web UI: http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: petslodge-mailpit
+    restart: no
+    ports:
+      - "8025:8025"
+      - "1025:1025"
     networks:
       - petslodge-network
 

@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\PetDroppedIn;
+use App\Events\PetDroppedOut;
 use App\Models\CheckIn;
 use App\Models\Status;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class PetStaffDashboardController extends Controller
 {
@@ -45,9 +48,12 @@ class PetStaffDashboardController extends Controller
             'check_out' => now(),
         ]);
 
+        $this->announce(fn () => PetDroppedIn::dispatch($checkIn), 'drop-in', $checkIn->id);
+
         return redirect()->route('pet-staff.dashboard')
             ->with('success', 'Pet Dropped In successfully!');
     }
+
     /**
      * Update check-in status to CHECKED_OUT with checkout date
      */
@@ -61,8 +67,29 @@ class PetStaffDashboardController extends Controller
             'check_out' => now(),
         ]);
 
+        $this->announce(fn () => PetDroppedOut::dispatch($checkIn), 'drop-out', $checkIn->id);
+
         return redirect()->route('pet-staff.dashboard')
             ->with('success', 'Pet checked out successfully!');
+    }
+
+    /**
+     * Dispatch a client-notification event without ever letting it break the
+     * staff action that triggered it.
+     *
+     * A pet really was dropped in / picked up; a failing mail server must not
+     * turn that into an error page for the front desk.
+     */
+    private function announce(callable $dispatch, string $context, int $checkInId): void
+    {
+        try {
+            $dispatch();
+        } catch (\Throwable $e) {
+            Log::warning("PetStaffDashboardController: {$context} notification failed to dispatch", [
+                'check_in_id' => $checkInId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
@@ -89,16 +116,16 @@ class PetStaffDashboardController extends Controller
         $checkIn = CheckIn::findOrFail($id);
 
         // Check if document_url exists
-        if (!$checkIn->document_url) {
+        if (! $checkIn->document_url) {
             return redirect()->route('pet-staff.dashboard')
                 ->with('error', 'No document URL found for this check-in.');
         }
 
         try {
             // Send to PrintNode using stored document_url
-            $printService = new \App\Services\PrintNodeService();
+            $printService = new \App\Services\PrintNodeService;
             $response = $printService->sendPrintJob($checkIn->document_url, [
-                'title' => 'Re-Print: ' . $checkIn->pet->name . ' - ' . $checkIn->user->name
+                'title' => 'Re-Print: '.$checkIn->pet->name.' - '.$checkIn->user->name,
             ]);
 
             if ($response['success']) {
@@ -106,11 +133,11 @@ class PetStaffDashboardController extends Controller
                     ->with('success', 'Document re-printed successfully!');
             } else {
                 return redirect()->route('pet-staff.dashboard')
-                    ->with('error', 'Error re-printing document: ' . ($response['message'] ?? 'Unknown error'));
+                    ->with('error', 'Error re-printing document: '.($response['message'] ?? 'Unknown error'));
             }
         } catch (\Exception $e) {
             return redirect()->route('pet-staff.dashboard')
-                ->with('error', 'Unexpected error: ' . $e->getMessage());
+                ->with('error', 'Unexpected error: '.$e->getMessage());
         }
     }
 }
