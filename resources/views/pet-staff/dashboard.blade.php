@@ -1,6 +1,13 @@
 <x-app-layout>
     <div class="container mx-auto px-4 py-8">
-        <h1 class="text-3xl font-bold mb-8">Pet Staff Dashboard</h1>
+        <div class="flex flex-wrap justify-between items-center gap-4 mb-8">
+            <h1 class="text-3xl font-bold">Pet Staff Dashboard</h1>
+
+            <a href="{{ route('pet-staff.terms.edit') }}"
+                class="px-4 py-2 bg-green text-white rounded hover:bg-green-dark transition">
+                Edit Terms &amp; Conditions
+            </a>
+        </div>
 
         @if (session('success'))
             <div class="mb-4 p-4 bg-green-lightest border border-green text-green rounded">

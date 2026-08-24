@@ -1,10 +1,11 @@
 <?php
 
-use App\Http\Controllers\ProfileController;
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DropInController;
 use App\Http\Controllers\HealthCheckController;
 use App\Http\Controllers\PetStaffDashboardController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\TermsAndConditionsController;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -40,17 +41,21 @@ Route::middleware(['auth', 'pet.staff.only'])->group(function () {
     Route::get('/drop-in', [DropInController::class, 'show'])->name('drop-in.show');
     Route::get('/drop-in/confirmation', [DropInController::class, 'showDropConfirmation'])->name('drop-in.confirmation');
     Route::post('/drop-in/check-user', [DropInController::class, 'checkUser'])->name('drop-in.check-user');
-    
+
     // Pet Staff Dashboard
-    Route::get('/pet-staff/dashboard', [PetStaffDashboardController::class, 'index'])->name('pet-staff.dashboard');
-    Route::post('/pet-staff/checkout/{id}', [PetStaffDashboardController::class, 'checkout'])->name('pet-staff.checkout');
-    Route::post('/pet-staff/dropped-in/{id}', [PetStaffDashboardController::class, 'dropped_in'])->name('pet-staff.dropped-in');
-    Route::post('/pet-staff/cancel/{id}', [PetStaffDashboardController::class, 'cancel'])->name('pet-staff.cancel');
-    Route::post('/pet-staff/reprint/{id}', [PetStaffDashboardController::class, 'reprint'])->name('pet-staff.reprint');
+    Route::get('/petstaff/dashboard', [PetStaffDashboardController::class, 'index'])->name('pet-staff.dashboard');
+    Route::post('/petstaff/checkout/{id}', [PetStaffDashboardController::class, 'checkout'])->name('pet-staff.checkout');
+    Route::post('/petstaff/dropped-in/{id}', [PetStaffDashboardController::class, 'dropped_in'])->name('pet-staff.dropped-in');
+    Route::post('/petstaff/cancel/{id}', [PetStaffDashboardController::class, 'cancel'])->name('pet-staff.cancel');
+    Route::post('/petstaff/reprint/{id}', [PetStaffDashboardController::class, 'reprint'])->name('pet-staff.reprint');
+
+    // Terms & Conditions editor (entered from the pet-staff dashboard)
+    Route::get('/petstaff/terms', [TermsAndConditionsController::class, 'edit'])->name('pet-staff.terms.edit');
+    Route::put('/petstaff/terms', [TermsAndConditionsController::class, 'update'])->name('pet-staff.terms.update');
 });
 
 Route::redirect('/dropin', '/drop-in');
-Route::redirect('/pet-staff', '/pet-staff/dashboard');
+Route::redirect('/petstaff', '/petstaff/dashboard');
 // -----------------------
 // ---------------------
 // Check-in routes

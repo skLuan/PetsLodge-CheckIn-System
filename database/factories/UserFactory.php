@@ -28,6 +28,11 @@ class UserFactory extends Factory
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
+            // The users table requires phone/address/role (see create_users_table);
+            // phone is unique, so keep it generated per-user.
+            'phone' => fake()->unique()->numerify('##########'),
+            'address' => fake()->streetAddress(),
+            'role' => 'CLIENT',
             'remember_token' => Str::random(10),
         ];
     }
@@ -39,6 +44,26 @@ class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
+        ]);
+    }
+
+    /**
+     * A user who can reach the pet-staff area (`pet.staff.only`).
+     */
+    public function petStaff(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => 'PET_STAFF',
+        ]);
+    }
+
+    /**
+     * A super admin — also allowed through `pet.staff.only`.
+     */
+    public function superAdmin(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => 'SUPER_ADMIN',
         ]);
     }
 }

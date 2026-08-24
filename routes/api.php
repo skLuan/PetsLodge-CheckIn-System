@@ -1,9 +1,8 @@
 <?php
 
+use App\Http\Controllers\DropInController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\DropInController;
-
 
 /*
 |--------------------------------------------------------------------------
@@ -33,6 +32,9 @@ Route::post('/checkin/step2/pet-info', [App\Http\Controllers\CheckInApiControlle
 Route::post('/checkin/step3/pet-health', [App\Http\Controllers\CheckInApiController::class, 'submitPetHealth']);
 Route::post('/checkin/step4/checkin-data', [App\Http\Controllers\CheckInApiController::class, 'submitCheckInData']);
 Route::post('/checkin/step5/extra-info', [App\Http\Controllers\CheckInApiController::class, 'submitExtraInfo']);
+
+// Terms & Conditions — public read of the active version (used by the check-in popup)
+Route::get('/terms/active', [App\Http\Controllers\TermsAndConditionsController::class, 'show']);
 
 // Session update route
 Route::post('/update-session-checkin', [App\Http\Controllers\CheckInApiController::class, 'updateSessionCheckIn']);
