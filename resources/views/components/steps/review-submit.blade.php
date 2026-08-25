@@ -1,6 +1,6 @@
 @props(['checkinData' => []])
 
-<div id="step7" class="step w-full inactive-right">
+<div id="step6" class="step w-full inactive-right">
     <div class="text-center">
         <p class="text-lg text-gray-700 mb-6">Please review your information and submit your check-in when
             ready.

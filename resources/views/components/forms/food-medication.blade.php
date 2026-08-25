@@ -6,6 +6,9 @@
             <span>Same feeding for all</span>
         </label>
     </div>
+    <div id="feedingGroupedByPet" class="hidden">
+        {{-- Populated dynamically: collapsible per-pet feeding/medication sections --}}
+    </div>
     <!------------------------------------------------------------------------ Morning Section -->
     <div class="container-day mb-8 hidden" data-time-slot="morning">
         <div class="flex items-center mb-2">

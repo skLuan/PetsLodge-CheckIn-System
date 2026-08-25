@@ -19,7 +19,6 @@
             <x-steps.owner-info :user="$user ?? null" />
             <x-steps.pet-info :user="$user ?? null" />
             <x-steps.feeding-medication />
-            <x-steps.health-info />
             <x-steps.inventory />
             <x-steps.grooming />
             <x-steps.review-submit :checkinData="session('checkin_data', [])" />

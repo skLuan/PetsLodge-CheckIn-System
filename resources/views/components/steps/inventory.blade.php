@@ -1,3 +1,3 @@
-<div id="step5" class="step w-full">
+<div id="step4" class="step w-full">
     <x-forms.inventory />
 </div>

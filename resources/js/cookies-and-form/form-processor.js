@@ -202,8 +202,6 @@ document.addEventListener("DOMContentLoaded", async function () {
     //------------------------------------------------
     // Pet pill selection: load the selected pet into the form for editing
     //------------------------------------------------
-    let healthEditingPetIndex = null;
-
     document.addEventListener("pet:select-request", function (e) {
         const { index, selected } = e.detail;
         const form = document.getElementById("petInfoForm");
@@ -214,31 +212,19 @@ document.addEventListener("DOMContentLoaded", async function () {
             const pet = pets[index];
 
             if (currentStep === FORM_CONFIG.STEPS.PET_INFO - 1) {
-                // Pet info step: load the selected pet into the form.
+                // Pet info step: load the selected pet (info + health) into the form.
                 if (pet && form) {
                     form.reset();
                     FormUpdater.updatePetForm(pet);
+                    HealthFormManager.loadPetHealth(index);
                 }
                 setPetSubmitButtonLabel(true);
-            } else if (currentStep === FORM_CONFIG.STEPS.HEALTH_INFO - 1) {
-                // Save the current health to the previously edited pet before toggling.
-                if (healthEditingPetIndex !== null && healthEditingPetIndex !== index) {
-                    HealthFormManager.saveCurrentPetHealth(healthEditingPetIndex);
-                }
-                healthEditingPetIndex = index;
-                HealthFormManager.loadPetHealth(index);
             }
         } else {
             if (form) {
                 form.reset();
-                setPetSubmitButtonLabel(false);
-            }
-            if (currentStep === FORM_CONFIG.STEPS.HEALTH_INFO - 1) {
-                if (healthEditingPetIndex !== null) {
-                    HealthFormManager.saveCurrentPetHealth(healthEditingPetIndex);
-                }
-                healthEditingPetIndex = null;
                 HealthFormManager.loadPetHealth(null);
+                setPetSubmitButtonLabel(false);
             }
         }
 

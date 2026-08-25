@@ -97,6 +97,14 @@ class NavigationManager {
             return;
         }
 
+        // "Same feeding for all" checked → show "All"
+        const sameFeedingForAll = document.getElementById('sameFeedingForAll');
+        if (sameFeedingForAll && sameFeedingForAll.checked) {
+            nowEditingName.textContent = 'All';
+            nowEditContainer.classList.remove('hidden');
+            return;
+        }
+
         const selectedPill = document.querySelector('#petPillsContainer .pill.selected');
         if (selectedPill) {
             const nameSpan = selectedPill.querySelector('span');
@@ -148,7 +156,7 @@ class NavigationManager {
         if (!nextButton) return;
 
         // Update grooming summary when reaching the grooming or final step
-        if (currentStep === FORM_CONFIG.STEPS.INVENTORY || currentStep === FORM_CONFIG.STEPS.THANKS - 1) {
+        if (currentStep === FORM_CONFIG.STEPS.GROOMING - 1 || currentStep === FORM_CONFIG.STEPS.THANKS - 1) {
             PopupManager.updateGroomingSummary();
         }
 

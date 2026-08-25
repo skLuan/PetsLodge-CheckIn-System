@@ -6,7 +6,7 @@
     @endif
 
     <x-ui.input label="Phone Number" name="phone" type="tel" placeholder="Your Phone Number"
-        :value="$user?->phone ?? request()->get('phone')" pattern="[0-9]{10}" required />
+        :value="request()->get('phone') ?? $user?->phone" pattern="[0-9]{10}" required />
 
     <x-ui.input label="Name and Last name" name="name" placeholder="Your Name"
         :value="$user?->name ?? old('name')" required />
