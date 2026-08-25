@@ -80,6 +80,76 @@ Signature::create([...., 'path' => $path, 'terms_and_conditions_id' => TermsAndC
 4. `npm install signature_pad`, JS component, blade partial, wire into drop-in.
 5. Gate drop-in completion on signature.
 6. Docs (`docs/API_REFERENCE.md`) + move to `plans/`.
+7. **Printing config — local stand-in now, production work still OPEN.** See below.
+
+## Step 7 — Printing: local stand-in + the production configuration problem
+
+Discovered while verifying step 5 end to end: completing a drop-in locally is
+**impossible against the real PrintNode API**, for a structural reason rather than a
+credential one.
+
+### The problem
+
+`PrintNodeService::sendPrintJob()` sends `contentType: pdf_uri` — it hands PrintNode a
+**URL** and PrintNode's cloud servers fetch the PDF themselves. The URL is built from
+`config('app.url')`:
+
+```php
+// PrintNodeService::getFullPdfUri()
+return rtrim(config('app.url'), '/').'/'.ltrim($pdfUri, '/');
+```
+
+So the PDF must be reachable **from the public internet**, and three things have to be
+true at once in production:
+
+| Requirement | Why it breaks otherwise |
+|---|---|
+| `APP_URL` is the public **https** URL | `http://localhost:8080/...` is unreachable by PrintNode. This is the same `APP_URL` the email templates need for their `asset()` logo links — one variable, two features. |
+| `public/storage` symlink exists **and resolves** | `PdfService` writes to the `public` disk. On shared hosting the symlink is a common casualty of deploy/rsync. |
+| PDFs under `storage/app/public/pdfs/` are publicly served | If they 404, PrintNode fails on fetch, not on auth — the error message will not say so. |
+
+> ⚠️ **Privacy note, not yet decided.** Making the PDF publicly fetchable means the
+> printed check-in summary — owner name, phone, address, pet health notes, **and now the
+> embedded signature image** — sits behind an unguessable-but-public URL. That is at
+> odds with the private-disk treatment signatures get everywhere else in this plan.
+> Options if this matters: switch PrintNode to `contentType: pdf_base64` (upload the
+> bytes instead of a URL, no public exposure at all), or serve PDFs from a signed,
+> expiring route. **Recommend `pdf_base64`** — it removes all three requirements above
+> in one move. Not done here: out of scope for the signature plan, and it changes how
+> printing works for every flow.
+
+### What was built (local only)
+
+`PRINTNODE_FAKE=true` swaps `PrintNodeService` for `FakePrintNodeService` via a
+container binding in `AppServiceProvider::bindPrinter()`. The fake logs the job at
+**warning** level and returns the real response shape with `fake: true`, so the whole
+drop-in completes locally with no printer and no API key.
+
+It is **opt-in and ignored when `APP_ENV=production`** on purpose: auto-enabling
+whenever the API key is missing would let production report "printed successfully"
+forever while nothing came out of the printer.
+
+Covers re-prints too — `PetStaffDashboardController::reprint` was changed from
+`new PrintNodeService` to `app(PrintNodeService::class)`.
+
+### Also fixed here: the dangling `public/storage` symlink
+
+The first real drop-in died with `Unable to create a directory at
+/var/www/public/storage`. The symlink pointed at `/mnt/host/c/DockerWorkspace/...`, a
+path from an older Docker mount layout. `docker-entrypoint.sh` had a repair step, but
+its guard was `[ ! -L public/storage ]` — **`-L` only asks "is this a symlink?", and a
+dangling symlink still is one**, so the repair never ran. Now tested with `-e`/`-d`
+(which follow the link) plus an `rm -f`, since `storage:link` cannot overwrite an
+existing path.
+
+### ❗ Still open for production
+
+- [ ] Obtain the **PrintNode API key** (the account credentials are held, the key is not).
+- [ ] Set `PRINTNODE_PRINTER_ID` to the real printer.
+- [ ] Set `APP_URL` to the public https URL and confirm a PDF is fetchable from outside.
+- [ ] Confirm `public/storage` resolves on the Hostinger box after deploy.
+- [ ] Keep `PRINTNODE_FAKE=false` in `.env.production`.
+- [ ] **Decide the privacy question above** before going live with public PDF URLs.
 
 ## Acceptance criteria
 

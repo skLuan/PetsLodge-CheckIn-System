@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Models\TermsAndConditions;
+use App\Services\FakePrintNodeService;
+use App\Services\PrintNodeService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\View;
@@ -15,7 +17,32 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->bindPrinter();
+    }
+
+    /**
+     * Resolve the printer: the real PrintNode API, or a local stand-in.
+     *
+     * PrintNode pulls the PDF from their cloud, so a local `APP_URL` is
+     * unreachable to them and no amount of valid credentials makes a local
+     * drop-in complete. `PRINTNODE_FAKE=true` swaps in a logger instead.
+     *
+     * Faking in production would mean silently never printing, so it is refused
+     * there and the real service is used regardless of the flag.
+     */
+    private function bindPrinter(): void
+    {
+        $this->app->bind(PrintNodeService::class, function ($app) {
+            if (config('services.printnode.fake') && ! $app->environment('production')) {
+                return new FakePrintNodeService;
+            }
+
+            if (config('services.printnode.fake')) {
+                Log::warning('PRINTNODE_FAKE is set in production and is being IGNORED — using the real PrintNode API.');
+            }
+
+            return new PrintNodeService;
+        });
     }
 
     /**

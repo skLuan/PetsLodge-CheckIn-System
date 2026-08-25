@@ -31,9 +31,12 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
     'printnode' => [
-        'api_key'    => env('PRINTNODE_API_KEY'),
+        'api_key' => env('PRINTNODE_API_KEY'),
         'printer_id' => env('PRINTNODE_PRINTER_ID'),
+        // Local stand-in for the print API. PrintNode fetches the PDF from THEIR
+        // servers, so a localhost APP_URL can never work — see FakePrintNodeService.
+        // Ignored when APP_ENV=production; must stay false on the live site.
+        'fake' => env('PRINTNODE_FAKE', false),
     ],
-
 
 ];

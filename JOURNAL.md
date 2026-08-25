@@ -121,17 +121,58 @@ contain it. (`npm audit` reports 13 pre-existing vulnerabilities in the dependen
 - **`npm run build` succeeds**; `signature_pad` present in `public/build/assets/app-*.js`.
 - Dev DB survived the suite (the `phpunit.xml` pin from the previous session holds).
 
+### Follow-up in the same session: the pad was exercised for real, and printing
+
+The user drew a signature in the browser and hit Print. **The signature module worked**
+— row 1 stored against check-in 26, owner 27, T&C v1, PNG on the private disk — but the
+click returned `Unable to create a directory at /var/www/public/storage`. Two separate
+problems came out of that, neither caused by Plan 03:
+
+1. **`public/storage` was a dangling symlink** pointing at
+   `/mnt/host/c/DockerWorkspace/...`, a path from an older Docker mount layout.
+   `PdfService` writes to the `public` disk, so *every* drop-in print was already
+   broken. `docker-entrypoint.sh` had a repair step whose guard was
+   `[ ! -L public/storage ]` — **`-L` only asks "is this a symlink?", and a dangling
+   symlink still is one**, so the repair never fired. Now tested with `-e`/`-d`, which
+   follow the link, plus an `rm -f` (storage:link cannot overwrite an existing path).
+   Verified by re-breaking the link exactly as found: old guard skipped, new guard
+   repaired.
+
+2. **PrintNode can never work from localhost.** `sendPrintJob()` uses
+   `contentType: pdf_uri` — PrintNode's *cloud servers* fetch the PDF from a URL built
+   from `APP_URL`. A local URL is unreachable to them, so this is structural, not a
+   credentials problem. Added `PRINTNODE_FAKE=true` → `FakePrintNodeService`, bound in
+   `AppServiceProvider::bindPrinter()`. It logs at **warning** level and returns the
+   real response shape with `fake: true`. Opt-in and **ignored in production**, because
+   auto-faking a missing key would let production claim success forever while nothing
+   printed. `PetStaffDashboardController::reprint` moved from `new` to `app()` so
+   re-prints are covered too. 7 tests in `tests/Feature/FakePrinterTest.php`.
+
+   The full production checklist — and an **unresolved privacy question** (making PDFs
+   publicly fetchable exposes owner name/phone/address, health notes and the embedded
+   signature behind an unguessable URL; `pdf_base64` would avoid it entirely) — is
+   written up as **Step 7 in `plans/03-signature-module.md`**.
+
+Suite after this work: **92 passed / 4 failed** (85 + 7), same pre-existing failures.
+
+**Verified end-to-end with the fake:** `readyToPrint` for check-in 26 returned `200`
+with a `fake-…` job id, and the PDF embed is real — the same check-in renders at
+**36,111 bytes with 2 image XObjects** signed vs **1,882 bytes** when the signature file
+is missing (the `dataUri()` null-guard degrades instead of erroring).
+
 ### ❗ Left for a human
 
-1. **Nobody has actually drawn on the pad.** `/drop-in/confirmation` needs a staff
-   login and this session did not create one. Stroke rendering, touch input and the
-   devicePixelRatio scaling are **not** manually verified — worth five minutes on a
-   real tablet before this ships. Everything else about the page is test-covered.
+1. ~~Nobody has drawn on the pad.~~ **Done in-session** — a real signature was drawn,
+   stored and embedded in the PDF. Touch input on a tablet is still unexercised (this
+   was a desktop browser), as is the devicePixelRatio path on a retina screen.
 2. **Decide whether existing unsigned check-ins matter.** The gate is retroactive: any
    check-in created before this change has no signature, so its drop-in will be refused
    until someone signs. Fine for a beta with test data; confirm before production.
 3. **`storage/app/signatures/` must be writable and backed up** on Hostinger — it is
    legal evidence, it is *not* in the database, and it is not in git.
+3b. **Printing in production is still unfinished** — the PrintNode **API key is not in
+   hand** (account credentials are). See Step 7 of `plans/03-signature-module.md` for
+   the checklist and the privacy decision that should be made before going live.
 4. Nothing committed; changes sit on `feature/03-signature-module`.
 5. Notion card for Phase 4 still needs a human.
 6. Still open from the previous session: the Hostinger mail send, and **`.env.v0` is

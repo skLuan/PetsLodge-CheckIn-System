@@ -122,8 +122,9 @@ class PetStaffDashboardController extends Controller
         }
 
         try {
-            // Send to PrintNode using stored document_url
-            $printService = new \App\Services\PrintNodeService;
+            // Send to PrintNode using stored document_url. Resolved from the
+            // container so PRINTNODE_FAKE covers re-prints too, not just drop-ins.
+            $printService = app(\App\Services\PrintNodeService::class);
             $response = $printService->sendPrintJob($checkIn->document_url, [
                 'title' => 'Re-Print: '.$checkIn->pet->name.' - '.$checkIn->user->name,
             ]);

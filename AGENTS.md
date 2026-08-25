@@ -143,6 +143,7 @@ php artisan test --filter=SomeTest              # single test
 | `app/Services/CheckInPetService.php`    | Pet-related operations. |
 | `app/Services/CheckInUserService.php`   | User/owner operations. |
 | `app/Services/PdfService.php` / `PrintNodeService.php` | PDF generation & physical printing. |
+| `app/Services/FakePrintNodeService.php` | Local stand-in for PrintNode (`PRINTNODE_FAKE=true`). Logs the job instead of printing; bound in `AppServiceProvider::bindPrinter()`. |
 | `app/Models/` | Eloquent models: `CheckIn`, `Pet`, `EmergencyContact`, `Food`, `Medicine`, `Item`, `ExtraService`, `KindOfPet`, `Gender`, `Castrated`, `MomentOfDay`, `Status`, `TermsAndConditions`, `Signature`, `User`. |
 | `app/Providers/AppServiceProvider.php` | View composer that injects `$activeTerms` into the T&C popup. |
 | `app/Providers/EventServiceProvider.php` | Maps the check-in/drop-in/drop-out events to their queued mail listeners. |
@@ -273,6 +274,20 @@ Rules that keep this from breaking:
    uses Redis + the `queue` container. Production is **Hostinger shared hosting**: no
    Redis, no daemons — `QUEUE_CONNECTION=database` (needs the `jobs` table) drained by
    a per-minute hPanel cron. Details and the cron line: `docs/DEPLOYMENT_GUIDE.md`.
+
+### Printing locally: `PRINTNODE_FAKE=true`
+
+**A drop-in cannot complete locally against the real PrintNode API**, and no API key
+fixes it. `PrintNodeService` sends `contentType: pdf_uri` — PrintNode's *cloud servers*
+fetch the PDF from a URL built out of `APP_URL`, so `http://localhost:8080/...` is
+unreachable by definition.
+
+`PRINTNODE_FAKE=true` (already set in `.env`/`.env.docker`) swaps in
+`FakePrintNodeService`, which logs the job at **warning** level and returns
+`fake: true`. Opt-in, and **ignored when `APP_ENV=production`** — auto-faking on a
+missing key would let production report "printed successfully" forever while nothing
+came out of the printer. See `plans/03-signature-module.md` § Step 7 for the production
+checklist and an unresolved privacy question about publicly-fetchable PDFs.
 
 **Diagnosing mail:** `php artisan mail:test [address] [--template=confirmation|drop-in|drop-out]`
 prints the configuration Laravel has *actually* loaded, warns about the common

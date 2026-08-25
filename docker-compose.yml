@@ -32,6 +32,20 @@
 x-app-volumes: &app-volumes
   - .:/var/www
   - ./.env.docker:/var/www/.env:ro
+  # PERFORMANCE — do not remove. The bind mount above crosses the WSL2 9p
+  # bridge to C:\, where a single stat() costs ~5.9 ms. A Laravel bootstrap
+  # includes 455 PHP files, 421 of them (93%) under vendor/ — roughly 2.5 s of
+  # pure filesystem latency on EVERY request, before a line of app code runs.
+  # This named volume serves vendor/ from the container's own ext4 instead
+  # (~0.007 ms per stat), while app/, config/ and resources/ stay bind-mounted
+  # and hot-reloadable.
+  #
+  # CAVEAT: the volume is seeded from the image ONCE, when it is first created.
+  # After changing composer.json/composer.lock you must rebuild AND drop it:
+  #   docker compose down && docker volume rm petslodge_vendor_data
+  #   docker compose up -d --build
+  # A `composer install` run on the HOST no longer affects the containers.
+  - vendor_data:/var/www/vendor
 
 services:
   # Laravel Application (php artisan serve)
@@ -64,9 +78,13 @@ services:
   # worker exit on purpose once an hour (to release leaked memory), and under a
   # `no` restart policy that first clean exit would end mail delivery for good.
   #
-  # SKIP_MIGRATIONS stops this container racing the app container to run
-  # `migrate` at startup — both used the same entrypoint, and the loser died
-  # with "table already exists".
+  # SKIP_SHARED_SETUP stops this container touching any state the app container
+  # owns. Both run the same entrypoint over the same bind mount, so without it:
+  #   - both run `migrate` at startup, and the loser dies on "table already exists"
+  #   - this container's `view:clear` wipes storage/framework/views WHILE the app
+  #     is serving out of it, forcing every page to recompile Blade across the
+  #     slow mount — the "app got slow after I added the queue" symptom
+  #   - both race on `storage:link`, and the loser exits non-zero under `set -e`
   queue:
     build:
       context: .
@@ -80,7 +98,7 @@ services:
       redis:
         condition: service_healthy
     environment:
-      SKIP_MIGRATIONS: "true"
+      SKIP_SHARED_SETUP: "true"
     volumes: *app-volumes
     entrypoint: ["sh", "/var/www/docker-entrypoint.sh"]
     command: php artisan queue:work --tries=3 --backoff=30 --sleep=3 --max-time=3600
@@ -147,4 +165,8 @@ volumes:
   mysql_data:
     driver: local
   redis_data:
+    driver: local
+  # Serves vendor/ from container-native ext4 instead of the slow 9p bind
+  # mount. Seeded from the image at creation — see the x-app-volumes note.
+  vendor_data:
     driver: local

@@ -37,8 +37,13 @@ COPY . .
 # Copy .env.docker as .env (after COPY . . so it's not overwritten by local .env)
 COPY .env.docker .env
 
-# Install PHP dependencies
-RUN composer install --optimize-autoloader --no-dev
+# Install PHP dependencies.
+#
+# Dev dependencies (phpunit, faker) are installed ON PURPOSE. docker-compose.yml
+# mounts a named volume over /var/www/vendor and seeds it from THIS layer, so the
+# vendor/ built here is the one the running containers actually use. Under
+# --no-dev, `docker compose exec app php artisan test` dies on a missing PHPUnit.
+RUN composer install --optimize-autoloader
 
 # Generate application key
 RUN php artisan key:generate
