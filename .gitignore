@@ -12,6 +12,8 @@
 .env.production
 .env.docker
 .env.testing
+.env*.bak.claude
+.env.v0
 .phpunit.result.cache
 Homestead.json
 Homestead.yaml

@@ -55,7 +55,10 @@ Route::middleware(['auth', 'pet.staff.only'])->group(function () {
 });
 
 Route::redirect('/dropin', '/drop-in');
+// Convenience aliases. The canonical URL prefix is `/petstaff` (no hyphen) even
+// though the route *names* are `pet-staff.*` — both spellings land on the dashboard.
 Route::redirect('/petstaff', '/petstaff/dashboard');
+Route::redirect('/pet-staff', '/petstaff/dashboard');
 // -----------------------
 // ---------------------
 // Check-in routes
