@@ -108,7 +108,7 @@
                                         </button>
                                     </form>
 
-                                    @if ($checkIn->document_url)
+                                    @if ($checkIn->document_path)
                                         <form action="{{ route('pet-staff.reprint', $checkIn->id) }}" method="POST"
                                             class="flex-1">
                                             @csrf
@@ -118,6 +118,14 @@
                                                 Re-Print
                                             </button>
                                         </form>
+
+                                        {{-- Summaries live on the private disk (Plan 07); this
+                                             authenticated route is the only way to open one. --}}
+                                        <a href="{{ route('pet-staff.check-in.document', $checkIn) }}" target="_blank"
+                                            class="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition text-center"
+                                            title="Open the check-in document">
+                                            View PDF
+                                        </a>
                                     @endif
                                 </div>
                             </div>

@@ -173,50 +173,44 @@ class DropInController extends Controller
         }
 
         try {
-            $pdfUri = null;
+            // Resolved from the container (not `new`) so tests can swap them out.
+            $pdfService = app(PdfService::class);
+            $checkIn = \App\Models\CheckIn::find($checkInId);
 
-            // Check if document_url already exists for this check-in
-            if ($checkInId) {
-                $checkIn = \App\Models\CheckIn::find($checkInId);
-                if ($checkIn && $checkIn->document_url) {
-                    $pdfUri = $checkIn->document_url;
-                }
+            // Generate the summary once and remember where it went; a re-print
+            // of the same drop-in must reuse the identical document.
+            $documentPath = $checkIn?->document_path;
+
+            if (! $documentPath) {
+                $documentPath = $pdfService->generatePdf($validated['info']);
+
+                $checkIn?->update(['document_path' => $documentPath]);
             }
 
-            // Generate PDF only if not already stored
-            if (! $pdfUri) {
-                // Resolved from the container (not `new`) so tests can swap it out.
-                $pdfService = app(PdfService::class);
-                $pdfUri = $pdfService->generatePdf($validated['info']);  // Devuelve URI (e.g., S3 URL)
+            // Plan 07: PrintNode is sent the BYTES, not a URL. Nothing about this
+            // flow is publicly reachable any more.
+            $pdfContents = $pdfService->pdfBytes($documentPath);
 
-                if (! $pdfUri) {
-                    return response()->json(['error' => 'Error generating PDF'], 500);
-                }
-
-                // Save document_url to database if check-in ID is available
-                if ($checkInId) {
-                    $checkIn = \App\Models\CheckIn::find($checkInId);
-                    if ($checkIn) {
-                        $checkIn->update(['document_url' => $pdfUri]);
-                    }
-                }
+            if ($pdfContents === null) {
+                return response()->json([
+                    'error' => 'The check-in document could not be found. Please try again.',
+                ], 422);
             }
-            // Llama a PrintNode via service
+
             $printService = app(PrintNodeService::class);
-            $response = $printService->sendPrintJob($pdfUri, $validated['info']);
-            // $response = $printService->getPrinters();
+            $response = $printService->sendPrintJob($pdfContents, $validated['info']);
 
             // Respuesta JSON para frontend (éxito/error)
             if ($response['success']) {
                 return response()->json([
                     'message' => 'Print job sent successfully!',
-                    'pdfUri' => $pdfUri,
+                    // Authenticated staff-only link; there is no public PDF URL.
+                    'documentUrl' => $checkIn ? route('pet-staff.check-in.document', $checkIn) : null,
                     'printResponse' => $response['data'] ?? null,
                 ], 200);
             } else {
                 return response()->json([
                     'error' => $response['message'] ?? 'Error sending print job',
-                    'pdfUri' => $pdfUri,
                 ], 500);
             }
         } catch (\Exception $e) {

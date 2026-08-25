@@ -448,8 +448,11 @@ class SignatureTest extends TestCase
             'context' => 'drop-in',
         ]);
 
+        // Plan 07: the controller stores a PATH, then reads the bytes back to
+        // upload them. (Printing itself is covered in depth by PrintingTest.)
         $this->mock(PdfService::class, function ($mock) {
-            $mock->shouldReceive('generatePdf')->once()->andReturn('/storage/pdfs/fake.pdf');
+            $mock->shouldReceive('generatePdf')->once()->andReturn('pdfs/2026/08/fake.pdf');
+            $mock->shouldReceive('pdfBytes')->once()->andReturn("%PDF-1.4\nfake");
         });
 
         $this->mock(PrintNodeService::class, function ($mock) {
@@ -458,7 +461,7 @@ class SignatureTest extends TestCase
 
         $this->postJson('/api/readyToPrint', [
             'info' => ['id' => $checkIn->id, 'pets' => []],
-        ])->assertOk()->assertJsonStructure(['message', 'pdfUri']);
+        ])->assertOk()->assertJsonStructure(['message', 'documentUrl']);
     }
 
     /** @test */

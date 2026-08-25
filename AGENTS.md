@@ -142,10 +142,11 @@ php artisan test --filter=SomeTest              # single test
 | `app/Services/CheckInService.php`       | Core check-in business logic. |
 | `app/Services/CheckInPetService.php`    | Pet-related operations. |
 | `app/Services/CheckInUserService.php`   | User/owner operations. |
-| `app/Services/PdfService.php` / `PrintNodeService.php` | PDF generation & physical printing. |
+| `app/Services/PdfService.php` | Renders the check-in summary to PDF on the **private** disk; returns a relative path + `pdfBytes()`. |
+| `app/Services/PrintNodeService.php` | Uploads PDF bytes to PrintNode (`contentType: pdf_base64`). Never sends a URL. |
 | `app/Services/FakePrintNodeService.php` | Local stand-in for PrintNode (`PRINTNODE_FAKE=true`). Logs the job instead of printing; bound in `AppServiceProvider::bindPrinter()`. |
 | `app/Models/` | Eloquent models: `CheckIn`, `Pet`, `EmergencyContact`, `Food`, `Medicine`, `Item`, `ExtraService`, `KindOfPet`, `Gender`, `Castrated`, `MomentOfDay`, `Status`, `TermsAndConditions`, `Signature`, `User`. |
-| `app/Providers/AppServiceProvider.php` | View composer that injects `$activeTerms` into the T&C popup. |
+| `app/Providers/AppServiceProvider.php` | View composer for `$activeTerms`, plus `bindPrinter()` (real vs fake PrintNode). |
 | `app/Providers/EventServiceProvider.php` | Maps the check-in/drop-in/drop-out events to their queued mail listeners. |
 | `app/Http/Middleware/AdminOnly.php`, `PetStaffOnly.php` | Role gates (`admin.only`, `pet.staff.only`). |
 | `app/Events/` | `CheckInCompleted`, `PetDroppedIn`, `PetDroppedOut` — each carries a `CheckIn`. |
@@ -204,7 +205,8 @@ The heart of the app. **`cookies-and-form/` is where most feature work happens.*
 ### Routes
 - `routes/web.php` — pages: `/check-in` (phone entry), `/new-form` (the actual multi-step
   form), `/edit-check-in/{id}`, `/view-check-in`, `/drop-in`, `/petstaff/dashboard`,
-  `/petstaff/terms`, `/signatures` (store/show), `/health`, admin monitoring.
+  `/petstaff/terms`, `/signatures` (store/show), `/petstaff/check-in/{id}/document`,
+  `/health`, admin monitoring.
 - `routes/api.php` — form API: `/api/checkin/submit`, `/api/checkin/autosave`,
   per-step `/api/checkin/step1..step5/...`, `/api/update-session-checkin`, `/api/check-user`,
   `/api/terms/active`.
@@ -275,19 +277,40 @@ Rules that keep this from breaking:
    Redis, no daemons — `QUEUE_CONNECTION=database` (needs the `jobs` table) drained by
    a per-minute hPanel cron. Details and the cron line: `docs/DEPLOYMENT_GUIDE.md`.
 
-### Printing locally: `PRINTNODE_FAKE=true`
+## 6d. Printing: the document is UPLOADED, never linked
 
-**A drop-in cannot complete locally against the real PrintNode API**, and no API key
-fixes it. `PrintNodeService` sends `contentType: pdf_uri` — PrintNode's *cloud servers*
-fetch the PDF from a URL built out of `APP_URL`, so `http://localhost:8080/...` is
-unreachable by definition.
+`PrintNodeService::sendPrintJob()` takes **raw PDF bytes** and sends them as
+`contentType: pdf_base64`. It used to send `pdf_uri` — a URL PrintNode's cloud servers
+fetched themselves — which forced the printed summary onto a **public** disk and made
+printing impossible from localhost. Plan 07 changed that.
 
-`PRINTNODE_FAKE=true` (already set in `.env`/`.env.docker`) swaps in
-`FakePrintNodeService`, which logs the job at **warning** level and returns
-`fake: true`. Opt-in, and **ignored when `APP_ENV=production`** — auto-faking on a
-missing key would let production report "printed successfully" forever while nothing
-came out of the printer. See `plans/03-signature-module.md` § Step 7 for the production
-checklist and an unresolved privacy question about publicly-fetchable PDFs.
+Rules that keep this from breaking:
+
+1. **Never hand PrintNode a URL again.** `sendPrintJob($bytes)`, not `sendPrintJob($url)`.
+   `content` must be **raw base64 with no `data:` prefix** (signature payloads use the
+   prefixed form — don't copy that shape here).
+2. **Printed summaries are personal data.** They hold owner name/phone/address, health
+   notes and the client's signature, so they live on the **private** disk
+   (`PdfService::DISK`, `storage/app/pdfs/YYYY/MM/{uuid}.pdf`). The only way to read one
+   is `GET /petstaff/check-in/{checkIn}/document` (`auth` + `pet.staff.only`).
+3. **`check_ins.document_path` stores a relative path**, never a URL. The old
+   `document_url` column held an absolute `APP_URL`-based link, so every stored value
+   broke when the app changed domain. It is gone; don't reintroduce it.
+4. **A successful `POST /printjobs` returns 201 with the bare job id** (`623`), not a
+   JSON object — so `$response['data']` is a **scalar**, not an array.
+5. **Size limit is 50MB of request body** (~37.5MB of document). A check-in summary is
+   ~40KB, so `PrintNodeService::MAX_DOCUMENT_BYTES` is a sanity guard, not a real
+   constraint.
+6. **`APP_URL` no longer affects printing at all.** It still matters for email
+   `asset()` links (§6b) — don't assume this fixed that.
+
+### `PRINTNODE_FAKE=true`
+
+Swaps in `FakePrintNodeService`, which logs the job (and its byte size) at **warning**
+level and returns `fake: true`. Opt-in, and **ignored when `APP_ENV=production`** —
+auto-faking on a missing key would let production report "printed successfully" forever
+while nothing came out of the printer. Since Plan 07 a real API key also works locally,
+so this is now a convenience rather than the only option.
 
 **Diagnosing mail:** `php artisan mail:test [address] [--template=confirmation|drop-in|drop-out]`
 prints the configuration Laravel has *actually* loaded, warns about the common

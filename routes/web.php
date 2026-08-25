@@ -49,6 +49,9 @@ Route::middleware(['auth', 'pet.staff.only'])->group(function () {
     Route::post('/petstaff/dropped-in/{id}', [PetStaffDashboardController::class, 'dropped_in'])->name('pet-staff.dropped-in');
     Route::post('/petstaff/cancel/{id}', [PetStaffDashboardController::class, 'cancel'])->name('pet-staff.cancel');
     Route::post('/petstaff/reprint/{id}', [PetStaffDashboardController::class, 'reprint'])->name('pet-staff.reprint');
+    // The only way to read a printed summary — they live on the private disk
+    // (Plan 07), because they carry owner PII, health notes and the signature.
+    Route::get('/petstaff/check-in/{checkIn}/document', [PetStaffDashboardController::class, 'document'])->name('pet-staff.check-in.document');
 
     // Terms & Conditions editor (entered from the pet-staff dashboard)
     Route::get('/petstaff/terms', [TermsAndConditionsController::class, 'edit'])->name('pet-staff.terms.edit');

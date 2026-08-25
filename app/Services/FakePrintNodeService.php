@@ -34,9 +34,10 @@ class FakePrintNodeService extends PrintNodeService
     /**
      * Pretend to print, and record exactly what would have been sent.
      *
+     * @param  string  $pdfContents  Raw PDF bytes (Plan 07 — no longer a URL).
      * @return array Same shape as PrintNodeService::sendPrintJob().
      */
-    public function sendPrintJob($pdfUri, $info = [])
+    public function sendPrintJob($pdfContents, $info = [])
     {
         $jobId = 'fake-'.now()->format('YmdHis').'-'.random_int(1000, 9999);
 
@@ -44,8 +45,9 @@ class FakePrintNodeService extends PrintNodeService
             'jobId' => $jobId,
             'title' => $info['title'] ?? 'Drop-in Print Job',
             'checkInId' => $info['id'] ?? null,
-            // The operator can open this URL to see what would have printed.
-            'pdfUri' => $pdfUri,
+            // There is no URL to log any more — the document is uploaded. Size is
+            // the useful signal that a real, non-empty PDF reached this point.
+            'bytes' => is_string($pdfContents) ? strlen($pdfContents) : 0,
         ]);
 
         return [
@@ -54,7 +56,7 @@ class FakePrintNodeService extends PrintNodeService
             'fake' => true,
             'data' => [
                 'id' => $jobId,
-                'pdfUri' => $pdfUri,
+                'bytes' => is_string($pdfContents) ? strlen($pdfContents) : 0,
             ],
         ];
     }

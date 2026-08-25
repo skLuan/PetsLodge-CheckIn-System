@@ -260,3 +260,79 @@ brief is explicit: **no print path ships untested.**
 - Queueing print jobs. Worth considering later (an upload is slower than posting a URL,
   and `readyToPrint` is synchronous), but it changes the UX contract of the print button
   and belongs in its own plan.
+
+---
+
+## Execution notes (2026-08-25, branch `feature/07-printnode-base64-printing`)
+
+**Status: complete.** 27 tests in `tests/Feature/PrintingTest.php`, all green.
+Full suite **119 passed / 4 failed** — the same 4 pre-existing failures as the
+documented baseline (92 + 27 = 119), no new ones.
+
+### Plan followed as written
+
+Unusually few deviations — the plan was written after the API docs were read and after
+the call sites were mapped, so the design held up. Everything in the step list was done
+in order.
+
+### One change to the plan's design
+
+**`PrintNodeService` gained an injectable Guzzle client** (`__construct(?Client $client = null)`).
+The plan said to assert the payload "on a mocked Guzzle handler" without saying how —
+the client was built inline in the constructor, so there was no seam. Tests now pass a
+`Client` wrapping `MockHandler` + `Middleware::history()`; production still gets the
+default client. This is what makes the payload assertions real rather than mocked at the
+service boundary.
+
+### Bug found during execution (and the test that now covers it)
+
+`readyToPrint`'s **failure** branch still returned `'pdfUri' => $pdfUri` after the
+success path was rewritten — a variable that no longer existed. It would have thrown
+`Undefined variable $pdfUri` on **any** print failure, converting a clean "printer
+rejected the job" message into a 500. Not caught by the first test pass, because the
+tests exercised `sendPrintJob()` failure at the service level but never a print failure
+*through the controller*. Added `a_printer_failure_is_reported_without_crashing`.
+
+### Verified behaviour
+
+- **Payload:** `contentType: pdf_base64`; `content` decodes to bytes starting `%PDF-`;
+  no `data:` prefix; no URL anywhere in the request.
+- **201 + bare integer body** (`623`) is handled — `data` is a scalar, and nothing
+  indexes it as an array.
+- **Signature gate intact** — unsigned drop-in still 422s, and no PDF is generated.
+- **Reuse** — a second print of the same drop-in does not regenerate the document
+  (asserted by file count on the fake disk, not by mock expectations).
+- **Privacy** — after a full drop-in the `public` disk holds no PDF. Verified in the
+  real dev app too: the only remaining entry is Laravel's own `.gitignore`.
+- **Real end-to-end** (dev DB, `PRINTNODE_FAKE=true`): check-in 26 →
+  `pdfs/2026/08/a319aaca-….pdf`, **39,690 bytes** (signature embedded),
+  `documentUrl` = the authenticated staff route.
+- **Migration reversible** — rollback restores `document_url` and drops `document_path`;
+  re-migrate flips it back. Column-level assertions run both ways.
+
+### Cleanup performed
+
+- Deleted the 26 stale PDFs from `storage/app/public/pdfs/` (unreferenced after the
+  schema change, and sitting on the disk this plan exists to stop using).
+- `SignatureTest::a_signed_drop_in_passes_the_gate_and_reaches_the_printer` updated: its
+  `PdfService` mock now also stubs `pdfBytes()`, and it asserts `documentUrl` instead of
+  `pdfUri`.
+
+### Not verified
+
+- **No print has gone through the real PrintNode API.** The API key is still not in
+  hand, so the acceptance criterion "printing works from localhost with a real API key"
+  is **unproven** — though it is now *possible*, which it was not before this plan.
+  Everything up to the HTTP call is covered by tests against a mock transport.
+- The dashboard's new **"View PDF" link was not clicked in a browser** (needs a staff
+  login). The route is covered by feature tests for staff 200 / guest redirect / 404.
+
+### Acceptance criteria
+
+- [x] Printing sends `pdf_base64` with raw base64; no PDF URL is ever handed to PrintNode.
+- [x] No PDF is written to, or served from, public storage.
+- [x] Both print flows (drop-in, re-print) work.
+- [ ] Printing works from localhost **with a real API key** — blocked on the key.
+- [x] The Plan 03 signature gate is intact (regression test green).
+- [x] `document_url` is gone from the schema, the model and the dashboard.
+- [x] Full suite: no new failures against the documented baseline.

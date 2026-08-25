@@ -5,41 +5,67 @@ namespace App\Services;
 use App\Models\Signature;
 use Dompdf\Dompdf;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class PdfService
 {
-    public function generatePdf(array $data)
+    /**
+     * The PRIVATE disk printed summaries live on.
+     *
+     * Was `public` until Plan 07. The summary carries the owner's name, phone
+     * and address, the pet's health notes and warnings, and the client's
+     * signature — it is the same class of data as `Signature::DISK`, and it is
+     * only public here because the old print flow made PrintNode fetch it over
+     * HTTP. Printing now uploads the bytes, so nothing needs a public URL.
+     */
+    public const DISK = 'local';
+
+    /**
+     * Render a check-in summary to PDF and store it privately.
+     *
+     * @return string Relative path on the private disk, e.g. `pdfs/2026/08/{uuid}.pdf`.
+     *                NEVER a URL — an absolute APP_URL-based value is what broke
+     *                re-prints across domains before Plan 07.
+     */
+    public function generatePdf(array $data): string
     {
-        // Instanciar Dompdf
         $dompdf = new Dompdf;
 
-        // Generar HTML para el PDF (puedes usar una vista Blade)
-        // The view expects 'checkinData' variable, not 'data'
+        // The view expects 'checkinData', not 'data'.
         $html = view('pdf-for-print', [
             'checkinData' => $data,
             'signature' => $this->signatureFor($data['id'] ?? null),
         ])->render();
 
-        // Cargar HTML en Dompdf
         $dompdf->loadHtml($html);
-
-        // Configurar opciones (e.g., tamaño de papel)
         $dompdf->setPaper('letter', 'portrait');
-
-        // Renderizar PDF
         $dompdf->render();
 
-        // Obtener el contenido del PDF
-        $pdfContent = $dompdf->output();
+        // Sharded + uuid, mirroring the signatures layout. The old
+        // `drop-in-{time()}.pdf` scheme collided when two drop-ins landed in the
+        // same second.
+        $path = 'pdfs/'.now()->format('Y/m').'/'.Str::uuid().'.pdf';
 
-        // Generar nombre único para el archivo
-        $fileName = 'pdfs/drop-in-'.time().'.pdf';
+        Storage::disk(self::DISK)->put($path, $dompdf->output());
 
-        // Almacenar en el disco public
-        Storage::disk('public')->put($fileName, $pdfContent);
+        return $path;
+    }
 
-        // Devolver la URL pública del PDF
-        return Storage::url($fileName);
+    /**
+     * Raw PDF bytes for upload to the printer.
+     *
+     * @return string|null null when the file is missing, so callers can report a
+     *                     clean error instead of throwing.
+     */
+    public function pdfBytes(?string $path): ?string
+    {
+        if (! $path) {
+            return null;
+        }
+
+        $disk = Storage::disk(self::DISK);
+
+        return $disk->exists($path) ? $disk->get($path) : null;
     }
 
     /**

@@ -1308,10 +1308,51 @@ file has gone missing from the disk.
 
 ### POST `/api/readyToPrint`
 
-Completes a drop-in (generates the PDF, sends it to PrintNode). **Rejects with `422` and
-`{"requiresSignature": true}` unless a `drop-in` signature already exists for
-`info.id`** — the browser gate in `Drop-in-confirmation.blade.php` is a convenience, this
-is the enforcement.
+Completes a drop-in: renders the summary PDF (once — a second call reuses
+`check_ins.document_path`) and **uploads the bytes** to PrintNode as
+`contentType: pdf_base64`.
+
+**Rejects with `422` and `{"requiresSignature": true}` unless a `drop-in` signature
+already exists for `info.id`** — the browser gate in `Drop-in-confirmation.blade.php` is
+a convenience, this is the enforcement.
+
+**Response `200`**
+
+```json
+{
+  "message": "Print job sent successfully!",
+  "documentUrl": "http://localhost:8080/petstaff/check-in/26/document",
+  "printResponse": 623
+}
+```
+
+`documentUrl` is the **authenticated staff-only** route below. There is no public PDF
+URL — see the note on `pdf_base64`.
+
+**Response `422`** — unsigned, or the stored PDF has vanished from disk.
+**Response `500`** — PrintNode rejected the job; `error` carries the reason.
+
+### GET `/petstaff/check-in/{checkIn}/document`
+
+| Route name | Middleware |
+|---|---|
+| `pet-staff.check-in.document` | `auth`, `pet.staff.only` |
+
+Streams the stored check-in summary (`application/pdf`, `Cache-Control: private,
+no-store`). `404` when the check-in has no `document_path` or the file is missing.
+
+> **Why printing changed (Plan 07).** `PrintNodeService` used to send
+> `contentType: pdf_uri`, so PrintNode's *cloud servers* fetched the PDF from a URL
+> built out of `APP_URL`. That forced the summary — owner name/phone/address, pet health
+> notes, and the client's signature — onto a publicly readable disk, and made printing
+> impossible from localhost. It now uploads raw base64 (**no `data:` prefix**) and PDFs
+> live on the private disk. `check_ins.document_url` was replaced by `document_path`,
+> which stores a relative path; the old column held an absolute `APP_URL`-based link
+> that broke whenever the app changed domain.
+>
+> PrintNode answers a successful job with **HTTP 201 and the bare job id** (`623`), not
+> a JSON object, so `printResponse` is a scalar. Request bodies are capped at 50MB
+> (~37.5MB of document); a check-in summary is ~40KB.
 
 ---
 

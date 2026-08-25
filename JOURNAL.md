@@ -8,6 +8,103 @@
 
 ---
 
+## Session 2026-08-25 — Plan 07: Print by upload (`pdf_base64`), not by public URL
+
+**Branch:** `feature/07-printnode-base64-printing`
+**Plan:** `AIplans/07-printnode-base64-printing.md` → archived to `plans/`
+**Status:** ✅ complete. 27 new tests; full suite **119 passed / 4 failed** — the same
+4 pre-existing failures (92 + 27 = 119). ❗ One acceptance criterion open: no print has
+gone through the **real** PrintNode API — the key is still not in hand.
+
+### What this closed
+
+Step 7 of Plan 03. `PrintNodeService` sent `contentType: pdf_uri`, so PrintNode's cloud
+servers fetched the PDF from a URL built out of `APP_URL`. Three consequences, all now
+gone: the printed summary had to sit on a **public** disk (owner name/phone/address, pet
+health notes, and the client's signature, readable by anyone with the URL); printing was
+impossible from localhost regardless of credentials; and production needed three
+separate things true at once, each failing as an opaque PrintNode fetch error.
+
+`sendPrintJob()` now takes **raw PDF bytes** and uploads them as `pdf_base64`.
+
+### Facts worth keeping (from the PrintNode docs, not guessed)
+
+- `content` for `pdf_base64` is **raw base64 with NO `data:` prefix**. Signature
+  payloads in Plan 03 use the *prefixed* form — copying that shape here corrupts the
+  document. There is a test asserting the prefix is absent.
+- A successful `POST /printjobs` returns **HTTP 201 with the bare job id** (`623`), not
+  a JSON object. `json_decode('623', true)` gives an int, so `$response['data']` is a
+  **scalar** — anything doing `$response['data']['id']` is wrong.
+- Body cap is **50MB** (~37.5MB of document after base64 overhead). A check-in summary
+  is ~40KB — about 0.1% of the limit. An earlier draft of the plan called for an
+  elaborate size guard; with the real number in hand it is a one-line sanity check.
+
+### The bug the first test pass missed
+
+`readyToPrint`'s **failure** branch still returned `'pdfUri' => $pdfUri` after the
+success path was rewritten — a variable that no longer existed. Any print failure would
+have raised `Undefined variable $pdfUri`, turning a clean "printer rejected the job"
+message into a 500. The tests covered `sendPrintJob()` failing *at the service level*
+but never a print failure *through the controller*. Fixed, and
+`a_printer_failure_is_reported_without_crashing` now covers it.
+**Lesson: test the failure branch through the same entry point the user hits.**
+
+### Design change against the plan
+
+**`PrintNodeService` gained an injectable Guzzle client.** The plan said to assert the
+payload against "a mocked Guzzle handler" without saying how — and the client was built
+inline in the constructor, so there was no seam. Tests now pass a `Client` wrapping
+`MockHandler` + `Middleware::history()`, which is what makes the payload assertions real
+rather than a mock of our own service.
+
+### What changed
+
+| Area | File |
+|---|---|
+| Migration (destructive) | `2026_08_25_120000_replace_document_url_with_document_path_on_check_ins.php` |
+| PDF | `PdfService` — private disk (`DISK = 'local'`), returns a **path**, adds `pdfBytes()`, uuid+`Y/m` sharding |
+| Printer | `PrintNodeService` — `pdf_base64`, injectable client, `MAX_DOCUMENT_BYTES`; `getFullPdfUri()` deleted |
+| Fake | `FakePrintNodeService` — takes bytes, logs size instead of a URL |
+| Flows | `DropInController::readyToPrint`, `PetStaffDashboardController::reprint` |
+| New route | `GET /petstaff/check-in/{checkIn}/document` → `PetStaffDashboardController::document` |
+| UI | Dashboard: `@if` on `document_path`, plus a "View PDF" link |
+| Tests | `tests/Feature/PrintingTest.php` (27) |
+| Docs | `AGENTS.md` §6d + map, `docs/API_REFERENCE.md` |
+
+### Destructive, on purpose
+
+The app is not live (confirmed with the user), so **no backfill, no legacy fallback, no
+phased rollout**: `document_url` was dropped outright and the 26 stale PDFs in
+`storage/app/public/pdfs/` were deleted. `down()` restores the *column* but not the
+*values* — the migration is structurally reversible, not data-reversible, and says so.
+**If real check-ins ever exist before a similar change, this approach is wrong.**
+
+### Verification
+
+- **Payload:** `pdf_base64`; content decodes to bytes starting `%PDF-`; no `data:`
+  prefix; no URL in the request at all.
+- **Signature gate intact** — unsigned drop-in still 422s and generates no PDF.
+- **Reuse** — a second print doesn't regenerate (asserted by file count on the fake
+  disk, not by mock expectations).
+- **Privacy** — `public` disk holds no PDF after a full drop-in; confirmed in the real
+  dev app too (only Laravel's own `.gitignore` remains).
+- **Real end-to-end** (dev DB, `PRINTNODE_FAKE=true`): check-in 26 →
+  `pdfs/2026/08/a319aaca-….pdf`, **39,690 bytes** with the signature embedded.
+- **Migration reversible** both ways, asserted at column level.
+
+### ❗ Left for a human
+
+1. **The PrintNode API key.** Everything up to the HTTP call is tested against a mock
+   transport, but **no real print has happened**. This is now *possible* from localhost
+   for the first time — it was structurally impossible before.
+2. The dashboard's new **"View PDF" link was not clicked in a browser** (needs a staff
+   login); the route is covered by feature tests for staff / guest / 404.
+3. `APP_URL` **no longer affects printing at all** — but it still matters for email
+   `asset()` links (Plan 02). Don't treat that as fixed by this work.
+4. Nothing committed; changes sit on `feature/07-printnode-base64-printing`.
+
+---
+
 ## Session 2026-08-24 (2) — Plan 03: Signature module for drop-in
 
 **Branch:** `feature/03-signature-module` (off `vbeta.1`, which already carries alex's
