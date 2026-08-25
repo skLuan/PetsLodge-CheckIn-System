@@ -30,8 +30,12 @@ a slow or dead mail server must never block the check-in flow.
 > **Never commit credentials.** They belong in the production `.env` only, which is
 > gitignored. `.env.example` documents the *keys*, never the values.
 
-Production uses **Hostinger SMTP**. Get the values from Hostinger hPanel →
-**Emails → your mailbox → Connect Devices / Configure Desktop App**:
+Production uses **Hostinger SMTP** from the mailbox **`no-reply@petlogde.fun`**.
+
+`.env.production` in the repo root is already filled in with everything except the
+password — copy it to the server as `.env` and add `MAIL_PASSWORD`. Get that value
+from hPanel → **Emails → no-reply@petlogde.fun → Connect Devices / Configure
+Desktop App**:
 
 | Key | Production value |
 |---|---|
@@ -39,7 +43,7 @@ Production uses **Hostinger SMTP**. Get the values from Hostinger hPanel →
 | `MAIL_HOST` | `smtp.hostinger.com` |
 | `MAIL_PORT` | `465` (SSL) — or `587` with `MAIL_ENCRYPTION=tls` |
 | `MAIL_ENCRYPTION` | `ssl` (or `tls` on 587) |
-| `MAIL_USERNAME` | the full mailbox address, e.g. `no-reply@yourdomain.com` |
+| `MAIL_USERNAME` | the full mailbox address: `no-reply@petlogde.fun` |
 | `MAIL_PASSWORD` | that mailbox's password (from hPanel) |
 | `MAIL_FROM_ADDRESS` | same as `MAIL_USERNAME` — must match, or mail gets rejected/spam-filed |
 | `MAIL_FROM_NAME` | `"Pet Lodge & Spa"` |
@@ -73,18 +77,52 @@ Leave a line blank and it is omitted from the footer entirely.
 
 ### 3. Queue worker (required — no worker means no email)
 
+Production runs on **Hostinger shared hosting**, which has no Redis and cannot keep a
+daemon alive. The queue is therefore backed by a database table and drained by cron:
+
 ```env
-QUEUE_CONNECTION=redis
+QUEUE_CONNECTION=database
 ```
 
-The worker must run as a long-lived process. With Docker it is already defined:
+**Prerequisite — the `jobs` table must exist.** Without it every queued email dies
+with `Base table or view not found: 'jobs'` and no client receives anything:
 
 ```bash
-docker compose up -d queue          # the petslodge-queue service
-docker compose logs -f queue
+php artisan migrate --force        # creates `jobs` and `failed_jobs`
 ```
 
-Outside Docker, use supervisor (or systemd):
+#### The cron entry (hPanel → Advanced → Cron Jobs)
+
+Set the schedule to **every minute** and use:
+
+```
+cd /home/u189079842/domains/petlogde.fun/public_html && /usr/bin/php artisan queue:work --stop-when-empty --tries=3 --backoff=30 --max-time=55 >> storage/logs/queue.log 2>&1
+```
+
+Why each flag matters on shared hosting:
+
+| Flag | Reason |
+|---|---|
+| `--stop-when-empty` | The process exits once the queue drains instead of idling. Shared hosts kill long-running CLI processes, and a killed worker can lose the job it was holding. |
+| `--max-time=55` | Guarantees the run ends before the next minute's cron fires, so the runs never pile up on top of each other. |
+| `--tries=3` | A transient Hostinger SMTP hiccup gets two more attempts before the job is parked in `failed_jobs`. |
+| `>> storage/logs/queue.log` | Cron output is otherwise emailed or discarded; this is where you look when mail stops arriving. |
+
+> Confirm the PHP binary path first — Hostinger sometimes uses a versioned one:
+> ```bash
+> which php ; ls /usr/bin/php*
+> ```
+> If the account defaults to an older PHP, use the explicit path (e.g.
+> `/opt/alt/php82/usr/bin/php`) or the job silently fails on syntax it cannot parse.
+
+> ⚠️ **After every deploy run `php artisan queue:restart`** — and clear config:
+> `php artisan config:clear`. A cached config keeps the *old* mail credentials
+> even after you edit `.env`, which is the most common "I changed it and nothing
+> happened" cause.
+
+#### If you later move to a VPS
+
+A long-lived worker is better there — use supervisor:
 
 ```ini
 [program:petslodge-queue]
@@ -98,22 +136,30 @@ stdout_logfile=/path/to/storage/logs/queue.log
 stopwaitsecs=3600
 ```
 
-> ⚠️ **Restart the worker after every deploy** (`php artisan queue:restart`) — workers
-> hold the old code in memory and will keep running it otherwise.
+`autorestart=true` is not optional: `--max-time` makes the worker exit on purpose
+once an hour, and without a restart policy that first clean exit ends mail delivery
+permanently. (The same reason `docker-compose.yml` uses `restart: unless-stopped`.)
 
 ### 4. Verifying after deploy
 
+The `mail:test` command reports the configuration the framework has actually loaded
+(not what `.env` says — those differ whenever config is cached) and sends
+synchronously, so SMTP errors surface immediately instead of being swallowed:
+
 ```bash
-# 1. Confirm config is live (should print the Hostinger host, not mailpit)
-php artisan tinker --execute="echo config('mail.mailers.smtp.host');"
+# 1. Inspect the effective config — warns about the common Hostinger mistakes
+php artisan mail:test
 
-# 2. Send a real test email to yourself
-php artisan tinker --execute="Mail::raw('PetsLodge SMTP test', fn(\$m) => \$m->to('you@yourdomain.com')->subject('SMTP test'));"
+# 2. Send a real probe to yourself
+php artisan mail:test you@yourdomain.com
 
-# 3. Watch the queue drain
+# 3. Send a real branded template rendered from actual data
+php artisan mail:test you@yourdomain.com --template=confirmation
+php artisan mail:test you@yourdomain.com --template=drop-in
+php artisan mail:test you@yourdomain.com --template=drop-out
+
+# 4. Watch the queue drain, then check for casualties
 php artisan queue:work --once -v
-
-# 4. Anything that failed
 php artisan queue:failed
 php artisan queue:retry all
 ```
@@ -121,12 +167,48 @@ php artisan queue:retry all
 Check-in confirmations are deliberately delayed **~2 minutes**: a booking with several
 pets writes one check-in row per pet, and the delay lets the job coalesce them into a
 single email. A confirmation that hasn't arrived yet is normal for the first two
-minutes; drop-in and drop-out emails go out immediately.
+minutes; drop-in and drop-out emails go out immediately. On cron-driven queues add up
+to another minute for the next cron tick.
+
+#### Troubleshooting
+
+| Symptom | Cause |
+|---|---|
+| `Authentication failed` | `MAIL_USERNAME` must be the **full address**, not the mailbox short name. |
+| `Connection timed out` on 465 | Port blocked or throttled — switch to `MAIL_PORT=587` with `MAIL_ENCRYPTION=tls`. |
+| Mail sends but From is wrong / rejected | `MAIL_FROM_ADDRESS` must equal `MAIL_USERNAME`. Hostinger refuses to send as another mailbox. |
+| Everything reports success, nothing arrives | No worker is draining the queue. Check `storage/logs/queue.log` and `php artisan queue:failed`. |
+| Config changes have no effect | `php artisan config:clear` — a cached config outranks `.env`. |
+| Lands in spam | SPF/DKIM missing — verify with the `dig` commands in §1. |
+| Logo missing in the email | `APP_URL` is not the public https URL. |
 
 ### 5. Local development
 
 Local mail must never reach real clients. `docker compose up -d` starts **mailpit**,
-which captures everything: **http://localhost:8025**.
+which captures everything: **http://localhost:8025**. Nothing leaves the machine, so
+it is safe to test with real-looking client addresses.
+
+The stack is five containers — `app`, `queue`, `mailpit`, `mysql`, `redis`. The
+**`queue` container is what actually delivers mail**; if it is not up, messages
+accumulate in Redis and nobody receives anything:
+
+```bash
+docker compose ps                  # queue must show "Up"
+docker compose logs -f queue       # each job logs RUNNING then DONE
+docker compose exec app php artisan mail:test you@example.com
+```
+
+**Container configuration lives in `.env.docker`**, which docker-compose mounts over
+`/var/www/.env`. It is not decoration: Laravel 10's `php artisan serve` strips every
+environment variable outside a short whitelist before spawning the HTTP server, so
+values placed under `environment:` in `docker-compose.yml` reach the CLI and the
+queue worker but **never a web request**. Edit `.env.docker`, then
+`docker compose restart app queue`.
+
+To rehearse the real Hostinger path locally, uncomment the Hostinger block in
+`.env.docker`, add the mailbox password, restart, and run `mail:test`. Remember to
+put mailpit back afterwards — with Hostinger active, local testing sends real mail
+to real people.
 
 ---
 

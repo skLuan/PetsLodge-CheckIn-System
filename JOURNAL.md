@@ -8,6 +8,151 @@
 
 ---
 
+## Session 2026-08-24 — Plan 02 (cont.): Hostinger SMTP + Docker/queue infrastructure
+
+**Branch:** `vbeta.1`
+**Plan:** `AIplans/02-transactional-emails.md` (steps 4–5: queue config + production SMTP)
+**Status:** infrastructure complete and verified against mailpit. ❗ Still no send
+through Hostinger — the mailbox password was not available this session.
+
+### Decision that reshaped the plan: production is Hostinger SHARED HOSTING
+
+Confirmed with the user. This invalidates the plan's queue design:
+
+| Plan assumed | Reality on shared hosting |
+|---|---|
+| `QUEUE_CONNECTION=redis` in prod | **No Redis.** Must be `database`. |
+| A supervisor/Docker worker daemon | **No long-lived processes.** Must be a per-minute cron. |
+
+Local Docker still uses Redis + a worker container; only production differs.
+
+### Production-breaking bugs found (would have meant ZERO emails in prod)
+
+1. **The `jobs` table did not exist.** Only `create_failed_jobs_table` was ever
+   migrated, yet `.env.production` already said `QUEUE_CONNECTION=database`. Every
+   queued email would have died with `Base table or view not found: 'jobs'`.
+   Added `2026_08_24_100000_create_jobs_table.php` (rollback verified both ways).
+2. **`.env.production` was a Laravel 11 env file in a Laravel 10 app.** It used
+   `MAIL_SCHEME`, `CACHE_STORE`, `BROADCAST_CONNECTION` — all silently ignored here.
+   It also had `MAIL_MAILER=log` (mail written to disk, delivered to nobody),
+   `APP_ENV=local` and `APP_DEBUG=true` in production (a stack trace would render
+   the live DB credentials in the browser). Rewritten for Laravel 10 + Hostinger.
+3. **The queue container could never survive.** `docker-compose.yml` paired
+   `restart: no` with `--max-time=3600`. That flag makes the worker exit *on
+   purpose* every hour; with no restart policy the first clean exit ends mail
+   delivery permanently. Found it already dead (`Exited (137)`). Now
+   `restart: unless-stopped`.
+
+### The trap that cost the most time: `artisan serve` discards your environment
+
+Laravel 10's `ServeCommand::$passthroughVariables` whitelists ~13 variables
+(`APP_ENV`, `PATH`, `XDEBUG_*`, …) and **drops everything else** before spawning the
+HTTP server. So `APP_KEY`, `DB_*`, `MAIL_*` set under `environment:` in
+`docker-compose.yml` reach the CLI and the queue worker but **never a web request**.
+
+The old compose was quietly relying on the `.env` baked into the image; its
+`environment:` block was decorative for HTTP. Had Hostinger credentials been put
+there, the worker would have sent mail and the web app would not — the worst kind
+of split-brain bug to debug.
+
+**Fix:** one source of truth. `.env.docker` is now mounted read-only over
+`/var/www/.env`, and **no** `APP_/DB_/MAIL_` variables are exported from compose.
+Verified `app` and `queue` resolve identical mail config.
+
+### ⚠️ I wiped the development database — read this before running tests
+
+`php artisan test` inside the container **truncated the dev `petslodge` database.**
+`.env.testing` (created last session, gitignored) no longer exists, `phpunit.xml`
+named no database, so `RefreshDatabase` ran against the live dev DB. The previous
+session's journal warned about exactly this; I ran the suite without checking.
+
+Lost: ~3 dev users, their pets and all existing check-in rows. Recovered by
+re-seeding (lookup tables, statuses, terms and admin users are all back); the
+ad-hoc check-in test data is gone and must be re-created by hand through the form.
+**No production data was involved.**
+
+**Root cause fixed so it cannot recur** — `phpunit.xml` now pins
+`<env name="DB_DATABASE" value="petslodge_testing" force="true"/>`, and the
+`petslodge_testing` database was created. `force="true"` is essential *and was not
+sufficient on its own*: a real environment variable arrives via `$_SERVER`, which
+Laravel's env repository reads before PHPUnit's override, so compose's
+`DB_DATABASE=petslodge` still won. Removing the DB_* exports from compose (see
+above) is what actually made the override stick. Verified: dev DB now survives a
+full suite run, and `petslodge_testing` holds the 21 tables.
+
+### What was built
+
+| Area | File |
+|---|---|
+| Queue table for prod | `database/migrations/2026_08_24_100000_create_jobs_table.php` |
+| Diagnostics | `app/Console/Commands/MailTest.php` — `php artisan mail:test` |
+| Compose | `docker-compose.yml` — one-source-of-truth env, restart policies, bind mount, hot entrypoint |
+| Entrypoint | `docker-entrypoint.sh` — `SKIP_MIGRATIONS` guard |
+| Test isolation | `phpunit.xml` — pinned test database |
+| Env | `.env`, `.env.docker`, `.env.example`, `.env.production` — documented MAIL_*/LODGE_* blocks |
+| Docs | `docs/DEPLOYMENT_GUIDE.md` §§1,3,4,5 rewritten for shared hosting |
+
+`php artisan mail:test [address] [--template=confirmation|drop-in|drop-out]` prints
+the *effective* config (not what `.env` claims — those differ whenever config is
+cached), warns about the specific Hostinger mistakes (port/encryption mismatch,
+`MAIL_FROM_ADDRESS` ≠ `MAIL_USERNAME`, empty password, localhost `APP_URL`), and
+sends **synchronously** so SMTP errors surface instead of being swallowed by the
+app's deliberate try/catch. Note `PendingMail::sendNow()` does not exist in
+Laravel 10 — the immediate path is `$mailable->to(...)->send(app(Mailer::class))`.
+
+### Other fixes made along the way
+
+- **Resolved the `routes/web.php` merge conflict** (`UU`, left over from a stash).
+  It was a hard blocker — conflict markers are a PHP parse error. The stashed side
+  redirected `/pet-staff` → `/pet-staff/dashboard`, a URL that does not exist (the
+  real prefix is `/petstaff`, no hyphen — route *names* keep the hyphen). Resolved
+  so both spellings land on `/petstaff/dashboard`; verified 302 for each.
+- **Migration race between containers.** `app` and `queue` share an entrypoint and
+  start together, so both ran `migrate` simultaneously and the loser died on
+  "table already exists". Added `SKIP_MIGRATIONS=true` for the queue container.
+- **Bind mount added** (`.:/var/www`). Code was previously baked into the image, so
+  every template tweak needed a full rebuild. The entrypoint is now run from the
+  mount too (`entrypoint: ["sh", "/var/www/docker-entrypoint.sh"]`) so edits to it
+  apply on `restart`. `.env.docker` needed its empty `APP_KEY` filled — the bind
+  mount shadows the image's generated one, which 500s every request.
+
+### Verification performed
+
+- **Full suite: 62 passed / 4 failed** — identical to the documented baseline, the
+  same 4 pre-existing failures, no new ones.
+- **Queued path end-to-end:** dispatched a real `PetDroppedIn`; worker log shows
+  `SendDropInNotification RUNNING → DONE` then `DropInMail RUNNING → DONE`, and the
+  message landed in mailpit — correct subject, recipient, and `no-reply@petlogde.fun`
+  sender. Re-verified *after* the config refactor.
+- **All 3 templates** sent via `mail:test --template=…`; confirmation body checked
+  for pet name, check-in ID, date and footer. Blank `LODGE_*` fields are correctly
+  omitted rather than rendered empty.
+- **Migration reversible:** rollback dropped `jobs`, re-migrate recreated it.
+- Endpoints after the routes fix: `/check-in` 200, `/new-form` 200,
+  `/pet-staff` and `/petstaff` both 302 → `/petstaff/dashboard`.
+
+### ❗ Left for a human
+
+1. **The Hostinger send has still never happened.** Put the mailbox password into
+   `MAIL_PASSWORD` in the server's `.env` (`.env.production` is otherwise complete)
+   and run `php artisan mail:test you@petlogde.fun`.
+2. **Create the `no-reply@petlogde.fun` mailbox** in hPanel if it does not exist.
+3. **Add the cron job** — the exact line is in `docs/DEPLOYMENT_GUIDE.md` §3.
+   Confirm the PHP binary path first (`ls /usr/bin/php*`); Hostinger sometimes
+   needs a versioned path.
+4. **Run `php artisan migrate --force` on production** to create `jobs`.
+5. **Verify SPF/DKIM** for petlogde.fun (`dig` commands in §1) or Gmail spam-files it.
+6. **`LODGE_ADDRESS` / `LODGE_PHONE` / `LODGE_EMAIL` are still empty.** Emails ship
+   with a name-only footer until filled. Nothing invented was put in them.
+7. **Security: `.env.v0` is staged for commit and contains a live
+   `PRINTNODE_API_KEY` and an `APP_KEY`.** It was added to `.gitignore` during this
+   session, but that does not untrack an already-staged file. Unstage it
+   (`git rm --cached .env.v0`) before committing, or the key lands in history.
+8. Nothing was committed. Plan 02 is **not** archived to `plans/` — it stays in
+   `AIplans/` until a real Hostinger message is delivered.
+
+---
+
 ## Session 2026-08-04 (2) — Plan 02: Transactional emails (check-in / drop-in / drop-out)
 
 **Branch:** `feature/02-transactional-emails` (branched off `feature/01-terms-dashboard`,

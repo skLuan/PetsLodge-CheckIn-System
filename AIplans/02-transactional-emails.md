@@ -149,3 +149,38 @@ once a real Hostinger email has been received.
   URL — the header logo is an `asset()` link and breaks otherwise.
 - Fill in `LODGE_ADDRESS` / `LODGE_PHONE` / `LODGE_EMAIL` / `LODGE_WEBSITE`.
 - Run the `queue` container in production (`php artisan queue:restart` after each deploy).
+
+---
+
+## Infrastructure status — updated 2026-08-24
+
+**Production is Hostinger SHARED HOSTING (hPanel)**, confirmed with the user. This
+supersedes the queueing section above, which assumed Redis and a worker daemon:
+
+| Plan said | Actual |
+|---|---|
+| `QUEUE_CONNECTION=redis` in prod | `database` — shared hosting has no Redis |
+| supervisor / docker worker | per-minute **cron** running `queue:work --stop-when-empty` |
+
+Required `jobs` table was missing entirely and has been added
+(`2026_08_24_100000_create_jobs_table.php`).
+
+### Done this session (steps 4 and most of 5)
+
+- [x] Queue config for both environments; `jobs` migration (reversible).
+- [x] Docker: queue worker restart policy, migration-race guard, bind mount,
+      single-source-of-truth env via `.env.docker`.
+- [x] `.env.production` rewritten for Laravel 10 + Hostinger (`no-reply@petlogde.fun`),
+      everything filled except `MAIL_PASSWORD`.
+- [x] `php artisan mail:test` diagnostic command.
+- [x] Full pipeline verified end-to-end against mailpit (event → Redis → worker → SMTP).
+- [x] `docs/DEPLOYMENT_GUIDE.md` rewritten for shared hosting, incl. the cron line.
+
+### Blocking the last acceptance criterion
+
+- [ ] **A real message through Hostinger.** Needs the mailbox password. Then:
+      `php artisan mail:test you@petlogde.fun`
+- [ ] hPanel cron job added; `migrate --force` run on prod; SPF/DKIM verified.
+
+Do not archive this plan to `plans/` until a real Hostinger email is delivered.
+See JOURNAL.md (2026-08-24) for the full findings.

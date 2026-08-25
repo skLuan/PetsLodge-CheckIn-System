@@ -28,13 +28,20 @@ done
 echo "MySQL is ready!"
 
 # 2. Run migrations (idempotent — Laravel tracks progress in the `migrations` table).
-echo "Running database migrations..."
-php artisan migrate --force
+#    Only ONE container may do this. The app and queue containers share this
+#    entrypoint and start together, so without the guard both run `migrate` at
+#    the same moment and the loser dies on "table already exists".
+if [ "${SKIP_MIGRATIONS:-false}" = "true" ]; then
+    echo "SKIP_MIGRATIONS=true — leaving migrations to the app container."
+else
+    echo "Running database migrations..."
+    php artisan migrate --force
+fi
 
 # 3. Seed ONLY on a fresh database (empty `users` table) to avoid duplicate-key
 #    errors when the persistent volume already holds data.
 USERS_COUNT=$(php -r "try { \$pdo = new PDO('${DB_CONNECTION}:host=${DB_HOST};port=${DB_PORT};dbname=${DB_DATABASE}', '${DB_USERNAME}', '${DB_PASSWORD}'); echo \$pdo->query('SELECT COUNT(*) FROM users')->fetchColumn(); } catch (\Throwable \$e) { echo '0'; }")
-if [ "${USERS_COUNT:-0}" -eq 0 ]; then
+if [ "${SKIP_MIGRATIONS:-false}" != "true" ] && [ "${USERS_COUNT:-0}" -eq 0 ]; then
     echo "Fresh database detected — seeding..."
     php artisan db:seed --force
 else

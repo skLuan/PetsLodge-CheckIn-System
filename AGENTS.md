@@ -47,6 +47,13 @@ The project runs in Docker. `docker-compose.yml` defines five services: `app`
 > ⚠️ Client emails are **queued**. If the `queue` service isn't running, no email is
 > ever delivered — the job just sits in Redis. `docker compose logs -f queue` to check.
 
+> **Container config lives in `.env.docker`** (mounted read-only over `/var/www/.env`),
+> *not* in compose's `environment:`. Laravel 10's `artisan serve` strips every env var
+> outside a short whitelist before spawning the HTTP server, so variables set in compose
+> reach the CLI and queue worker but never a web request. Edit `.env.docker`, then
+> `docker compose restart app queue`. The project is bind-mounted, so PHP/blade edits
+> need only a restart — no rebuild.
+
 ```bash
 # Start everything (app, MySQL, Redis)
 docker compose up -d
@@ -81,13 +88,16 @@ npm run build        # production build
 ## 4. How to test & format
 
 > ⚠️ **Tests need a separate database.** They use `RefreshDatabase`, which drops every
-> table on the configured connection. `phpunit.xml` sets no DB (the sqlite lines are
-> commented out and the sqlite PHP extension isn't installed), so tests fall back to
-> whatever `.env` points at — i.e. they would **wipe the dev database**.
-> A gitignored `.env.testing` pointing at a `petslodge_testing` schema is what keeps that
-> from happening; Laravel loads it automatically because `phpunit.xml` sets `APP_ENV=testing`.
-> If you clone fresh, recreate both:
-> `CREATE DATABASE petslodge_testing;` + copy `.env` → `.env.testing` and change `DB_DATABASE`.
+> table on the configured connection — this has already wiped the dev database once
+> (see JOURNAL.md, 2026-08-24). `phpunit.xml` now pins the target explicitly:
+> `<env name="DB_DATABASE" value="petslodge_testing" force="true"/>`.
+> On a fresh clone, create the schema once: `CREATE DATABASE petslodge_testing;`
+>
+> `force="true"` is necessary but **not sufficient on its own** — a real environment
+> variable reaches Laravel via `$_SERVER`, which its env repository reads *before*
+> PHPUnit's override. That is why `docker-compose.yml` deliberately exports **no**
+> `DB_*`/`APP_*`/`MAIL_*` variables; container config lives in `.env.docker`, which is
+> mounted over `/var/www/.env`. Don't add those variables back to compose.
 
 ```bash
 # PHP tests
@@ -256,6 +266,15 @@ Rules that keep this from breaking:
 5. **`/api/checkin/submit` is dead code** — it calls `CheckInService::submitCheckIn()`,
    which does not exist, so it always 500s. Don't wire anything new to it; the live
    path is step1→step5.
+6. **Something must drain the queue, and it differs per environment.** Local Docker
+   uses Redis + the `queue` container. Production is **Hostinger shared hosting**: no
+   Redis, no daemons — `QUEUE_CONNECTION=database` (needs the `jobs` table) drained by
+   a per-minute hPanel cron. Details and the cron line: `docs/DEPLOYMENT_GUIDE.md`.
+
+**Diagnosing mail:** `php artisan mail:test [address] [--template=confirmation|drop-in|drop-out]`
+prints the configuration Laravel has *actually* loaded, warns about the common
+Hostinger mistakes, and sends synchronously so SMTP errors surface instead of being
+swallowed by rule 2's try/catch.
 
 ---
 

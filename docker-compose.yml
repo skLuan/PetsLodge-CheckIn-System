@@ -1,3 +1,38 @@
+# PetsLodge — local development stack.
+#
+# ---------------------------------------------------------------------------
+# WHERE CONFIGURATION LIVES:  .env.docker  (mounted read-only as /var/www/.env)
+# ---------------------------------------------------------------------------
+# Do NOT add APP_/DB_/MAIL_/REDIS_ values to the `environment:` blocks below and
+# expect the web app to see them. Laravel 10's `php artisan serve` filters the
+# environment down to a short whitelist (APP_ENV, PATH, XDEBUG_*, …) before it
+# spawns the HTTP server, so anything else set here is dropped for every web
+# request — while CLI and the queue worker still see it. That split produces
+# the worst possible bug: mail that works from the worker but not the app, or
+# vice versa. One file, `.env.docker`, avoids it.
+#
+# MAIL: by default every message is captured by mailpit (http://localhost:8025)
+# and nothing reaches a real client. To rehearse the production Hostinger path,
+# edit the MAIL_* block in `.env.docker`, then:
+#
+#   docker compose restart app queue
+#   docker compose exec app php artisan mail:test you@example.com
+
+# NOTE: no DB_*/APP_*/MAIL_* variables are exported to the PHP containers.
+# A real environment variable outranks both `.env` and PHPUnit's <env> overrides
+# (it arrives via $_SERVER, which Laravel's env repository reads first), so an
+# exported DB_DATABASE made `php artisan test` run RefreshDatabase against the
+# DEVELOPMENT database and truncate it. docker-entrypoint.sh supplies the same
+# values as shell defaults for its readiness probe, so nothing is lost.
+
+# The project is bind-mounted so edits to mail templates, listeners and config
+# take effect on `docker compose restart` instead of needing a full rebuild.
+# `.env.docker` is mounted over `.env` so the container keeps container-side
+# hostnames (mysql, redis, mailpit) while the host `.env` stays host-side.
+x-app-volumes: &app-volumes
+  - .:/var/www
+  - ./.env.docker:/var/www/.env:ro
+
 services:
   # Laravel Application (php artisan serve)
   app:
@@ -5,7 +40,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: petslodge-app
-    restart: no
+    restart: unless-stopped
     working_dir: /var/www
     ports:
       - "8080:8000"
@@ -14,40 +49,30 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    environment:
-      - APP_KEY=base64:s12COBNOF0DKWXWTo7709hGBJ31sAhwQLjbvzPQH09M=
-      - APP_ENV=local
-      - APP_DEBUG=true
-      - APP_URL=http://localhost:8080
-      - DB_HOST=mysql
-      - DB_PORT=3306
-      - DB_DATABASE=petslodge
-      - DB_USERNAME=petslodge
-      - DB_PASSWORD=petslodge_secret
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - CACHE_DRIVER=redis
-      - SESSION_DRIVER=redis
-      - QUEUE_CONNECTION=redis
-      # Local mail goes to mailpit (UI on http://localhost:8025), never to real clients.
-      - MAIL_MAILER=smtp
-      - MAIL_HOST=mailpit
-      - MAIL_PORT=1025
-      - MAIL_ENCRYPTION=null
-      - MAIL_FROM_ADDRESS=no-reply@petlodge.local
-      - MAIL_FROM_NAME=Pet Lodge & Spa
+    volumes: *app-volumes
+    # Run the bind-mounted entrypoint rather than the copy baked into the image,
+    # so edits to docker-entrypoint.sh apply on `restart` without a rebuild.
+    entrypoint: ["sh", "/var/www/docker-entrypoint.sh"]
     command: php artisan serve --host=0.0.0.0 --port=8000
     networks:
       - petslodge-network
 
   # Queue worker — transactional emails are queued, so without this container
   # running no client email is ever actually delivered.
+  #
+  # `restart: unless-stopped` is REQUIRED, not a nicety: --max-time makes the
+  # worker exit on purpose once an hour (to release leaked memory), and under a
+  # `no` restart policy that first clean exit would end mail delivery for good.
+  #
+  # SKIP_MIGRATIONS stops this container racing the app container to run
+  # `migrate` at startup — both used the same entrypoint, and the loser died
+  # with "table already exists".
   queue:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: petslodge-queue
-    restart: no
+    restart: unless-stopped
     working_dir: /var/www
     depends_on:
       mysql:
@@ -55,26 +80,9 @@ services:
       redis:
         condition: service_healthy
     environment:
-      - APP_KEY=base64:s12COBNOF0DKWXWTo7709hGBJ31sAhwQLjbvzPQH09M=
-      - APP_ENV=local
-      - APP_DEBUG=true
-      - APP_URL=http://localhost:8080
-      - DB_HOST=mysql
-      - DB_PORT=3306
-      - DB_DATABASE=petslodge
-      - DB_USERNAME=petslodge
-      - DB_PASSWORD=petslodge_secret
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - CACHE_DRIVER=redis
-      - SESSION_DRIVER=redis
-      - QUEUE_CONNECTION=redis
-      - MAIL_MAILER=smtp
-      - MAIL_HOST=mailpit
-      - MAIL_PORT=1025
-      - MAIL_ENCRYPTION=null
-      - MAIL_FROM_ADDRESS=no-reply@petlodge.local
-      - MAIL_FROM_NAME=Pet Lodge & Spa
+      SKIP_MIGRATIONS: "true"
+    volumes: *app-volumes
+    entrypoint: ["sh", "/var/www/docker-entrypoint.sh"]
     command: php artisan queue:work --tries=3 --backoff=30 --sleep=3 --max-time=3600
     networks:
       - petslodge-network
@@ -84,7 +92,7 @@ services:
   mailpit:
     image: axllent/mailpit:latest
     container_name: petslodge-mailpit
-    restart: no
+    restart: unless-stopped
     ports:
       - "8025:8025"
       - "1025:1025"
@@ -95,7 +103,7 @@ services:
   mysql:
     image: mysql:8.0
     container_name: petslodge-mysql
-    restart: no
+    restart: unless-stopped
     environment:
       - MYSQL_ROOT_PASSWORD=root_secret
       - MYSQL_DATABASE=petslodge
@@ -118,7 +126,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: petslodge-redis
-    restart: no
+    restart: unless-stopped
     ports:
       - "6379:6379"
     volumes:
