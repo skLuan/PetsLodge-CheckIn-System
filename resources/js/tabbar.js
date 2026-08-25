@@ -1,5 +1,3 @@
-import { HealthFormManager } from "./cookies-and-form/managers/HealthFormManager.js";
-
 const progressBar = document.getElementById("stepProgress");
 if(progressBar){
     progressBar.addEventListener("click", function (event) {
@@ -18,12 +16,6 @@ document.getElementById("prevStep").addEventListener("click", function (e) {
    e.preventDefault();
     // Logic to go to the previous step
     let currentStep = getCurrentStep();
-
-    // Persist the current step's form before navigating back.
-    // Step 4 (1-based) is the health-info step; save to the selected pet (or all).
-    if (currentStep === 4) {
-        HealthFormManager.saveHealthForSelectedOrAll();
-    }
 
     if (currentStep > 1) {
         showStep(currentStep - 1);
@@ -51,7 +43,7 @@ document.getElementById("nextStep").addEventListener("click", async function (e)
 
     // Logic to go to the next step
     let currentStep = getCurrentStep();
-    if (currentStep < 7) {
+    if (currentStep < 6) {
         showStep(currentStep + 1);
     }
 });
@@ -83,7 +75,7 @@ function extractFormInputValues(formElement) {
 }
 
 function getCurrentStep() {
-    for (let i = 1; i <= 7; i++) {
+    for (let i = 1; i <= 6; i++) {
         if (document.getElementById(`step${i}`).classList.contains("active")) {
             return i;
         }
@@ -92,7 +84,7 @@ function getCurrentStep() {
 }
 
 function deactivateAllSteps() {
-    for (let i = 1; i <= 7; i++) {
+    for (let i = 1; i <= 6; i++) {
         document.getElementById(`step${i}`).classList.remove("active");
         document.getElementById(`step${i}`).classList.add("inactive-right");
     }
@@ -104,7 +96,7 @@ function deactivateAllSteps() {
 
 function showStep(step) {
     deactivateAllSteps();
-    for (let i = 1; i <= 7; i++) {
+    for (let i = 1; i <= 6; i++) {
         document
             .getElementById(`step${i}`)
             .classList.toggle("inactive-left", i < step);

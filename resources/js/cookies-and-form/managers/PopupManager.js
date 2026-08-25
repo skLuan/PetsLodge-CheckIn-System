@@ -71,6 +71,8 @@ class PopupManager {
                 document.querySelectorAll("#petPillsContainer .pill")
                     .forEach((pill) => pill.classList.toggle("selected", this.checked));
                 syncApplyToVisibility();
+                // Re-render feeding/medication (flat vs grouped-by-pet view)
+                FormDataManager.updateFeedingMedicationUI(FormDataManager.getAllPetsFromCheckin());
             });
         }
 

@@ -13,7 +13,7 @@ class HealthFormManager {
      * Initializes health information form event handlers
      */
     static initializeHealthForm() {
-        const healthInfoForm = document.getElementById('healthInfoForm');
+        const healthInfoForm = document.getElementById('petInfoForm');
         if (!healthInfoForm) return;
 
         // Handle unusual health behavior radio buttons
@@ -54,69 +54,6 @@ class HealthFormManager {
     }
 
     /**
-     * Saves the current #healthInfoForm values into the given pet's health slot.
-     *
-     * Mirrors the shape used by the Next path (ValidationManager step 3):
-     *   { unusualHealthBehavior: bool, healthBehaviors: string, warnings: string }
-     *
-     * No-ops if the form is missing or petIndex is null/invalid.
-     *
-     * @param {number|null} petIndex - Index of the pet to persist into.
-     * @returns {void}
-     */
-    static saveCurrentPetHealth(petIndex) {
-        if (petIndex === null || petIndex === undefined || isNaN(petIndex)) return;
-
-        const healthInfoForm = document.getElementById('healthInfoForm');
-        if (!healthInfoForm) return;
-
-        const formData = FormHandler.extractFormInputValues('#healthInfoForm');
-
-        const healthData = {
-            unusualHealthBehavior: formData.unusualHealthBehavior === 'yes',
-            healthBehaviors: formData.healthBehaviorDetails || '',
-            warnings: formData.warnings || '',
-        };
-
-        FormDataManager.updatePetHealthInfo(petIndex, healthData);
-    }
-
-    /**
-     * Saves the current #healthInfoForm values to EVERY pet (bulk edit).
-     */
-    static saveAllPetsHealth() {
-        const healthInfoForm = document.getElementById('healthInfoForm');
-        if (!healthInfoForm) return;
-
-        const formData = FormHandler.extractFormInputValues('#healthInfoForm');
-        const healthData = {
-            unusualHealthBehavior: formData.unusualHealthBehavior === 'yes',
-            healthBehaviors: formData.healthBehaviorDetails || '',
-            warnings: formData.warnings || '',
-        };
-
-        const checkinData = FormDataManager.getCheckinData();
-        if (checkinData && checkinData.pets) {
-            checkinData.pets.forEach((_, index) => {
-                FormDataManager.updatePetHealthInfo(index, healthData);
-            });
-        }
-    }
-
-    /**
-     * Saves the current #healthInfoForm to the selected pet (or to every pet
-     * when no pet is selected).
-     */
-    static saveHealthForSelectedOrAll() {
-        const selectedIndex = FormDataManager.getCurrentSelectedPetIndex();
-        if (selectedIndex !== null) {
-            this.saveCurrentPetHealth(selectedIndex);
-        } else {
-            this.saveAllPetsHealth();
-        }
-    }
-
-    /**
      * Resets the #healthInfoForm and repopulates it from the given pet's health.
      *
      * Always clears the form fields first (radios, "Which?" details, warnings,
@@ -128,7 +65,7 @@ class HealthFormManager {
      * @returns {void}
      */
     static loadPetHealth(petIndex) {
-        const healthInfoForm = document.getElementById('healthInfoForm');
+        const healthInfoForm = document.getElementById('petInfoForm');
         if (!healthInfoForm) return;
 
         // --- Reset fields first ---

@@ -1,4 +1,4 @@
-<div id="step6" class="step w-full">
+<div id="step5" class="step w-full">
     <h2 class="text-center font-bold">Grooming</h2>
     <p class="text-lg text-center">Optional — choose grooming services and which mascot(s) take them.</p>
     <div id="groomingPopup" class="grooming bg-white p-4 rounded-lg border border-gray-300">

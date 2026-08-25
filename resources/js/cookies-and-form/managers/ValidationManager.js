@@ -30,44 +30,6 @@ class ValidationManager {
                 // Este paso se maneja desde los popups específicos
                 return true;
 
-            case FORM_CONFIG.STEPS.HEALTH_INFO - 1: // step 3 = HEALTH_INFO
-                const healthData = {
-                    unusualHealthBehavior: formData.unusualHealthBehavior === 'yes',
-                    healthBehaviors: formData.healthBehaviorDetails || '',
-                    warnings: formData.warnings || '',
-                };
-
-                {
-                    const selectedIndex = FormDataManager.getCurrentSelectedPetIndex();
-                    if (selectedIndex !== null) {
-                        // A pet is selected: apply health to that pet only.
-                        this.updatePetHealthInfo(selectedIndex, healthData);
-                    } else {
-                        // No pet selected: bulk-apply to every pet.
-                        const checkinData = CoreDataManager.getCheckinData();
-                        if (checkinData && checkinData.pets) {
-                            checkinData.pets.forEach((_, index) => {
-                                this.updatePetHealthInfo(index, healthData);
-                            });
-                        }
-                    }
-                }
-
-                // Handle grooming data (global, not per-pet)
-                const groomingData = {};
-                if (formData.grooming && Array.isArray(formData.grooming)) {
-                    formData.grooming.forEach(service => {
-                        groomingData[service] = true;
-                    });
-                }
-
-                // Preserve existing inventory data - don't overwrite with empty array
-                const existingData = CoreDataManager.getCheckinData();
-                const existingInventory = existingData?.inventory || [];
-                this.updateGroomingAndInventory(groomingData, existingInventory, formData.groomingDetails || '');
-
-                return true;
-
             case FORM_CONFIG.STEPS.INVENTORY - 1: // step 4 = INVENTORY
                 // Inventory is managed separately via add/remove and checkbox
                 // Validate both inventory completion and terms acceptance

@@ -3,10 +3,9 @@ const FORM_CONFIG = {
         OWNER_INFO: 1,
         PET_INFO: 2,
         FEEDING_MEDICATION: 3,
-        HEALTH_INFO: 4,
-        INVENTORY: 5,
-        GROOMING: 6,
-        THANKS: 7,
+        INVENTORY: 4,
+        GROOMING: 5,
+        THANKS: 6,
     },
     COOKIE_PREFIX: "formStep",
     DEFAULT_COOKIE_DAYS: 7, // Cambiar a 7 días para mayor persistencia
