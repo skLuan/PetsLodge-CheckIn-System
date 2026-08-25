@@ -3,14 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
+use App\Services\CheckInTransformer;
 use App\Services\PdfService;
 use App\Services\PrintNodeService;
-use App\Services\CheckInTransformer;
-use App\Services\CheckInService;
-use App\Services\CheckInUserService;
-use App\Services\CheckInPetService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class DropInController extends Controller
 {
@@ -20,13 +17,14 @@ class DropInController extends Controller
     {
         // Carga datos prellenados (e.g., de sesión o BD)
         $data = $request->user()->dropInData ?? [];  // Asumiendo modelo User con datos
+
         return view('drop-in', compact('data'));
     }
+
     public function showDropConfirmation(Request $request)
     {
         $phone = $request->validate(['phone' => 'required|string|regex:/^[0-9]{10}$/']);
         $user = User::where('phone', $phone['phone'])->first();
-
 
         // Initialize checkinData with user info
         $checkinData = session('checkin_data', []);
@@ -34,7 +32,7 @@ class DropInController extends Controller
         // DIAGNOSTIC LOG
         \Log::info('DropInController::showDropConfirmation', [
             'phone' => $phone['phone'],
-            'session_checkin_data_exists' => !empty($checkinData),
+            'session_checkin_data_exists' => ! empty($checkinData),
             'session_checkin_id' => $checkinData['id'] ?? 'EMPTY',
             'user_exists' => $user ? true : false,
             'user_id' => $user->id ?? null,
@@ -43,12 +41,12 @@ class DropInController extends Controller
         // If no session data, populate from user's active check-in
         if (empty($checkinData) && $user) {
             $latestCheckIn = $user->checkIns()->whereNull('check_out')->latest()->first();
-            
+
             \Log::info('DropInController::showDropConfirmation - Loading from DB', [
                 'latest_checkin_exists' => $latestCheckIn ? true : false,
                 'latest_checkin_id' => $latestCheckIn->id ?? 'NONE',
             ]);
-            
+
             if ($latestCheckIn) {
                 // Eager load all relationships needed by the transformer
                 $latestCheckIn->load([
@@ -59,10 +57,10 @@ class DropInController extends Controller
                     'foods.momentOfDay',
                     'medicines.momentOfDay',
                     'items',
-                    'extraServices'
+                    'extraServices',
                 ]);
 
-                $transformer = new CheckInTransformer();
+                $transformer = new CheckInTransformer;
                 $checkinData = $transformer->transformCheckInToCookieFormat($latestCheckIn);
 
                 // Store in session for consistency with Process flow
@@ -77,18 +75,20 @@ class DropInController extends Controller
                         'phone' => $user->phone,
                         'email' => $user->email,
                         'address' => $user->address,
-                        'emergencyContacts' => $user->emergencyContacts->toArray()
-                    ]
+                        'emergencyContacts' => $user->emergencyContacts->toArray(),
+                    ],
                 ];
             }
         }
 
         return view('Drop-in-confirmation', compact('checkinData', 'user'));
     }
+
     public function checkInfo(Request $request)
     {
         return view('Drop-in.check');
     }
+
     public function checkUser(Request $request)
     {
         $checkInApiController = app(CheckInApiController::class);
@@ -98,7 +98,7 @@ class DropInController extends Controller
         if ($responseData->userExists === false) {
             return response()->json([
                 'userExists' => false,
-                'message' => 'User not found'
+                'message' => 'User not found',
             ], 404);
         }
 
@@ -128,11 +128,11 @@ class DropInController extends Controller
                     'foods.momentOfDay',
                     'medicines.momentOfDay',
                     'items',
-                    'extraServices'
+                    'extraServices',
                 ]);
 
                 // Transform and store in session
-                $transformer = new CheckInTransformer();
+                $transformer = new CheckInTransformer;
                 $checkinData = $transformer->transformCheckInToCookieFormat($latestCheckIn);
                 session(['checkin_data' => $checkinData]);
             }
@@ -148,7 +148,7 @@ class DropInController extends Controller
         }
 
         return response()->json([
-            'error' => 'Unexpected error'
+            'error' => 'Unexpected error',
         ], 500);
     }
 
@@ -159,9 +159,20 @@ class DropInController extends Controller
             'info' => 'required|array',  // Datos confirmados
         ]);
 
+        // Extract check-in ID from info if available
+        $checkInId = $validated['info']['id'] ?? null;
+
+        // Signature gate (Plan 03). A drop-in is a signed agreement, so it can
+        // never be completed unsigned — checked here as well as in the UI,
+        // because the browser gate alone is trivially bypassed.
+        if (! $checkInId || ! \App\Models\Signature::where('check_in_id', $checkInId)->forDropIn()->exists()) {
+            return response()->json([
+                'error' => 'A signature is required before completing the drop-in.',
+                'requiresSignature' => true,
+            ], 422);
+        }
+
         try {
-            // Extract check-in ID from info if available
-            $checkInId = $validated['info']['id'] ?? null;
             $pdfUri = null;
 
             // Check if document_url already exists for this check-in
@@ -173,11 +184,12 @@ class DropInController extends Controller
             }
 
             // Generate PDF only if not already stored
-            if (!$pdfUri) {
-                $pdfService = new PdfService();
+            if (! $pdfUri) {
+                // Resolved from the container (not `new`) so tests can swap it out.
+                $pdfService = app(PdfService::class);
                 $pdfUri = $pdfService->generatePdf($validated['info']);  // Devuelve URI (e.g., S3 URL)
 
-                if (!$pdfUri) {
+                if (! $pdfUri) {
                     return response()->json(['error' => 'Error generating PDF'], 500);
                 }
 
@@ -190,7 +202,7 @@ class DropInController extends Controller
                 }
             }
             // Llama a PrintNode via service
-            $printService = new PrintNodeService();
+            $printService = app(PrintNodeService::class);
             $response = $printService->sendPrintJob($pdfUri, $validated['info']);
             // $response = $printService->getPrinters();
 
@@ -199,17 +211,17 @@ class DropInController extends Controller
                 return response()->json([
                     'message' => 'Print job sent successfully!',
                     'pdfUri' => $pdfUri,
-                    'printResponse' => $response['data'] ?? null
+                    'printResponse' => $response['data'] ?? null,
                 ], 200);
             } else {
                 return response()->json([
                     'error' => $response['message'] ?? 'Error sending print job',
-                    'pdfUri' => $pdfUri
+                    'pdfUri' => $pdfUri,
                 ], 500);
             }
         } catch (\Exception $e) {
             return response()->json([
-                'error' => 'Unexpected error: ' . $e->getMessage()
+                'error' => 'Unexpected error: '.$e->getMessage(),
             ], 500);
         }
     }

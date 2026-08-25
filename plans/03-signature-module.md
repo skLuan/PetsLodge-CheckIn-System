@@ -87,3 +87,84 @@ Signature::create([...., 'path' => $path, 'terms_and_conditions_id' => TermsAndC
 - [ ] PNG stored under private storage, row in DB with T&C version captured.
 - [ ] Signature retrievable only by authorized users.
 - [ ] Tests green including storage fake.
+
+
+---
+
+## Execution notes (2026-08-24, branch `feature/03-signature-module`)
+
+**Status: complete.** 23 tests green; full suite 85 passed / 4 failed — the same 4
+pre-existing failures as the documented baseline (62 + 23 = 85), no new ones.
+
+### Decisions taken
+
+| Question | Decision |
+|---|---|
+| `signatures` table vs `users.signature_url` | **Table**, as the plan recommended. The audit argument won: a user column is overwritten every visit. |
+| Where the routes live | **`routes/web.php`**, not `routes/api.php` — see deviation 1. |
+| Who is `user_id` | The **pet owner** (`$checkIn->user_id`), not the authenticated staff member operating the tablet. There is a test asserting exactly this, because it is the easy thing to get wrong. |
+| Clear + Accept buttons | Clear kept; **Accept merged into the existing Print button** — see deviation 2. |
+| PDF embed (stretch goal) | **Done**, not deferred. |
+
+### Deviations from the plan
+
+1. **`POST /api/signatures` → `POST /signatures` in `web.php`.** The plan's route
+   could not have worked: the `api` middleware group in `Kernel.php` is stateless
+   (`EnsureFrontendRequestsAreStateful` is commented out), so `pet.staff.only` would
+   never see a staff session there. Both signature routes therefore sit in the
+   existing `['auth','pet.staff.only']` group in `web.php`.
+
+2. **No separate "Accept" button.** The plan wanted Clear + Accept on the pad. The
+   drop-in page already has one terminal action — "Print Check-in" — so a second
+   confirm button would have meant two ways to say yes. Instead the print button is
+   **disabled until the pad has strokes** and saves the signature as its first step.
+   `savedSignatureId` guards against storing a duplicate if the print then fails and
+   the user retries.
+
+3. **Authorization is staff-only, not "owner or staff".** The plan suggested a policy
+   allowing the owner too, but clients have no login in this app (role `CLIENT` users
+   are created by staff and never authenticate) — an owner branch would be dead code.
+   `auth` + `pet.staff.only` on both routes.
+
+4. **`readyToPrint` also rejects a request with no `check_in_id` at all**, not just
+   one whose check-in is unsigned. Without an id there is nothing a signature could
+   be attached to, so accepting it would be a hole in the gate.
+
+### Things worth knowing
+
+- **The declared mime is attacker-controlled.** `data:image/png;base64,` in front of
+  JPEG bytes is trivial to send, so validation checks the **decoded PNG magic number**
+  (`PNG
+
+`) as well as the prefix, and caps the encoded length *before*
+  decoding so a huge payload is rejected without being allocated. Cap: 1 MB decoded.
+- **The pad draws on a white background on purpose.** signature_pad defaults to a
+  transparent PNG, which dompdf renders as black-on-black in the printed summary.
+- **dompdf cannot fetch `signatures.show`** (it is authenticated), so
+  `pdf-for-print.blade.php` inlines the bytes via `Signature::dataUri()`.
+- **`PdfService` and `PrintNodeService` are now resolved with `app()` instead of
+  `new`** in `DropInController::readyToPrint`, so the gate test can mock them instead
+  of hitting the real PrintNode API. Behaviour is unchanged.
+- **Pint reformats the whole `app/` directory** if you point it at `app/`. It touched
+  17 files unrelated to this plan; those were reverted with `git checkout --`.
+  Only `DropInController` and `PdfService` keep Pint's incidental reformatting,
+  because this plan edited them anyway.
+
+### Not verified
+
+- **The pad was never drawn on in a real browser.** `/drop-in/confirmation` needs a
+  staff login, and this session did not create one. A feature test asserts the page
+  renders the canvas, the store URL and the correct `data-check-in-id`, and that the
+  print button starts as "Sign to Print Check-in" — but *stroke rendering, touch
+  input, and the devicePixelRatio scaling were not eyeballed.* Worth 5 minutes on a
+  tablet before this ships.
+- Nothing committed; changes sit on `feature/03-signature-module`.
+- Notion card still needs a human.
+
+### Acceptance criteria
+
+- [x] Client can sign on canvas at drop-in (mouse + touch), clear and retry — *code
+      complete; touch not manually exercised, see above.*
+- [x] PNG stored under private storage, row in DB with T&C version captured.
+- [x] Signature retrievable only by authorized users.
+- [x] Tests green including storage fake.

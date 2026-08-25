@@ -4,6 +4,7 @@ use App\Http\Controllers\DropInController;
 use App\Http\Controllers\HealthCheckController;
 use App\Http\Controllers\PetStaffDashboardController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SignatureController;
 use App\Http\Controllers\TermsAndConditionsController;
 use Illuminate\Support\Facades\Route;
 
@@ -52,6 +53,13 @@ Route::middleware(['auth', 'pet.staff.only'])->group(function () {
     // Terms & Conditions editor (entered from the pet-staff dashboard)
     Route::get('/petstaff/terms', [TermsAndConditionsController::class, 'edit'])->name('pet-staff.terms.edit');
     Route::put('/petstaff/terms', [TermsAndConditionsController::class, 'update'])->name('pet-staff.terms.update');
+
+    // Signatures. Deliberately web routes, not api.php: the `api` middleware
+    // group is stateless (Sanctum's stateful middleware is commented out in
+    // Kernel.php), so `pet.staff.only` could never see the staff session there.
+    // Signature images are personal data — `show` is the ONLY way to read one.
+    Route::post('/signatures', [SignatureController::class, 'store'])->name('signatures.store');
+    Route::get('/signatures/{signature}', [SignatureController::class, 'show'])->name('signatures.show');
 });
 
 Route::redirect('/dropin', '/drop-in');

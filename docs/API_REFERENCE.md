@@ -1258,6 +1258,61 @@ Saving never overwrites: `TermsAndConditions::publishNewVersion()` inserts versi
 deactivates N, and records `updated_by`. Old rows stay intact as the audit trail that
 signed agreements point at.
 
+### Signatures (pet staff)
+
+| Method | URL | Route name | Middleware |
+|---|---|---|---|
+| POST | `/signatures` | `signatures.store` | `auth`, `pet.staff.only` |
+| GET | `/signatures/{signature}` | `signatures.show` | `auth`, `pet.staff.only` |
+
+> These are **web** routes, not `api.php` ones. The `api` middleware group is stateless
+> (Sanctum's `EnsureFrontendRequestsAreStateful` is commented out in `Kernel.php`), so
+> `pet.staff.only` could never read the staff session there.
+
+**POST `/signatures`** — store a signature drawn on the pad.
+
+```json
+{
+  "image": "data:image/png;base64,iVBORw0KGgoAAA...",
+  "check_in_id": 42,
+  "context": "drop-in"
+}
+```
+
+| Field | Rules |
+|---|---|
+| `image` | required. Must be a `data:image/png;base64,` URL whose **decoded** bytes start with the PNG magic number and are ≤ 1 MB. The declared mime is client-supplied, so the bytes are what is actually checked. |
+| `check_in_id` | required, must exist in `check_ins`. |
+| `context` | optional, `drop-in` (default) or `check-in`. |
+
+**Response `201`**
+
+```json
+{ "id": 7, "url": "http://localhost:8080/signatures/7", "signedAt": "2026-08-24T18:20:11+00:00" }
+```
+
+**Response `422`** — standard Laravel validation body. Anything rejected is never
+written to disk.
+
+Side effects: the PNG is written to the **private** `local` disk at
+`storage/app/signatures/YYYY/MM/{uuid}.png`, and a row is inserted recording the pet
+**owner** (not the staff member operating the tablet), the check-in, and the
+`terms_and_conditions_id` that was active at that moment. Rows are append-only —
+re-signing inserts a new one, so the audit trail is never overwritten.
+
+**GET `/signatures/{signature}`** — streams the PNG (`Content-Type: image/png`,
+`Cache-Control: private, no-store`). This is the only way to read a signature image;
+there is no public URL and the absolute URL is never persisted — build it with
+`route('signatures.show', $signature)` or `$signature->url()`. Returns `404` if the
+file has gone missing from the disk.
+
+### POST `/api/readyToPrint`
+
+Completes a drop-in (generates the PDF, sends it to PrintNode). **Rejects with `422` and
+`{"requiresSignature": true}` unless a `drop-in` signature already exists for
+`info.id`** — the browser gate in `Drop-in-confirmation.blade.php` is a convenience, this
+is the enforcement.
+
 ---
 
 ## Related Documentation

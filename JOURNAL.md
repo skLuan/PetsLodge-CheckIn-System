@@ -8,6 +8,138 @@
 
 ---
 
+## Session 2026-08-24 (2) — Plan 03: Signature module for drop-in
+
+**Branch:** `feature/03-signature-module` (off `vbeta.1`, which already carries alex's
+merged form/pill refactor and the Plan 02 email work)
+**Plan:** `AIplans/03-signature-module.md` → archived to `plans/`
+**Status:** ✅ complete. 23 new tests green; full suite **85 passed / 4 failed** — the
+same 4 pre-existing failures, no new ones (62 + 23 = 85).
+
+### The design question the plan asked us to settle
+
+Notion said "guardar firma en user table". We went with the plan's recommendation
+instead: a dedicated **`signatures`** table. A signature is per-visit consent tied to a
+specific T&C version, so a single `users.signature_url` column would be overwritten
+every visit and destroy the legal audit trail — which is precisely what Plan 01's
+append-only T&C versioning was built to support. Each row records who signed, which
+visit, and `terms_and_conditions_id` for the exact text that was on screen.
+
+**Who signs is not who is logged in.** The tablet is operated by staff (`/drop-in*` is
+behind `pet.staff.only`), so `user_id` comes from `$checkIn->user_id`, never
+`auth()->id()`. There is a test asserting this specifically — it is the easy thing to
+get wrong, and it would silently attribute every client's consent to a staff member.
+
+### Deviations from the plan (all deliberate)
+
+1. **`POST /api/signatures` was impossible as specified.** The `api` middleware group
+   in `Kernel.php` is stateless — `EnsureFrontendRequestsAreStateful` is commented out
+   — so `pet.staff.only` would never see a staff session there. Both signature routes
+   went into the existing `['auth','pet.staff.only']` group in `web.php` as
+   `POST /signatures` and `GET /signatures/{signature}`.
+2. **No separate "Accept" button.** The drop-in page already has one terminal action.
+   The existing **Print button is disabled until the pad has strokes** and saves the
+   signature as its first step; `savedSignatureId` stops a print retry from storing a
+   duplicate.
+3. **Staff-only authorization, not "owner or staff".** Clients have no login in this
+   app — `CLIENT` users are created by staff and never authenticate — so an owner
+   branch in a policy would have been dead code.
+4. **The gate also rejects a request with no `check_in_id` at all**, not just one whose
+   check-in is unsigned. Without an id there is nothing to attach consent to.
+
+### Security decisions worth remembering
+
+- **A `data:image/png;base64,` prefix proves nothing** — it is client-supplied and
+  trivially placed in front of JPEG bytes. Validation checks the **decoded PNG magic
+  number**, and caps the *encoded* length before decoding so a hostile payload is
+  rejected without ever being allocated. Cap: 1 MB decoded. Tests cover
+  JPEG-behind-a-PNG-label, a non-PNG mime, garbage base64 and oversize — each also
+  asserting nothing reached the disk.
+- **Signatures never touch the `public` disk.** They go to
+  `storage/app/signatures/YYYY/MM/{uuid}.png` and are readable only through the
+  authenticated show route. A test asserts the public disk stays empty after a store,
+  because `PdfService` right next door *does* write to `public` — copying that pattern
+  would have quietly published every client's signature.
+- **Rows are append-only.** Re-signing inserts; nothing is updated or deleted.
+
+### Traps hit this session
+
+1. **signature_pad's default background is transparent.** dompdf renders a transparent
+   PNG as black-on-black in the printed summary — the signature would have looked blank
+   on every printout. The pad now draws on explicit white.
+2. **dompdf cannot fetch `signatures.show`** (it is authenticated and dompdf has no
+   session), so `pdf-for-print.blade.php` inlines the image via `Signature::dataUri()`
+   rather than linking it.
+3. **`./vendor/bin/pint app/` reformats the entire directory.** It modified 17 files
+   this plan never touched; reverted with `git checkout --`. Only `DropInController`
+   and `PdfService` keep the incidental reformatting, since this plan edited them
+   anyway. **Point Pint at your files, not at `app/`.** (Pint also reports parse errors
+   on `app/View/Components/forms.inventory.php` and `pop-ups.terms-conditions.php` —
+   pre-existing files with dots in their names that are not valid PHP class files.
+   Left alone.)
+4. **`readyToPrint` built its services with `new`**, so the gate test would have hit
+   the real PrintNode API. Changed to `app(PdfService::class)` /
+   `app(PrintNodeService::class)` — same behaviour, now mockable.
+5. **The `Drop-in-confirmation` inline script runs before `app.js` finishes loading**
+   (app.js is a deferred module). Used the same `setTimeout` retry the drop-in page
+   already uses for `window.CheckInHandler`.
+6. **Canvas devicePixelRatio.** The bitmap must be rescaled on every resize or strokes
+   land offset from the pen. The naive fix clears the canvas — which would erase a
+   half-drawn signature when a tablet rotates — so `resize()` round-trips the strokes
+   through `toData()` / `fromData()`.
+
+### What was built
+
+| Area | File |
+|---|---|
+| Migration | `database/migrations/2026_08_24_140000_create_signatures_table.php` |
+| Model | `app/Models/Signature.php` (`url()`, `dataUri()`, `forDropIn()` scope) |
+| Controller | `app/Http/Controllers/SignatureController.php` |
+| Routes | `routes/web.php` — `signatures.store`, `signatures.show` (staff group) |
+| Gate | `DropInController::readyToPrint` — `422 {requiresSignature:true}` |
+| JS | `resources/js/components/SignaturePad.js` (`window.SignatureCapture`), imported from `app.js` |
+| Blade | `resources/views/components/signature-pad.blade.php` |
+| Wiring | `resources/views/Drop-in-confirmation.blade.php` |
+| PDF | `resources/views/pdf-for-print.blade.php` + `PdfService::signatureFor()` |
+| Tests | `tests/Feature/SignatureTest.php` — 23 tests |
+| Docs | `docs/API_REFERENCE.md` (signatures + readyToPrint), `AGENTS.md` §6c + map |
+
+`npm install signature_pad` → v5.1.4, in `dependencies`. Bundle rebuilt and verified to
+contain it. (`npm audit` reports 13 pre-existing vulnerabilities in the dependency tree
+— not introduced by this package; left alone.)
+
+### Verification performed
+
+- **23 SignatureTest cases green**, covering the schema, owner-vs-staff attribution,
+  the four rejected-payload shapes, both authorization directions on both routes, the
+  drop-in gate in all three states, and the PDF embed.
+- **Full suite 85 passed / 4 failed** — identical pre-existing failures.
+- **Migration reversible:** migrate → rollback → re-migrate, all clean on the dev DB.
+- **Page wiring covered by test, not by eyeball:** `/drop-in/confirmation` renders the
+  canvas, the correct `data-check-in-id`, the store URL, and a print button reading
+  "Sign to Print Check-in".
+- **`npm run build` succeeds**; `signature_pad` present in `public/build/assets/app-*.js`.
+- Dev DB survived the suite (the `phpunit.xml` pin from the previous session holds).
+
+### ❗ Left for a human
+
+1. **Nobody has actually drawn on the pad.** `/drop-in/confirmation` needs a staff
+   login and this session did not create one. Stroke rendering, touch input and the
+   devicePixelRatio scaling are **not** manually verified — worth five minutes on a
+   real tablet before this ships. Everything else about the page is test-covered.
+2. **Decide whether existing unsigned check-ins matter.** The gate is retroactive: any
+   check-in created before this change has no signature, so its drop-in will be refused
+   until someone signs. Fine for a beta with test data; confirm before production.
+3. **`storage/app/signatures/` must be writable and backed up** on Hostinger — it is
+   legal evidence, it is *not* in the database, and it is not in git.
+4. Nothing committed; changes sit on `feature/03-signature-module`.
+5. Notion card for Phase 4 still needs a human.
+6. Still open from the previous session: the Hostinger mail send, and **`.env.v0` is
+   still staged with a live `PRINTNODE_API_KEY`** — `git rm --cached .env.v0` before
+   any commit.
+
+---
+
 ## Session 2026-08-24 — Plan 02 (cont.): Hostinger SMTP + Docker/queue infrastructure
 
 **Branch:** `vbeta.1`

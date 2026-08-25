@@ -135,6 +135,7 @@ php artisan test --filter=SomeTest              # single test
 | `app/Http/Controllers/DropInController.php`      | Drop-in flow (staff-only). |
 | `app/Http/Controllers/PetStaffDashboardController.php` | Staff dashboard: checkout, cancel, reprint. |
 | `app/Http/Controllers/TermsAndConditionsController.php` | T&C editor for pet staff (`/petstaff/terms`) + public `GET /api/terms/active`. |
+| `app/Http/Controllers/SignatureController.php` | Stores client signatures (`POST /signatures`) and streams them back (`GET /signatures/{signature}`). |
 | `app/Http/Controllers/HealthCheckController.php` | `/health` monitoring endpoints. |
 | `app/Services/CheckInTransformer.php`   | **Converts** between DB format ⇄ cookie/form format (null-safe). |
 | `app/Services/CheckInDataValidator.php` | Validates check-in data structure & required fields. |
@@ -142,7 +143,7 @@ php artisan test --filter=SomeTest              # single test
 | `app/Services/CheckInPetService.php`    | Pet-related operations. |
 | `app/Services/CheckInUserService.php`   | User/owner operations. |
 | `app/Services/PdfService.php` / `PrintNodeService.php` | PDF generation & physical printing. |
-| `app/Models/` | Eloquent models: `CheckIn`, `Pet`, `EmergencyContact`, `Food`, `Medicine`, `Item`, `ExtraService`, `KindOfPet`, `Gender`, `Castrated`, `MomentOfDay`, `Status`, `TermsAndConditions`, `User`. |
+| `app/Models/` | Eloquent models: `CheckIn`, `Pet`, `EmergencyContact`, `Food`, `Medicine`, `Item`, `ExtraService`, `KindOfPet`, `Gender`, `Castrated`, `MomentOfDay`, `Status`, `TermsAndConditions`, `Signature`, `User`. |
 | `app/Providers/AppServiceProvider.php` | View composer that injects `$activeTerms` into the T&C popup. |
 | `app/Providers/EventServiceProvider.php` | Maps the check-in/drop-in/drop-out events to their queued mail listeners. |
 | `app/Http/Middleware/AdminOnly.php`, `PetStaffOnly.php` | Role gates (`admin.only`, `pet.staff.only`). |
@@ -162,6 +163,7 @@ The heart of the app. **`cookies-and-form/` is where most feature work happens.*
 | `cookies-and-form/managers/` | Specialized managers (one concern each) — see below. |
 | `cookies-and-form/reactivitySystem/` | Auto-updates the UI when cookie data changes. |
 | `components/CheckInHandler.js`, `datePicker.js` | Check-in orchestration & date picker. |
+| `components/SignaturePad.js` | Signature capture (`window.SignatureCapture`). Wraps `signature_pad`; handles devicePixelRatio + POSTs the PNG. |
 | `config/checkInConfig.js` | Check-in front-end config. |
 | `Pill.js`, `tabbar.js`, `Utils.js`, `app.js`, `bootstrap.js` | UI widgets, tab bar, utilities, entry points. |
 
@@ -191,6 +193,7 @@ The heart of the app. **`cookies-and-form/` is where most feature work happens.*
 | `components/tabbar.blade.php`, `CheckInSummary.blade.php` | Tab bar, summary. |
 | `pet-staff/dashboard.blade.php`, `Drop-in*.blade.php` | Staff dashboard, drop-in pages. |
 | `pet-staff/terms-edit.blade.php` | T&C editor (HTML textarea + Alpine live preview). |
+| `components/signature-pad.blade.php` | The signature canvas + Clear button, embedded in `Drop-in-confirmation.blade.php`. |
 | `emails/layouts/base.blade.php` | Shared branded email shell (inline CSS + tables — email clients ignore external CSS). |
 | `emails/check-in-confirmation.blade.php`, `drop-in.blade.php`, `drop-out.blade.php` | The three client emails. |
 | `pdf-for-print.blade.php` | The PDF/print template. |
@@ -200,7 +203,7 @@ The heart of the app. **`cookies-and-form/` is where most feature work happens.*
 ### Routes
 - `routes/web.php` — pages: `/check-in` (phone entry), `/new-form` (the actual multi-step
   form), `/edit-check-in/{id}`, `/view-check-in`, `/drop-in`, `/petstaff/dashboard`,
-  `/petstaff/terms`, `/health`, admin monitoring.
+  `/petstaff/terms`, `/signatures` (store/show), `/health`, admin monitoring.
 - `routes/api.php` — form API: `/api/checkin/submit`, `/api/checkin/autosave`,
   per-step `/api/checkin/step1..step5/...`, `/api/update-session-checkin`, `/api/check-user`,
   `/api/terms/active`.
@@ -275,6 +278,45 @@ Rules that keep this from breaking:
 prints the configuration Laravel has *actually* loaded, warns about the common
 Hostinger mistakes, and sends synchronously so SMTP errors surface instead of being
 swallowed by rule 2's try/catch.
+
+---
+
+## 6c. The third concept: signatures
+
+A signature is **per-visit consent**, not a user attribute. It lives on its own
+`signatures` table — deliberately *not* a `signature_url` column on `users`, which
+would be overwritten every visit and destroy the legal audit trail.
+
+Each row records **who** signed (the pet *owner*, never the staff member holding the
+tablet), **which visit** (`check_in_id`), and **which text they agreed to**
+(`terms_and_conditions_id`, pinned to the version that was on screen — this is what
+Plan 01's append-only T&C versioning exists for).
+
+Rules that keep this from breaking:
+
+1. **Signature images are personal data.** The PNG goes to the **private** `local`
+   disk (`storage/app/signatures/YYYY/MM/{uuid}.png`). Never `public/`, never
+   `Storage::disk('public')`. The only way to read one is the authenticated
+   `GET /signatures/{signature}` route.
+2. **Store the path, build the URL on read** — `$signature->url()` /
+   `route('signatures.show', $signature)`. Absolute URLs are never persisted.
+3. **The routes are in `web.php`, not `api.php`.** The `api` middleware group is
+   stateless (Sanctum's stateful middleware is commented out in `Kernel.php`), so
+   `pet.staff.only` cannot see a staff session there.
+4. **Trust the bytes, not the label.** The `data:image/png` prefix is client-supplied;
+   `SignatureController` checks the decoded PNG magic number and a 1 MB cap, and
+   rejects before anything touches the disk.
+5. **Rows are append-only.** Re-signing inserts a new row; the newest one for a
+   check-in is the effective signature. Never update or delete one.
+6. **A drop-in cannot complete unsigned.** `DropInController::readyToPrint` returns
+   `422 {requiresSignature: true}` when no `drop-in` signature exists for the
+   check-in. The disabled print button is a convenience; this is the enforcement.
+7. **dompdf cannot fetch the authenticated route**, so `pdf-for-print.blade.php`
+   embeds the bytes inline via `$signature->dataUri()`. The pad draws on a white
+   background for exactly this reason — a transparent PNG prints as black-on-black.
+8. **Canvas gotcha:** the bitmap must be re-scaled to `devicePixelRatio` on every
+   resize or strokes land offset from the pen. `SignaturePad.js` does this and
+   preserves the drawing across the resize (`toData()` / `fromData()`).
 
 ---
 

@@ -496,6 +496,24 @@
             </div>
         @endif
 
+        {{-- Client signature (Plan 03). Bytes are inlined as a data URI because
+             dompdf cannot fetch the authenticated signatures.show route. --}}
+        @if (isset($signature) && $signature && ($signatureUri = $signature->dataUri()))
+            <div class="section">
+                <div class="section-title">✍️ Client Signature</div>
+                <div class="section-content">
+                    <img src="{{ $signatureUri }}" alt="Client signature"
+                        style="max-width: 260px; max-height: 90px; border-bottom: 1px solid #000;">
+                    <div style="font-size: 10px; color: #000; padding-top: 4px;">
+                        Signed {{ $signature->created_at->format('F j, Y \a\t g:i A') }}
+                        @if ($signature->terms_and_conditions_id)
+                            · Terms &amp; Conditions v{{ $signature->termsAndConditions?->version }}
+                        @endif
+                    </div>
+                </div>
+            </div>
+        @endif
+
         {{-- Footer --}}
         <div class="footer">
             <p>This document was generated for PetsLodge staff. Please keep for records.</p>

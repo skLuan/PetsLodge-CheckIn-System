@@ -22,15 +22,21 @@
                     <x-check-in-summary :checkinData="session('checkin_data', $checkinData ?? [])" />
                 </div>
 
+                <!-- Signature (Plan 03) — the drop-in cannot be completed unsigned. -->
+                <div class="bg-white p-4 rounded-md shadow-md mx-auto mb-6">
+                    <x-signature-pad :check-in-id="$checkinData['id'] ?? null" context="drop-in" />
+                </div>
+
                 <div class="mt-8 text-center px-4">
                     <p class="text-lg text-left text-gray-600 mb-4">If all is ok, please print the check in, our team will be with you shortly</p>
 
-                    <!-- Print Button -->
+                    <!-- Print Button. Stays disabled until the pad has a signature;
+                         the backend enforces the same rule in readyToPrint(). -->
                     <div class="mt-6">
                         <button id="print-button"
-                            class="bg-blue-600 text-white py-2 px-6 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-                            aria-label="Send to printer">
-                            🖨️ Print Check-in
+                            class="bg-blue-600 text-white py-2 px-6 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                            aria-label="Send to printer" disabled>
+                            🖨️ Sign to Print Check-in
                         </button>
                     </div>
 
@@ -170,6 +176,70 @@
 
                 let countdownInterval;
 
+                // ---------------------------------------------------------
+                // Signature pad (Plan 03)
+                // ---------------------------------------------------------
+                const padRoot = document.querySelector('[data-signature-pad]');
+                const padCanvas = padRoot?.querySelector('[data-signature-canvas]');
+                const padClear = padRoot?.querySelector('[data-signature-clear]');
+                const padStatus = padRoot?.querySelector('[data-signature-status]');
+                const padError = padRoot?.querySelector('[data-signature-error]');
+                const padPlaceholder = padRoot?.querySelector('[data-signature-placeholder]');
+                const checkInId = padRoot?.dataset.checkInId ? Number(padRoot.dataset.checkInId) : null;
+
+                let signature = null;      // SignatureCapture instance
+                let savedSignatureId = null; // set once the PNG is persisted
+
+                function setPadError(message) {
+                    if (!padError) return;
+                    padError.textContent = message || '';
+                    padError.classList.toggle('hidden', !message);
+                }
+
+                function onSignatureChanged(isEmpty) {
+                    if (padClear) padClear.disabled = isEmpty;
+                    if (padPlaceholder) padPlaceholder.classList.toggle('hidden', !isEmpty);
+                    if (padStatus) padStatus.textContent = isEmpty ? 'Not signed yet' : 'Signed ✓';
+
+                    // Re-signing invalidates whatever was stored for this attempt.
+                    if (isEmpty) savedSignatureId = null;
+
+                    printButton.disabled = isEmpty;
+                    printButton.textContent = isEmpty ? '🖨️ Sign to Print Check-in' : '🖨️ Print Check-in';
+                    if (!isEmpty) setPadError('');
+                }
+
+                // app.js is a deferred module, so window.SignatureCapture may not
+                // exist yet — same retry pattern the drop-in page uses.
+                function initSignaturePad() {
+                    if (!padCanvas) return;
+
+                    if (typeof window.SignatureCapture === 'undefined') {
+                        setTimeout(initSignaturePad, 50);
+                        return;
+                    }
+
+                    signature = new window.SignatureCapture({
+                        canvas: padCanvas,
+                        endpoint: '{{ route('signatures.store') }}',
+                        csrfToken: document.querySelector('meta[name="csrf-token"]').content,
+                        checkInId: checkInId,
+                        context: 'drop-in',
+                        onChange: onSignatureChanged,
+                    });
+
+                    padClear?.addEventListener('click', () => {
+                        signature.clear();
+                        setPadError('');
+                    });
+
+                    if (!checkInId) {
+                        setPadError('This drop-in has no check-in on file, so it cannot be signed. Please ask a staff member.');
+                    }
+                }
+
+                initSignaturePad();
+
                 function startCountdown() {
                     let secondsRemaining = 30;
                     countdownTimer.textContent = secondsRemaining;
@@ -196,10 +266,24 @@
                     // Reset messages
                     printSuccess.classList.add('hidden');
                     printError.classList.add('hidden');
+                    setPadError('');
                     printLoading.classList.remove('hidden');
                     printButton.disabled = true;
 
                     try {
+                        // Persist the signature first — readyToPrint rejects an
+                        // unsigned drop-in. Saved once, so a print retry after a
+                        // printer error doesn't store a duplicate.
+                        if (!savedSignatureId) {
+                            if (!signature) {
+                                throw new Error('The signature pad did not load. Please reload the page.');
+                            }
+                            const saved = await signature.save();
+                            savedSignatureId = saved.id;
+                            if (padStatus) padStatus.textContent = 'Signature saved ✓';
+                            if (padClear) padClear.disabled = true;
+                        }
+
                         // Get check-in data from the page
                         const checkinData = @json($checkinData);
 
@@ -234,7 +318,8 @@
                         printLoading.classList.add('hidden');
                         printError.classList.remove('hidden');
                         errorMessage.textContent = error.message || 'Error sending print job';
-                        printButton.disabled = false;
+                        // Only offer a retry while there is still something signed.
+                        printButton.disabled = signature ? signature.isEmpty() : false;
                     }
                 });
             });

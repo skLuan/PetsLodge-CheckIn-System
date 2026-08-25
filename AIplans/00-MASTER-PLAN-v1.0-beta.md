@@ -29,7 +29,7 @@ Ship **v1.0-beta**: all features below implemented, tested, and tagged. From tha
 | 1 | `01-terms-conditions-dashboard.md` → `plans/` | T&C: migration, editable from pet-staff dashboard (`petstaff/*`) | Us | **Done** 2026-08-04 (`feature/01-terms-dashboard`) |
 | 2 | `02-transactional-emails.md` | Emails via Hostinger SMTP: check-in, drop-in, drop-out + templates | Us | **Code complete** 2026-08-04 (`feature/02-transactional-emails`) — verified over real SMTP (mailpit); **awaiting Hostinger credentials** for the production send, then archive to `plans/` |
 | 3 (parallel) | `05-cookie-stabilization-bugs.md` | Cookie system stabilization + backend/UI bugs (incl. add-pet stuck in edit) | Mid dev | Pending |
-| 4 | `03-signature-module.md` | Signature pad for drop-in, stored in storage + URL in DB | Us | Pending |
+| 4 | `03-signature-module.md` → `plans/` | Signature pad for drop-in, stored in storage + URL in DB | Us | **Done** 2026-08-24 (`feature/03-signature-module`) — dedicated `signatures` table (not a `users` column), private disk, drop-in gated on signing |
 | 5 | `04-multi-pet-health-food.md` | Per-pet warnings/health + per-pet food (currently single-pet only) | Us | Pending |
 | 6 | `06-ui-polish-quick-wins.md` | Small Notion tasks: wording, misspellings, discount color, checkout ID, check-in time, pro check-in ID, branding | Anyone / fill-in work | Pending |
 
