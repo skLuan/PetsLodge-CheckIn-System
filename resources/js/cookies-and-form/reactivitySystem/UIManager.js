@@ -97,14 +97,6 @@ class UIManager {
                 console.log("🍽️ Step 2 (Feeding/Medication): Updating feeding/medication UI only");
                 this.updateFeedingMedicationUI(cookieData.pets);
             }
-            // STEP 3: Health Info - Only update health info and grooming
-            else if (currentStep === FORM_CONFIG.STEPS.HEALTH_INFO - 1) {
-                console.log("🏥 Step 3 (Health Info): Updating health info and grooming only");
-                this.updateHealthInfoUI(cookieData.pets, cookieData.grooming, cookieData.groomingDetails);
-                this.updateGroomingAndInventoryUI(cookieData.grooming, cookieData.inventory, cookieData.groomingDetails);
-                // Pre-populate grooming popup if it's open
-                this.populateGroomingPopupFromCookie(cookieData.grooming, cookieData.groomingDetails);
-            }
             // STEP 4: Inventory - Only update inventory UI
             else if (currentStep === FORM_CONFIG.STEPS.INVENTORY - 1) {
                 console.log("📦 Step 4 (Inventory): Updating inventory UI only");
@@ -198,6 +190,22 @@ class UIManager {
 
          console.log("[updateFeedingMedicationUI] Starting with pets:", pets);
 
+         // "Same feeding for all" checked → grouped, collapsible-by-pet view.
+         const sameFeedingForAll = document.getElementById("sameFeedingForAll");
+         const applyToAll = sameFeedingForAll ? sameFeedingForAll.checked : false;
+         const groupedContainer = document.getElementById("feedingGroupedByPet");
+
+         if (applyToAll) {
+             document.querySelectorAll(".container-day").forEach(c => c.classList.add("hidden"));
+             if (groupedContainer) {
+                 groupedContainer.classList.remove("hidden");
+                 this.renderFeedingGroupedByPet(pets);
+             }
+             return;
+         }
+
+         if (groupedContainer) groupedContainer.classList.add("hidden");
+
          // Track which time slots have items
          const timeSlotsWithItems = new Set();
 
@@ -245,6 +253,85 @@ class UIManager {
          console.log("[updateFeedingMedicationUI] Calling updateFeedingMedicationDisplays...");
          this.updateFeedingMedicationDisplays(pets);
      }
+
+    /**
+     * Renders feeding/medication grouped by pet (collapsible), then time of day,
+     * then category (food/medication). Used when "Same feeding for all" is checked.
+     */
+    static renderFeedingGroupedByPet(pets) {
+        const container = document.getElementById("feedingGroupedByPet");
+        if (!container) return;
+
+        container.innerHTML = "";
+
+        const timeSlots = ["morning", "afternoon", "night"];
+
+        pets.forEach((pet, petIndex) => {
+            const petName = pet?.info?.petName || `Pet ${petIndex + 1}`;
+
+            const details = document.createElement("details");
+            details.className = "feeding-pet-group mb-3 bg-white rounded-lg border border-green-30";
+            details.open = true;
+
+            const summary = document.createElement("summary");
+            summary.className = "cursor-pointer font-bold text-green-dark px-4 py-2";
+            summary.textContent = petName;
+            details.appendChild(summary);
+
+            const body = document.createElement("div");
+            body.className = "px-4 pb-3";
+
+            timeSlots.forEach(slot => {
+                const feedingList = document.createElement("div");
+                const medicationList = document.createElement("div");
+
+                (pet?.feeding || []).forEach((feed, itemIndex) => {
+                    if (feed.day_time === slot) {
+                        UtilitiesManager.createEditableItem(feedingList, feed, petIndex, "feeding", itemIndex, petName);
+                    }
+                });
+
+                (pet?.medication || []).forEach((med, itemIndex) => {
+                    if (med.day_time === slot) {
+                        UtilitiesManager.createEditableItem(medicationList, med, petIndex, "medication", itemIndex, petName);
+                    }
+                });
+
+                if (feedingList.children.length === 0 && medicationList.children.length === 0) {
+                    return;
+                }
+
+                const slotSection = document.createElement("div");
+                slotSection.className = "mb-3";
+
+                const slotHeader = document.createElement("div");
+                slotHeader.className = "font-semibold text-gray mb-1";
+                slotHeader.textContent = slot.charAt(0).toUpperCase() + slot.slice(1);
+                slotSection.appendChild(slotHeader);
+
+                if (feedingList.children.length > 0) {
+                    const foodTitle = document.createElement("div");
+                    foodTitle.className = "text-sm font-medium text-gray";
+                    foodTitle.textContent = "Food";
+                    slotSection.appendChild(foodTitle);
+                    slotSection.appendChild(feedingList);
+                }
+
+                if (medicationList.children.length > 0) {
+                    const medTitle = document.createElement("div");
+                    medTitle.className = "text-sm font-medium text-gray";
+                    medTitle.textContent = "Medication";
+                    slotSection.appendChild(medTitle);
+                    slotSection.appendChild(medicationList);
+                }
+
+                body.appendChild(slotSection);
+            });
+
+            details.appendChild(body);
+            container.appendChild(details);
+        });
+    }
 
     /**
      * Update the actual feeding and medication display elements

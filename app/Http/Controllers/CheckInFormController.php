@@ -47,7 +47,7 @@ class CheckInFormController extends Controller
         $user = User::where('phone', $phone)->with('pets.kindOfPet', 'pets.gender', 'pets.castrated')->first();
 
         if (!$user) {
-            return redirect()->route('new-form')->with('error', 'User not found');
+            return redirect()->route('new-form', ['phone' => $phone])->with('error', 'User not found');
         }
 
         // Pre-fill form with user data

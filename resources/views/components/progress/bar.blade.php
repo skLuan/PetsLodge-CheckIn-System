@@ -6,5 +6,4 @@
     <x-progress.circle />
     <x-progress.circle />
     <x-progress.circle />
-    <x-progress.circle />
 </div>
