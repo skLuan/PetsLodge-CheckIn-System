@@ -32,6 +32,7 @@ Ship **v1.0-beta**: all features below implemented, tested, and tagged. From tha
 | 4 | `03-signature-module.md` → `plans/` | Signature pad for drop-in, stored in storage + URL in DB | Us | **Done** 2026-08-24 (`feature/03-signature-module`) — dedicated `signatures` table (not a `users` column), private disk, drop-in gated on signing. ⚠️ **Step 7 (printing config) still open for production**: PrintNode API key not yet held, and a privacy decision is pending on publicly-fetchable PDFs. Local flow unblocked via `PRINTNODE_FAKE=true`. |
 | 5 | `04-multi-pet-health-food.md` | Per-pet warnings/health + per-pet food (currently single-pet only) | Us | Pending |
 | 6 | `06-ui-polish-quick-wins.md` | Small Notion tasks: wording, misspellings, discount color, checkout ID, check-in time, pro check-in ID, branding | Anyone / fill-in work | Pending |
+| 7 | `07-printnode-base64-printing.md` | Print by uploading bytes (`pdf_base64`) instead of a public URL. Closes Step 7 of Plan 03: removes the public-PDF privacy hole (owner PII + health notes + signature), makes local printing possible, and drops `document_url` (which breaks across domains) | Us | Pending — **implementable now**; API facts verified against PrintNode docs, and the app is pre-live so the plan is destructive (no backfill). Only the final real-printer check needs the API key |
 
 Phases 1→2 are sequential for us; Phase 3 runs in parallel (mid dev). 4–6 follow. In-progress Notion items ("Cambio de hora en el check in" — Simon) stay with their owners; they're listed in `06` for tracking only.
 

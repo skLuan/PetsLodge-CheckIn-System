@@ -117,6 +117,11 @@ true at once in production:
 > expiring route. **Recommend `pdf_base64`** — it removes all three requirements above
 > in one move. Not done here: out of scope for the signature plan, and it changes how
 > printing works for every flow.
+>
+> ➡️ **Now scoped as its own plan: `AIplans/07-printnode-base64-printing.md`**, which
+> takes the `pdf_base64` route and covers both print flows with tests. It also picks up
+> a latent bug found while scoping it: `document_url` stores an absolute `APP_URL`-based
+> URL, so every existing Re-Print row breaks the moment the app changes domain.
 
 ### What was built (local only)
 

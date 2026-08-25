@@ -153,6 +153,16 @@ problems came out of that, neither caused by Plan 03:
    signature behind an unguessable URL; `pdf_base64` would avoid it entirely) — is
    written up as **Step 7 in `plans/03-signature-module.md`**.
 
+   That step was then scoped into its own plan, **`AIplans/07-printnode-base64-printing.md`**
+   (added to the master plan as Phase 7). Scoping it surfaced a latent bug worth
+   knowing about even before the plan runs: **`check_ins.document_url` stores an
+   absolute URL built from `APP_URL`** (`http://localhost:8080/storage/pdfs/...`), and
+   `reprint` feeds it straight back to PrintNode — so **every existing Re-Print row
+   breaks the moment the app changes domain**. Also confirmed while scoping: only two
+   code paths print (drop-in + re-print), nothing in the frontend consumes the PDF URL,
+   and the dashboard uses `document_url` only as a boolean for the Re-Print button —
+   which is what makes moving PDFs to private storage low-risk.
+
 Suite after this work: **92 passed / 4 failed** (85 + 7), same pre-existing failures.
 
 **Verified end-to-end with the fake:** `readyToPrint` for check-in 26 returned `200`
