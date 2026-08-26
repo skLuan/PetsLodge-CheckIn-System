@@ -15,7 +15,7 @@ class CheckInTransformer
      * PHASE 2.4: Enhanced to include all missing fields (city, zip, petWeight)
      * and properly handle all data transformations
      *
-     * @param CheckIn $checkIn The check-in instance with loaded relationships
+     * @param  CheckIn  $checkIn  The check-in instance with loaded relationships
      * @return array The transformed data in cookie format
      */
     public function transformCheckInToCookieFormat(CheckIn $checkIn): array
@@ -36,7 +36,7 @@ class CheckInTransformer
                 'petSpayed' => $pet->castrated->status ?? '',
             ],
             'health' => [
-                'unusualHealthBehavior' => !empty($pet->health_conditions) || !empty($pet->warnings),
+                'unusualHealthBehavior' => ! empty($pet->health_conditions) || ! empty($pet->warnings),
                 'healthBehaviors' => $pet->health_conditions ?? '',
                 'warnings' => $pet->warnings ?? '',
             ],
@@ -62,23 +62,23 @@ class CheckInTransformer
             ];
         }
 
-         // Build user data structure
-         // PHASE 2.4: Added city and zip fields
-         // CRITICAL FIX #5: Added null checks for emergency contact
-         $userData = [
-             'info' => [
-                 'name' => $user->name ?? '',
-                 'phone' => $user->phone ?? '',
-                 'email' => $user->email ?? '',
-                 'address' => $user->address ?? '',
-                 'city' => $user->city ?? '', // PHASE 2.4: Added
-                 'zip' => $user->zip ?? '', // PHASE 2.4: Added
-             ],
-             'emergencyContact' => [
-                 'name' => $user->emergencyContacts?->first()?->name ?? '',
-                 'phone' => $user->emergencyContacts?->first()?->phone ?? '',
-             ],
-         ];
+        // Build user data structure
+        // PHASE 2.4: Added city and zip fields
+        // CRITICAL FIX #5: Added null checks for emergency contact
+        $userData = [
+            'info' => [
+                'name' => $user->name ?? '',
+                'phone' => $user->phone ?? '',
+                'email' => $user->email ?? '',
+                'address' => $user->address ?? '',
+                'city' => $user->city ?? '', // PHASE 2.4: Added
+                'zip' => $user->zip ?? '', // PHASE 2.4: Added
+            ],
+            'emergencyContact' => [
+                'name' => $user->emergencyContacts?->first()?->name ?? '',
+                'phone' => $user->emergencyContacts?->first()?->phone ?? '',
+            ],
+        ];
 
         // Build inventory data
         $inventoryData = [];
@@ -89,16 +89,16 @@ class CheckInTransformer
         // Build grooming data
         $groomingData = [];
         $appointmentDay = null;
-        
+
         foreach ($checkIn->extraServices as $service) {
             $groomingData[$service->name] = true;
-            
+
             // Get appointment day from pivot table if available
             if ($service->pivot && $service->pivot->grooming_appointment_day) {
                 $appointmentDay = $service->pivot->grooming_appointment_day;
             }
         }
-        
+
         // Add appointment day to grooming data if it exists
         if ($appointmentDay) {
             $groomingData['appointmentDay'] = $appointmentDay;
@@ -118,12 +118,55 @@ class CheckInTransformer
     }
 
     /**
+     * Transform a whole BOOKING — every check-in row it produced — into one
+     * cookie-format structure listing all of its pets.
+     *
+     * The check-in wizard creates one `check_ins` row per pet, so a 2-pet
+     * booking is 2 rows. Rendering only one of them printed a summary naming a
+     * single pet and left the other row with no document at all. Merging here
+     * mirrors what Plan 02 already does for the confirmation email: the client
+     * gets ONE artefact covering every pet they brought.
+     *
+     * `id` stays the FIRST check-in's id — the anchor the signature pad and the
+     * print endpoint address the booking by.
+     *
+     * @param  \Illuminate\Support\Collection<int, CheckIn>  $checkIns  Relationships pre-loaded.
+     */
+    public function transformCheckInsToCookieFormat($checkIns): array
+    {
+        $checkIns = $checkIns->values();
+
+        if ($checkIns->isEmpty()) {
+            return [];
+        }
+
+        // The first row carries the owner, inventory and grooming — those belong
+        // to the booking, not to an individual pet.
+        $data = $this->transformCheckInToCookieFormat($checkIns->first());
+
+        foreach ($checkIns->slice(1) as $checkIn) {
+            $sibling = $this->transformCheckInToCookieFormat($checkIn);
+
+            $data['pets'][] = $sibling['pets'][0];
+
+            // Items and services are recorded per row; a booking's printed
+            // summary should list everything that came with it.
+            $data['inventory'] = array_values(array_unique(array_merge($data['inventory'], $sibling['inventory'])));
+            $data['grooming'] = array_merge($data['grooming'], $sibling['grooming']);
+        }
+
+        $data['inventoryComplete'] = count($data['inventory']) > 0;
+
+        return $data;
+    }
+
+    /**
      * Transform cookie format data to check-in data structure
      *
      * PHASE 2.4: Implemented reverse transformation for submitting edited check-ins
      * Converts the cookie format back to the database format for storage
      *
-     * @param array $cookieData The data in cookie format
+     * @param  array  $cookieData  The data in cookie format
      * @return array The transformed data in check-in format for database storage
      */
     public function transformCookieToCheckInFormat(array $cookieData): array

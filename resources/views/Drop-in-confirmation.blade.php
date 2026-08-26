@@ -22,12 +22,31 @@
                     <x-check-in-summary :checkinData="session('checkin_data', $checkinData ?? [])" />
                 </div>
 
-                <!-- Signature (Plan 03) — the drop-in cannot be completed unsigned. -->
-                <div class="bg-white p-4 rounded-md shadow-md mx-auto mb-6">
-                    <x-signature-pad :check-in-id="$checkinData['id'] ?? null" context="drop-in" />
-                </div>
+                @php
+                    // A signature must belong to a specific check-in. Without one there
+                    // is nothing to attach it to — the pad would post an empty
+                    // `check_in_id`, 422, and the client would sign into the void.
+                    $signableCheckInId = ($canSign ?? false) ? ($checkinData['id'] ?? null) : null;
+                @endphp
 
-                <div class="mt-8 text-center px-4">
+                @unless ($signableCheckInId)
+                    <div class="bg-yellow-50 border border-yellow-400 text-yellow-900 p-4 rounded-md mx-auto mb-6">
+                        <p class="font-semibold">No active check-in for this phone number.</p>
+                        <p class="text-sm mt-1">
+                            Nothing can be signed or printed until the pet is checked in. Please complete a
+                            check-in first, or confirm the phone number is correct.
+                        </p>
+                        <a href="{{ route('drop-in.show') }}" class="inline-block mt-3 text-sm underline">Try another number</a>
+                    </div>
+                @endunless
+
+                @if ($signableCheckInId)
+                    <!-- Signature (Plan 03) — the drop-in cannot be completed unsigned. -->
+                    <div class="bg-white p-4 rounded-md shadow-md mx-auto mb-6">
+                        <x-signature-pad :check-in-id="$signableCheckInId" context="drop-in" />
+                    </div>
+
+                    <div class="mt-8 text-center px-4">
                     <p class="text-lg text-left text-gray-600 mb-4">If all is ok, please print the check in, our team will be with you shortly</p>
 
                     <!-- Print Button. Stays disabled until the pad has a signature;
@@ -55,7 +74,8 @@
                     <div id="print-error" class="hidden mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
                         <p id="error-message"></p>
                     </div>
-                </div>
+                    </div>
+                @endif
             </div>
 
             <!-- Post-Print State -->
@@ -166,6 +186,13 @@
         <script>
             document.addEventListener('DOMContentLoaded', function() {
                 const printButton = document.getElementById('print-button');
+
+                // Nothing to wire up when there is no active check-in — the pad and
+                // the print button are not rendered at all in that state.
+                if (!printButton) {
+                    return;
+                }
+
                 const printLoading = document.getElementById('print-loading');
                 const printSuccess = document.getElementById('print-success');
                 const printError = document.getElementById('print-error');

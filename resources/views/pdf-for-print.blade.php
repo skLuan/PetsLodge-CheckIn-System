@@ -215,7 +215,7 @@
     <div class="container">
         {{-- Header --}}
         <div class="header">
-            <h1>🐾 Check-In Summary</h1>
+            <h1>Check-In Summary</h1>
             <div class="header-info">
                 @if (isset($checkinData['id']))
                     <span><strong>Receipt ID:</strong> {{ $checkinData['id'] }}</span>
@@ -231,7 +231,7 @@
         {{-- Owner Information --}}
         @if (isset($checkinData['user']['info']))
             <div class="section">
-                <div class="section-title">👤 Owner Information</div>
+                <div class="section-title">Owner Information</div>
                 <div class="section-content">
                     <div class="info-row">
                         <span class="info-label">Name:</span>
@@ -266,7 +266,7 @@
                 (!empty($checkinData['user']['emergencyContact']['name']) ||
                     !empty($checkinData['user']['emergencyContact']['phone'])))
             <div class="section">
-                <div class="section-title">🚨 Emergency Contact</div>
+                <div class="section-title">Emergency Contact</div>
                 <div class="section-content">
                     <div class="info-row">
                         <span class="info-label">Name:</span>
@@ -283,7 +283,7 @@
         {{-- Pet Details --}}
         @if (isset($checkinData['pets']) && is_array($checkinData['pets']) && count($checkinData['pets']) > 0)
             <div class="section">
-                <div class="section-title">🐾 Pet Details ({{ count($checkinData['pets']) }} pet{{ count($checkinData['pets']) > 1 ? 's' : '' }})</div>
+                <div class="section-title">Pet Details ({{ count($checkinData['pets']) }} pet{{ count($checkinData['pets']) > 1 ? 's' : '' }})</div>
                 <div class="section-content">
                     @foreach ($checkinData['pets'] as $pet)
                         @if (isset($pet['info']))
@@ -333,7 +333,7 @@
                                 {{-- Feeding Schedule --}}
                                 @if (isset($pet['feeding']) && is_array($pet['feeding']) && count($pet['feeding']) > 0)
                                     <div style="margin-top: 6px;">
-                                        <strong style="color: #000; font-size: 11px;">🍽️ Feeding Schedule:</strong>
+                                        <strong style="color: #000; font-size: 11px;">Feeding Schedule:</strong>
                                         @php
                                             $feedingByTime = [];
                                             foreach ($pet['feeding'] as $feed) {
@@ -365,7 +365,7 @@
                                 {{-- Medication Schedule --}}
                                 @if (isset($pet['medication']) && is_array($pet['medication']) && count($pet['medication']) > 0)
                                     <div style="margin-top: 6px;">
-                                        <strong style="color: #000; font-size: 11px;">💊 Medication Schedule:</strong>
+                                        <strong style="color: #000; font-size: 11px;">Medication Schedule:</strong>
                                         @php
                                             $medByTime = [];
                                             foreach ($pet['medication'] as $med) {
@@ -413,7 +413,7 @@
                                     @endphp
                                     @if (count($healthNotes) > 0)
                                         <div style="margin-top: 6px;">
-                                            <strong style="color: #000; font-size: 11px;">🏥 Health Notes:</strong>
+                                            <strong style="color: #000; font-size: 11px;">Health Notes:</strong>
                                             @foreach ($healthNotes as $note)
                                                 <div class="health-warning">{{ $note }}</div>
                                             @endforeach
@@ -441,7 +441,7 @@
             
             @if ($hasGroomingServices)
                 <div class="section">
-                    <div class="section-title">🛁 Grooming Services</div>
+                    <div class="section-title">Grooming Services</div>
                     <div class="section-content">
                         @php
                             $services = [];
@@ -457,7 +457,7 @@
                         
                         @if (isset($checkinData['grooming']['appointmentDay']) && $checkinData['grooming']['appointmentDay'])
                             <div class="info-row" style="margin-top: 10px;">
-                                <span class="info-label">📅 Appointment Day:</span>
+                                <span class="info-label">Appointment Day:</span>
                                 <span class="info-value">{{ $checkinData['grooming']['appointmentDay'] }}</span>
                             </div>
                         @endif
@@ -469,7 +469,7 @@
         {{-- Grooming Instructions --}}
         @if (isset($checkinData['groomingDetails']))
             <div class="section">
-                <div class="section-title">📝 Grooming Instructions</div>
+                <div class="section-title">Grooming Instructions</div>
                 <div class="section-content">
                     <div style="font-size: 11px; color: #000; line-height: 1.4;">
                         {{ $checkinData['groomingDetails'] }}
@@ -481,7 +481,7 @@
         {{-- Inventory --}}
         @if (isset($checkinData['inventory']) && is_array($checkinData['inventory']))
             <div class="section">
-                <div class="section-title">🎒 Items to Store ({{ count($checkinData['inventory']) }} item{{ count($checkinData['inventory']) > 1 ? 's' : '' }})</div>
+                <div class="section-title">Items to Store ({{ count($checkinData['inventory']) }} item{{ count($checkinData['inventory']) > 1 ? 's' : '' }})</div>
                 <div class="section-content">
                     @if (count($checkinData['inventory']) > 0)
                         <div class="inventory-list">
@@ -500,12 +500,11 @@
              dompdf cannot fetch the authenticated signatures.show route. --}}
         @if (isset($signature) && $signature && ($signatureUri = $signature->dataUri()))
             <div class="section">
-                <div class="section-title">✍️ Client Signature</div>
+                <div class="section-title">Client Signature</div>
                 <div class="section-content">
                     <img src="{{ $signatureUri }}" alt="Client signature"
                         style="max-width: 260px; max-height: 90px; border-bottom: 1px solid #000;">
-                    <div style="font-size: 10px; color: #000; padding-top: 4px;">
-                        Signed {{ $signature->created_at->format('F j, Y \a\t g:i A') }}
+                    <div style="font-size: 10px; color: #000; padding-top: 4px;">Signed {{ $signature->created_at->format('F j, Y \a\t g:i A') }}
                         @if ($signature->terms_and_conditions_id)
                             · Terms &amp; Conditions v{{ $signature->termsAndConditions?->version }}
                         @endif

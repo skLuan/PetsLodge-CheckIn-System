@@ -323,6 +323,54 @@ class PrintingTest extends TestCase
     }
 
     /** @test */
+    public function the_pdf_is_built_from_server_data_not_the_browser_payload(): void
+    {
+        // The browser posts whatever `info` it has. Trusting it means a thin or
+        // stale payload silently produces a near-empty legal document with a
+        // real signature on it. The server already holds the truth.
+        $this->useRecordingPrinter();
+        $checkIn = $this->makeSignedCheckIn();
+
+        // Capture what the controller actually hands the renderer. dompdf
+        // compresses its text streams, so the finished PDF cannot be searched
+        // for the pet's name — the input is the honest place to assert.
+        $captured = null;
+        $this->mock(PdfService::class, function ($mock) use (&$captured) {
+            $mock->shouldReceive('generatePdf')->once()->andReturnUsing(function ($data) use (&$captured) {
+                $captured = $data;
+
+                return 'pdfs/2026/08/captured.pdf';
+            });
+            $mock->shouldReceive('pdfBytes')->andReturn("%PDF-1.4\ncaptured");
+        });
+
+        $this->postJson('/api/readyToPrint', [
+            'info' => ['id' => $checkIn->id],   // deliberately threadbare
+        ])->assertOk();
+
+        $this->assertNotNull($captured);
+        $this->assertSame('Luna', $captured['pets'][0]['info']['petName'] ?? null, 'The real pet name must come from the database.');
+        $this->assertArrayHasKey('user', $captured, 'Owner details must be present even though the payload omitted them.');
+        $this->assertNotSame(['id' => $checkIn->id], $captured, 'The posted payload must not be used verbatim.');
+    }
+
+    /** @test */
+    public function the_printed_summary_contains_no_unrenderable_emoji(): void
+    {
+        // dompdf's default font has no emoji glyphs — every one printed as "?".
+        $html = view('pdf-for-print', [
+            'checkinData' => ['id' => 1, 'pets' => []],
+            'signature' => null,
+        ])->render();
+
+        $this->assertSame(
+            0,
+            preg_match('/[\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}\x{FE0F}]/u', $html),
+            'Emoji render as "?" in the PDF — keep them out of pdf-for-print.blade.php.'
+        );
+    }
+
+    /** @test */
     public function a_printer_failure_is_reported_without_crashing(): void
     {
         // The failure branch is easy to leave behind when the success path is

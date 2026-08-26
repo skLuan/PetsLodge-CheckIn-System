@@ -44,26 +44,41 @@ class SignatureController extends Controller
 
         $checkIn = CheckIn::findOrFail($validated['check_in_id']);
         $bytes = $this->decode($validated['image']);
+        $context = $validated['context'] ?? 'drop-in';
 
         $path = 'signatures/'.now()->format('Y/m').'/'.Str::uuid().'.png';
 
         // Private disk: storage/app/signatures/... is not reachable over HTTP.
         Storage::disk(Signature::DISK)->put($path, $bytes);
 
-        $signature = Signature::create([
+        // Pin the exact T&C text that was on screen (Plan 01's audit trail).
+        $termsId = TermsAndConditions::active()->first()?->id;
+
+        // A booking is one check_ins row PER PET, and the client signs for the
+        // booking — not for one animal. Record the same signing event against
+        // every row it covers, so no pet is left unsigned and the drop-in gate
+        // passes for all of them. One image file, referenced N times: that is
+        // literally what happened.
+        $covered = $context === 'drop-in'
+            ? $checkIn->bookingSiblings()->get()
+            : collect([$checkIn]);
+
+        $signatures = $covered->map(fn (CheckIn $row) => Signature::create([
             // The OWNER signs, not the staff member operating the tablet.
-            'user_id' => $checkIn->user_id,
-            'check_in_id' => $checkIn->id,
-            // Pin the exact T&C text that was on screen (Plan 01's audit trail).
-            'terms_and_conditions_id' => TermsAndConditions::active()->first()?->id,
+            'user_id' => $row->user_id,
+            'check_in_id' => $row->id,
+            'terms_and_conditions_id' => $termsId,
             'path' => $path,
-            'context' => $validated['context'] ?? 'drop-in',
-        ]);
+            'context' => $context,
+        ]));
+
+        $signature = $signatures->firstWhere('check_in_id', $checkIn->id) ?? $signatures->first();
 
         return response()->json([
             'id' => $signature->id,
             'url' => $signature->url(),
             'signedAt' => $signature->created_at?->toIso8601String(),
+            'checkInIds' => $covered->pluck('id')->all(),
         ], 201);
     }
 

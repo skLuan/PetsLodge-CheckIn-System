@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CheckIn;
 use App\Models\User;
 use App\Services\CheckInTransformer;
 use App\Services\PdfService;
@@ -26,42 +27,33 @@ class DropInController extends Controller
         $phone = $request->validate(['phone' => 'required|string|regex:/^[0-9]{10}$/']);
         $user = User::where('phone', $phone['phone'])->first();
 
-        // Initialize checkinData with user info
-        $checkinData = session('checkin_data', []);
+        // The pet being dropped in is whatever is CURRENTLY checked in, so the
+        // database decides — not `session('checkin_data')`, which can still hold
+        // a previous booking from the check-in wizard. Trusting the session here
+        // meant the page could render a stale (or absent) check-in id, and the
+        // signature pad would then post `check_in_id: ''` and 422 silently.
+        $latestCheckIn = $user?->checkIns()->whereNull('check_out')->latest()->first();
+
+        $checkinData = $latestCheckIn ? [] : session('checkin_data', []);
 
         // DIAGNOSTIC LOG
         \Log::info('DropInController::showDropConfirmation', [
             'phone' => $phone['phone'],
-            'session_checkin_data_exists' => ! empty($checkinData),
-            'session_checkin_id' => $checkinData['id'] ?? 'EMPTY',
-            'user_exists' => $user ? true : false,
             'user_id' => $user->id ?? null,
+            'active_check_in_id' => $latestCheckIn->id ?? 'NONE',
+            'fell_back_to_session' => $latestCheckIn === null && ! empty($checkinData),
         ]);
 
-        // If no session data, populate from user's active check-in
         if (empty($checkinData) && $user) {
-            $latestCheckIn = $user->checkIns()->whereNull('check_out')->latest()->first();
-
-            \Log::info('DropInController::showDropConfirmation - Loading from DB', [
-                'latest_checkin_exists' => $latestCheckIn ? true : false,
-                'latest_checkin_id' => $latestCheckIn->id ?? 'NONE',
-            ]);
-
             if ($latestCheckIn) {
-                // Eager load all relationships needed by the transformer
-                $latestCheckIn->load([
-                    'pet.kindOfPet',
-                    'pet.gender',
-                    'pet.castrated',
-                    'user.emergencyContacts',
-                    'foods.momentOfDay',
-                    'medicines.momentOfDay',
-                    'items',
-                    'extraServices',
-                ]);
+                // A booking is one row PER PET, so drop-in works on the whole set:
+                // the client signs once and gets one summary listing every pet.
+                $booking = $latestCheckIn->bookingSiblings()
+                    ->with(CheckIn::SUMMARY_RELATIONS)
+                    ->get();
 
                 $transformer = new CheckInTransformer;
-                $checkinData = $transformer->transformCheckInToCookieFormat($latestCheckIn);
+                $checkinData = $transformer->transformCheckInsToCookieFormat($booking);
 
                 // Store in session for consistency with Process flow
                 session(['checkin_data' => $checkinData]);
@@ -81,7 +73,12 @@ class DropInController extends Controller
             }
         }
 
-        return view('Drop-in-confirmation', compact('checkinData', 'user'));
+        // Drives whether the page offers signing + printing at all. Without an
+        // active check-in there is nothing a signature could be attached to, so
+        // the page must say so rather than render a pad that cannot save.
+        $canSign = $latestCheckIn !== null;
+
+        return view('Drop-in-confirmation', compact('checkinData', 'user', 'canSign'));
     }
 
     public function checkInfo(Request $request)
@@ -152,6 +149,41 @@ class DropInController extends Controller
         ], 500);
     }
 
+    /**
+     * The data the printed summary is rendered from.
+     *
+     * Built SERVER-SIDE from the check-in, not from the browser's `info`
+     * payload. The summary is a legal record — it carries the client's
+     * signature — so a thin, stale or partial payload must not be able to
+     * produce a near-empty document that still looks signed and official.
+     *
+     * `$fallback` (the posted payload) is used only if the check-in cannot be
+     * read, so a transformer problem degrades instead of failing the drop-in.
+     */
+    private function summaryData(?\App\Models\CheckIn $checkIn, array $fallback): array
+    {
+        if (! $checkIn) {
+            return $fallback;
+        }
+
+        try {
+            // The whole booking, so a multi-pet drop-in prints ONE summary
+            // listing every pet rather than naming only the anchor row's.
+            $booking = $checkIn->bookingSiblings()->with(CheckIn::SUMMARY_RELATIONS)->get();
+
+            $data = (new CheckInTransformer)->transformCheckInsToCookieFormat($booking);
+
+            return ! empty($data) ? $data : $fallback;
+        } catch (\Throwable $e) {
+            \Log::warning('Could not build the check-in summary from the database; falling back to the posted payload.', [
+                'checkInId' => $checkIn->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $fallback;
+        }
+    }
+
     public function readyToPrint(Request $request)
     {
         // Valida inputs (puedes usar Request class personalizada)
@@ -182,9 +214,14 @@ class DropInController extends Controller
             $documentPath = $checkIn?->document_path;
 
             if (! $documentPath) {
-                $documentPath = $pdfService->generatePdf($validated['info']);
+                $documentPath = $pdfService->generatePdf($this->summaryData($checkIn, $validated['info']));
 
-                $checkIn?->update(['document_path' => $documentPath]);
+                // One booking, one document — recorded on EVERY row it covers, so
+                // each pet's dashboard entry can re-print and view the same PDF.
+                if ($checkIn) {
+                    $checkIn->bookingSiblings()->update(['document_path' => $documentPath]);
+                    $checkIn->refresh();
+                }
             }
 
             // Plan 07: PrintNode is sent the BYTES, not a URL. Nothing about this

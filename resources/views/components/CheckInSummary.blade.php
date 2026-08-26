@@ -7,7 +7,10 @@
             <div class="text-sm flex justify-between pt-1 text-gray-500">
                 Check-in Date:
                 <strong><span
-                        data-receipt-date>{{ $checkinData['date'] ? \Carbon\Carbon::parse($checkinData['date'])->toFormattedDateString() : now()->toFormattedDateString() }}</span></strong>
+                        {{-- `date` is absent whenever the summary is rendered for an owner
+                             with no active check-in — read it null-safely, not with a bare
+                             index, or the whole page 500s on an undefined-key warning. --}}
+                        data-receipt-date>{{ ($checkinData['date'] ?? null) ? \Carbon\Carbon::parse($checkinData['date'])->toFormattedDateString() : now()->toFormattedDateString() }}</span></strong>
             </div>
         </div>
         <div class="grid grid-cols-2 gap-4 border-b mb-4">
