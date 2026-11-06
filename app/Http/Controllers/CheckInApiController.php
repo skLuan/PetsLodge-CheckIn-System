@@ -5,11 +5,11 @@ namespace App\Http\Controllers;
 use App\Events\CheckInCompleted;
 use App\Models\User;
 use App\Models\CheckIn;
-use App\Models\Status;
 use App\Services\CheckInService;
 use App\Services\CheckInUserService;
 use App\Services\CheckInPetService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
 
@@ -349,25 +349,18 @@ class CheckInApiController extends Controller
                 'warnings' => $healthData['warnings'] ?? null,
             ]);
 
-            // Get CHECKED_IN status
-            $checkedInStatus = Status::where('name', 'CHECKED_IN')->first();
-            if (!$checkedInStatus) {
-                throw new \Exception('CHECKED_IN status not found in database');
-            }
+            // The pet's open stay — the row being edited, or a new CHECKED_IN
+            // row for a new check-in. Step 4 resolves the same row.
+            $tempCheckIn = DB::transaction(function () use ($pet, $feedingData, $medicationData) {
+                $checkIn = $this->checkInService->findOrCreateActiveCheckIn($pet);
 
-            // Create a temporary check-in for feeding/medication (will be updated in step 4)
-            $tempCheckIn = \App\Models\CheckIn::create([
-                'check_in' => now(),
-                'pet_id' => $petId,
-                'user_id' => $pet->user_id,
-                'status_id' => $checkedInStatus->id,
-            ]);
+                $this->petService->processFeedingAndMedication($pet, $checkIn, [
+                    'feeding' => $feedingData,
+                    'medication' => $medicationData
+                ]);
 
-            // Process feeding and medication
-            $this->petService->processFeedingAndMedication($pet, $tempCheckIn, [
-                'feeding' => $feedingData,
-                'medication' => $medicationData
-            ]);
+                return $checkIn;
+            });
 
             Log::info("CheckInApiController: Step 3 - Pet health submitted successfully [{$timestamp}]", [
                 'pet_id' => $petId,

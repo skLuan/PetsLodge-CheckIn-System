@@ -26,6 +26,9 @@ class CheckInTransformer
         // Build pet data structure
         $petData = [
             'info' => [
+                // Without it step 2 can't tell this pet already exists and
+                // creates a duplicate on every edit (same key FastCheckinManager sends).
+                'petId' => $pet->id,
                 'petName' => $pet->name ?? 'Unnamed Pet',
                 'petType' => $pet->kindOfPet->name ?? 'Unknown',
                 'petBreed' => $pet->race ?? '',

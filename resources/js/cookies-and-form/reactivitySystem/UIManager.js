@@ -372,52 +372,66 @@ class UIManager {
 
          console.log("[updateFeedingMedicationDisplays] Processing", pets.length, "pets");
 
-         pets.forEach((pet, petIndex) => {
-             if (pet?.feeding && Array.isArray(pet.feeding)) {
-                 console.log(`[updateFeedingMedicationDisplays] Pet ${petIndex} has ${pet.feeding.length} feeding items`);
-                 pet.feeding.forEach((feed, itemIndex) => {
-                     if (feed.day_time) {
-                         const container = document.querySelector(`#${feed.day_time}-food-list`);
-                         if (container) {
-                             console.log(`[updateFeedingMedicationDisplays] Creating feeding item for ${feed.day_time}`);
-                             UtilitiesManager.createEditableItem(
-                                 container,
-                                 feed,
-                                 petIndex,
-                                 'feeding',
-                                 itemIndex,
-                                 pet.info?.petName || 'Pet'
-                             );
-                         } else {
-                             console.warn(`[updateFeedingMedicationDisplays] Container #${feed.day_time}-food-list not found`);
-                         }
-                     }
-                 });
-             }
+         // Items are grouped under a pet-name label inside each list:
+         // Morning > Food > <petName> > items
+         const lists = [['feeding', 'food'], ['medication', 'med']];
 
-             if (pet?.medication && Array.isArray(pet.medication)) {
-                 console.log(`[updateFeedingMedicationDisplays] Pet ${petIndex} has ${pet.medication.length} medication items`);
-                 pet.medication.forEach((med, itemIndex) => {
-                     if (med.day_time) {
-                         const container = document.querySelector(`#${med.day_time}-med-list`);
-                         if (container) {
-                             console.log(`[updateFeedingMedicationDisplays] Creating medication item for ${med.day_time}`);
-                             UtilitiesManager.createEditableItem(
-                                 container,
-                                 med,
-                                 petIndex,
-                                 'medication',
-                                 itemIndex,
-                                 pet.info?.petName || 'Pet'
-                             );
-                         } else {
-                             console.warn(`[updateFeedingMedicationDisplays] Container #${med.day_time}-med-list not found`);
-                         }
+         pets.forEach((pet, petIndex) => {
+             const petName = pet?.info?.petName || `Pet ${petIndex + 1}`;
+
+             lists.forEach(([type, listKey]) => {
+                 const items = Array.isArray(pet?.[type]) ? pet[type] : [];
+
+                 items.forEach((item, itemIndex) => {
+                     if (!item.day_time) return;
+
+                     const container = document.querySelector(`#${item.day_time}-${listKey}-list`);
+                     if (!container) {
+                         console.warn(`[updateFeedingMedicationDisplays] Container #${item.day_time}-${listKey}-list not found`);
+                         return;
                      }
+
+                     UtilitiesManager.createEditableItem(
+                         this.getPetGroup(container, petIndex, petName),
+                         item,
+                         petIndex,
+                         type,
+                         itemIndex,
+                         petName
+                     );
                  });
-             }
+             });
          });
      }
+
+    /**
+     * Returns the per-pet wrapper inside a food/medication list, creating it
+     * (with the pet name label) the first time it is needed.
+     *
+     * @static
+     * @private
+     * @param {HTMLElement} container - The time-slot list (e.g. #morning-food-list)
+     * @param {number} petIndex - Index of the pet
+     * @param {string} petName - Name shown in the label
+     * @returns {HTMLElement}
+     */
+    static getPetGroup(container, petIndex, petName) {
+        let group = container.querySelector(`:scope > [data-pet-group="${petIndex}"]`);
+        if (group) return group;
+
+        group = document.createElement('div');
+        group.className = 'feeding-pet-items pt-2';
+        group.dataset.petGroup = petIndex;
+
+        const label = document.createElement('div');
+        label.className = 'flex items-center text-sm font-semibold text-green-dark pl-1';
+        label.innerHTML = '<iconify-icon icon="mdi:paw" class="mr-1"></iconify-icon>';
+        label.appendChild(document.createTextNode(petName));
+
+        group.appendChild(label);
+        container.appendChild(group);
+        return group;
+    }
 
     /**
      * Update health information UI

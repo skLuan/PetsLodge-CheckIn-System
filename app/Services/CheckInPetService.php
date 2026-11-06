@@ -164,6 +164,11 @@ class CheckInPetService
             'medication_count' => isset($petData['medication']) ? count($petData['medication']) : 0
         ]);
 
+        // The payload is the pet's full list, not a delta: replace, so re-saving
+        // an edited check-in doesn't duplicate every meal and medicine.
+        $checkIn->foods()->delete();
+        $checkIn->medicines()->delete();
+
         // Process feeding
         if (isset($petData['feeding']) && is_array($petData['feeding'])) {
             foreach ($petData['feeding'] as $feedData) {
