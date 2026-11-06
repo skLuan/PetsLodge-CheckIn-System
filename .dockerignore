@@ -16,7 +16,7 @@ storage/app/public/*
 !storage/app/public/.gitignore
 docker-compose.yml
 *.md
-openspec/
+ai/
 docs/
 scripts/
 screenshots/

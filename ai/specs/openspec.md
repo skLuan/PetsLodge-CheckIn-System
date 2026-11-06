@@ -76,9 +76,14 @@ Built on **Laravel Breeze** (server-rendered session auth) with **Sanctum** toke
 ## Directory layout
 
 ```text
-openspec.md                                  ← this file (project manifest)
-openspec/
-  changes/                                   ← one Markdown file per change (empty after v1.0.0 consolidation)
+ai/                                          ← AI-agent workspace (see ai/README.md)
+  specs/
+    openspec.md                              ← this file (project manifest)
+    features/                                ← one file per feature
+  plans/                                     ← roadmap + active / done / archive plans
+  implementation/                            ← implementation notes
+  JOURNAL.md                                 ← log of agent sessions
+CLAUDE.md                                    ← Claude Code entry point (imports AGENTS.md)
 README.md                                    ← setup, features, troubleshooting
 AGENTS.md                                    ← agent guide / project map
 DOCKER_README.md                             ← Docker details

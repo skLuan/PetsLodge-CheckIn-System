@@ -77,7 +77,7 @@ Use `Mail::fake()` / `Event::fake()`:
 3. Templates (base layout first, then the 3 emails). Preview via mailpit locally.
 4. Queue config + docker worker.
 5. Hostinger credentials in prod `.env`; send real test email to ourselves.
-6. Docs + move plan to `plans/`.
+6. Docs + move plan to `ai/plans/done/`.
 
 ## Acceptance criteria
 
@@ -93,7 +93,7 @@ Use `Mail::fake()` / `Event::fake()`:
 ## Execution notes (2026-08-04, branch `feature/02-transactional-emails`)
 
 **Status: code complete, 1 acceptance criterion open (production Hostinger send).**
-This plan stays in `AIplans/` until that is done — move it to `plans/` with `git mv`
+This plan stays in `ai/plans/active/` until that is done — move it to `ai/plans/done/` with `git mv`
 once a real Hostinger email has been received.
 
 ### Deviations from the plan as written
@@ -182,5 +182,5 @@ Required `jobs` table was missing entirely and has been added
       `php artisan mail:test you@petlogde.fun`
 - [ ] hPanel cron job added; `migrate --force` run on prod; SPF/DKIM verified.
 
-Do not archive this plan to `plans/` until a real Hostinger email is delivered.
-See JOURNAL.md (2026-08-24) for the full findings.
+Do not archive this plan to `ai/plans/done/` until a real Hostinger email is delivered.
+See ai/JOURNAL.md (2026-08-24) for the full findings.

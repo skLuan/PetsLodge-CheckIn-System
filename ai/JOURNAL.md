@@ -4,7 +4,94 @@
 > Purpose: give the next session (human or AI) context on what was done, what worked,
 > what didn't, and what was deliberately left alone.
 >
-> Companion files: `AGENTS.md` (project map), `AIplans/00-MASTER-PLAN-v1.0-beta.md` (roadmap).
+> Companion files: `CLAUDE.md` (operating guide), `AGENTS.md` (project map),
+> `ai/plans/00-MASTER-PLAN-v1.0-beta.md` (roadmap). Older entries use the pre-2026-11-06
+> paths (`AIplans/`, `plans/`, root `JOURNAL.md`) — mapping in `ai/README.md`.
+
+---
+
+## Session 2026-11-06 — Bug: editing a check-in duplicated its pets
+
+**Branch:** `feature/07-printnode-base64-printing` (fix sits uncommitted on top of it).
+
+**Report:** edit a 1-pet check-in, add a second pet, save → the owner ended up with
+**3** check-ins (and 3 pets), not 2.
+
+### Root cause (three compounding defects)
+
+1. `CheckInTransformer::transformCheckInToCookieFormat()` never put the pet's DB id in
+   the cookie, so step 2 (`processPetInfo`) saw no `petId` and **created a new pet**.
+2. Step 3 (`submitPetHealth`) **always** `CheckIn::create()`d a "temporary" row. Step 4
+   then looked up the pet's open row and returned the oldest — so even with a `petId`,
+   an edit would have left an orphan row (with the foods/medicines on it).
+3. Steps 3 and 5 **appended** foods, medicines and items every save; extra services used
+   `syncWithoutDetaching`, so unticking one while editing never removed it.
+
+Result: original row untouched + a copy of the edited pet + the added pet = 3.
+
+### Fix
+
+- Transformer emits `info.petId` (same key `FastCheckinManager` already sends).
+- `CheckInService::findActiveCheckIn()` / `findOrCreateActiveCheckIn()` — steps 3 and 4
+  now resolve the **same** row. "Active" = `check_out IS NULL` **and** status not
+  `CHECKED_OUT`/`CANCELLED` (cancel leaves `check_out` null — previously a cancelled row
+  could be revived by a new check-in).
+- Step 3 wrapped in `DB::transaction`; foods/medicines/items are **replaced** per
+  check-in; extra services use `sync()`. The payloads are full lists, never deltas.
+- `tests/Feature/EditCheckInSubmissionTest.php` (4 tests) replays the step2→5 sequence;
+  confirmed red against the old code, green with the fix.
+
+### Verification
+
+- Full suite: **136 passed / 4 failed** — the same 4 known-red tests, no new failures.
+- Pint: the new test file is clean. The touched service/controller files were already
+  non-Pint-compliant before this change; not reformatted, to keep the diff reviewable.
+- **Not verified in a browser.** Nobody re-ran the real edit flow end-to-end in the UI.
+
+### Left alone (noted, not fixed)
+
+- Step 4 still overwrites `check_in = now()` and status → `CHECKED_IN` on an existing
+  row, so editing changes the recorded arrival time and would revert a `PRINTED` /
+  `DROPPED_IN` row. Pre-existing; needs a product decision.
+- Step 3 stores `health_conditions = $healthData['unusualHealthBehavior']` (a boolean)
+  instead of `healthBehaviors`. Pre-existing.
+- The bad rows the bug already created in the dev DB were **not** cleaned up.
+
+---
+
+## Session 2026-11-06 — Docs: centralize agent docs under `ai/`, add `CLAUDE.md`
+
+**Branch:** `feature/07-printnode-base64-printing` (docs only, no code touched)
+**Status:** ✅ done. Nothing committed; moves are staged via `git mv`.
+
+### What changed
+
+- New **`ai/`** folder holds everything written for agents: `JOURNAL.md`, `plans/`
+  (master plan + `active/` / `done/` / `archive/`), `specs/` (was `openspec.md` +
+  `openspec/features/`), `implementation/` (was `implementation/` + root
+  `view-check-in-plan.md`). Index and old→new path table: `ai/README.md`.
+- `AIplans/` → `ai/plans/` (master) and `ai/plans/active/`; executed plans 01/03/07 →
+  `ai/plans/done/`; the untracked legacy docs from `plans/` → `ai/plans/archive/`.
+- `.kilo/plans/…stellar-engine.md` (a Kilo draft for per-pet `#healthInfoForm`) →
+  `ai/plans/active/04b-health-form-per-pet-draft.md`. **Not executed** — `Pill.js` has
+  no `HealthFormManager` import. It covers half of Plan 04.
+- New root **`CLAUDE.md`**: imports `AGENTS.md` and adds the session start/finish
+  checklists plus the traps distilled from this journal.
+- `.gitignore`: `/plans/` → `/ai/plans/archive/`. This removes the old trap where
+  archived plans had to be force-tracked inside an ignored folder; only the legacy
+  archive stays local-only. `.dockerignore`: `openspec/` → `ai/`.
+- Refreshed stale facts: `AGENTS.md` test baseline 62/4 → **132/4**; the master plan's
+  Plan 07 row no longer claims the real PrintNode print is unverified.
+- Living docs re-pointed (`AGENTS.md`, master plan, Plan 02, `README.md`,
+  `ai/specs/openspec.md`). Journal entries and done plans keep their old paths on purpose.
+
+### Left alone
+
+- Human docs stay put: `README.md`, `docs/`, `DOCKER_README.md`, `DEPLOYMENT_LOG.md`,
+  `CHECKIN_COOKIE_REFACTOR_README.md`.
+- `README.md` still links to `ai/plans/archive/*`, which is gitignored — those links were
+  already dead on GitHub before the move.
+- If the `openspec` CLI is ever adopted, it expects an `openspec/` folder at the root.
 
 ---
 

@@ -50,7 +50,15 @@ Editing flags are passed through the Laravel session:
    (race-condition-sensitive) and enables editing mode, snapshotting the original data.
 3. As the user edits, `EditingModeManager` diffs current vs. snapshot → change summary.
 4. Staff can **reset to original** (`FormDataManager.resetToOriginal()`).
-5. Submit persists the edited record (services handle create-vs-update).
+5. Submit persists the edited record (services handle create-vs-update). Edit reuses
+   the normal step1→step5 sequence, so it must be idempotent:
+   - the transformer puts the pet's DB id in `pets[i].info.petId` → step 2 updates
+     that pet instead of creating one;
+   - steps 3 and 4 resolve the pet's open stay via
+     `CheckInService::findActiveCheckIn()` (`check_out IS NULL`, status not
+     `CHECKED_OUT`/`CANCELLED`) → the edited row is reused, never duplicated;
+   - foods, medicines and items are replaced per check-in, extra services `sync()`ed.
+   Covered by `tests/Feature/EditCheckInSubmissionTest.php`.
 
 > ⚠️ Do not reorder the init/async sequence here — it is race-condition sensitive.
 

@@ -23,7 +23,9 @@ yarn-error.log
 /.fleet
 /.idea
 /.vscode
-/plans/
+# Legacy pre-roadmap plans (Jan–Mar 2026), kept local-only as before.
+# Everything else under ai/ is tracked normally.
+/ai/plans/archive/
 /logs
 /reports
 .kilocodemodes

@@ -1,10 +1,13 @@
 # AGENTS.md — Guide for AI Coding Agents
 
-> **Read this file first, then `JOURNAL.md`.** This file is the shortcut map of the
+> **Read this file first, then `ai/JOURNAL.md`.** This file is the shortcut map of the
 > PetsLodge project so you (an AI coding agent) don't have to re-read the whole codebase
-> every session; `JOURNAL.md` is the running log of what previous sessions actually did.
+> every session; `ai/JOURNAL.md` is the running log of what previous sessions actually did.
 > When something here goes stale, update it as part of your change — and append your
-> session to `JOURNAL.md` before you finish.
+> session to `ai/JOURNAL.md` before you finish.
+>
+> Everything written for agents (journal, plans, specs, implementation notes) lives in
+> **`ai/`** — see `ai/README.md`. Claude Code also loads `CLAUDE.md`, which imports this file.
 
 This file is written for two audiences:
 - **The AI agent** doing the work — file map, commands, conventions, gotchas.
@@ -89,7 +92,7 @@ npm run build        # production build
 
 > ⚠️ **Tests need a separate database.** They use `RefreshDatabase`, which drops every
 > table on the configured connection — this has already wiped the dev database once
-> (see JOURNAL.md, 2026-08-24). `phpunit.xml` now pins the target explicitly:
+> (see ai/JOURNAL.md, 2026-08-24). `phpunit.xml` now pins the target explicitly:
 > `<env name="DB_DATABASE" value="petslodge_testing" force="true"/>`.
 > On a fresh clone, create the schema once: `CREATE DATABASE petslodge_testing;`
 >
@@ -115,7 +118,7 @@ php artisan test --filter=SomeTest              # single test
 
 **Known-red tests (pre-existing, not your change):** `ExampleTest`, `Auth\RegistrationTest
 > new users can register`, and both `CheckInSubmissionTest` cases. The practical gate is
-"**no new failures**", not "all green". Current baseline: **62 passed / 4 failed**.
+"**no new failures**", not "all green". Current baseline: **132 passed / 4 failed** (Plan 07 + drop-in follow-ups, 2026-08-25).
 
 > The two `CheckInSubmissionTest` failures are caused by `CheckInApiController::submitCheckIn`
 > calling `CheckInService::submitCheckIn()`, **a method that does not exist** — so
@@ -217,7 +220,9 @@ The heart of the app. **`cookies-and-form/` is where most feature work happens.*
 
 ### Other
 - `database/migrations/`, `database/seeders/` — schema & seed data.
-- `docs/` — deeper developer docs (see §9). `plans/`, `AIplans/` — planning notes.
+- `docs/` — deeper developer docs (see §9).
+- `ai/` — everything for agents: `JOURNAL.md`, `plans/` (roadmap + `active/` / `done/` /
+  `archive/`), `specs/` (OpenSpec feature specs), `implementation/`. Index: `ai/README.md`.
 - `config/`, `.env` (local secrets), `.env.example` (template).
 
 ---
@@ -402,8 +407,8 @@ Common symptoms → look here:
 
 | File | When to read it |
 |------|-----------------|
-| `JOURNAL.md` | **Read at the start of every session.** What previous agent sessions did, what worked, what didn't, and known-broken things deliberately left alone. |
-| `AIplans/00-MASTER-PLAN-v1.0-beta.md` | Roadmap to v1.0-beta and the phase order. |
+| `ai/JOURNAL.md` | **Read at the start of every session.** What previous agent sessions did, what worked, what didn't, and known-broken things deliberately left alone. |
+| `ai/plans/00-MASTER-PLAN-v1.0-beta.md` | Roadmap to v1.0-beta and the phase order. |
 | `README.md` | Full feature list, setup, troubleshooting. |
 | `docs/DATA_FLOW.md` | Complete architecture of the cookie data flow. |
 | `docs/DEVELOPER_GUIDE.md` | FormDataManager API usage & examples. |
@@ -412,7 +417,10 @@ Common symptoms → look here:
 | `docs/MIGRATION_GUIDE.md` | Upgrading between versions of the system. |
 | `DOCKER_README.md` | Docker details. |
 | `CHECKIN_COOKIE_REFACTOR_README.md` | History/rationale of the cookie refactor. |
-| `plans/` , `AIplans/` | Prior implementation plans & phase reports. |
+| `ai/plans/active/`, `ai/plans/done/` | Pending plans / executed plans with Execution notes. |
+| `ai/plans/archive/` | Legacy (Jan–Mar 2026) data-flow refactor plans & phase reports. Gitignored, local only. |
+| `ai/specs/` | OpenSpec manifest (`openspec.md`) + one spec per feature (`features/`). |
+| `ai/implementation/` | Implementation notes (loading/FOUC, per-mascot refactor, view-check-in). |
 
 ---
 
