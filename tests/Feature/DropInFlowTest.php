@@ -300,6 +300,62 @@ class DropInFlowTest extends TestCase
     }
 
     // =====================================================================
+    // Cancelled check-ins are not part of a drop-in
+    // (cancel sets the status but leaves check_out null)
+    // =====================================================================
+
+    private function cancel(CheckIn $checkIn): CheckIn
+    {
+        $checkIn->update(['status_id' => Status::where('name', 'CANCELLED')->first()->id]);
+
+        return $checkIn;
+    }
+
+    /** @test */
+    public function a_cancelled_pet_is_not_shown_on_the_drop_in_page(): void
+    {
+        $owner = $this->owner();
+        $current = $this->checkInFor($owner, 'Pulsiani');
+        // Newest row — it would have been picked as the booking's anchor.
+        $this->cancel($this->checkInFor($owner, 'Ghost'));
+
+        $response = $this->confirmationPage($this->staff(), $owner);
+
+        $response->assertOk()->assertSee('Pulsiani')->assertDontSee('Ghost');
+        $this->assertSame((string) $current->id, $this->renderedCheckInId($response->getContent()));
+    }
+
+    /** @test */
+    public function an_owner_whose_only_check_in_was_cancelled_is_not_offered_a_signature_pad(): void
+    {
+        $owner = $this->owner();
+        $this->cancel($this->checkInFor($owner, 'Ghost'));
+
+        $response = $this->confirmationPage($this->staff(), $owner);
+
+        $response->assertOk()->assertDontSee('Ghost');
+        $this->assertSame(0, substr_count($response->getContent(), '<canvas'));
+
+        $this->actingAs($this->staff())->postJson(route('drop-in.check-user'), ['phone' => $owner->phone])
+            ->assertOk()->assertJson(['hasCheckIn' => false]);
+    }
+
+    /** @test */
+    public function signing_does_not_cover_a_cancelled_pet(): void
+    {
+        $owner = $this->owner();
+        $current = $this->checkInFor($owner, 'Pulsiani');
+        $cancelled = $this->cancel($this->checkInFor($owner, 'Ghost'));
+
+        $this->actingAs($this->staff())->postJson(route('signatures.store'), [
+            'image' => 'data:image/png;base64,'.self::PNG_1X1,
+            'check_in_id' => $current->id,
+        ])->assertCreated()->assertJsonPath('checkInIds', [$current->id]);
+
+        $this->assertSame(0, Signature::where('check_in_id', $cancelled->id)->count());
+    }
+
+    // =====================================================================
     // The failure that actually happened
     // =====================================================================
 

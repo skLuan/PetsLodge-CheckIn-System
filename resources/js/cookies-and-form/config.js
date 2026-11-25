@@ -14,7 +14,8 @@ const FORM_CONFIG = {
 
     // Nuevas configuraciones útiles
     MAX_PETS: 10,
-    COOKIE_SIZE_LIMIT: 4096, // 4KB
+    // Form data lives in localStorage (~5MB). This only triggers a console warning.
+    STORAGE_WARN_SIZE: 1000000,
     DEBUG_MODE: true, // Para activar logging adicional
 };
 

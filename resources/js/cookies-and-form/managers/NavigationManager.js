@@ -155,6 +155,16 @@ class NavigationManager {
 
         if (!nextButton) return;
 
+        // List steps are only rendered for the step that is current when data changes
+        // (UIManager.updateUIFromCookieData). Render them on step entry too, otherwise
+        // reloading on another step and navigating here shows them empty.
+        if (currentStep === FORM_CONFIG.STEPS.FEEDING_MEDICATION - 1 || currentStep === FORM_CONFIG.STEPS.INVENTORY - 1) {
+            const cookieData = FormDataManager.getCheckinData();
+            if (cookieData) {
+                FormDataManager.updateUIFromCookieData(cookieData);
+            }
+        }
+
         // Update grooming summary when reaching the grooming or final step
         if (currentStep === FORM_CONFIG.STEPS.GROOMING - 1 || currentStep === FORM_CONFIG.STEPS.THANKS - 1) {
             PopupManager.updateGroomingSummary();

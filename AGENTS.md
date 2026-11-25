@@ -20,9 +20,10 @@ This file is written for two audiences:
 **PetsLodge** is a pet-lodging (boarding) management system. Front-desk staff **check
 pets in** through a multi-step form, manage **pet profiles** (health, feeding,
 medication), track **services** (grooming, inventory), and **print/PDF** a check-in
-summary. The signature piece of the app is a **cookie-based form data flow**: the whole
-check-in form's state lives in a browser cookie (`pl_checkin_data`) that acts as the
-single source of truth, with automatic UI updates when the data changes.
+summary. The signature piece of the app is a **cookie-based form data flow** (historic
+name): the whole check-in form's state lives in one browser entry (`pl_checkin_data`,
+in **localStorage** since 2026-11-06 — it used to be a cookie) that acts as the single
+source of truth, with automatic UI updates when the data changes.
 
 ---
 
@@ -118,7 +119,7 @@ php artisan test --filter=SomeTest              # single test
 
 **Known-red tests (pre-existing, not your change):** `ExampleTest`, `Auth\RegistrationTest
 > new users can register`, and both `CheckInSubmissionTest` cases. The practical gate is
-"**no new failures**", not "all green". Current baseline: **132 passed / 4 failed** (Plan 07 + drop-in follow-ups, 2026-08-25).
+"**no new failures**", not "all green". Current baseline: **152 passed / 4 failed** (booking view + signed-delete guard, 2026-11-06).
 
 > The two `CheckInSubmissionTest` failures are caused by `CheckInApiController::submitCheckIn`
 > calling `CheckInService::submitCheckIn()`, **a method that does not exist** — so
@@ -162,7 +163,8 @@ The heart of the app. **`cookies-and-form/` is where most feature work happens.*
 | Path | What it does |
 |------|--------------|
 | `cookies-and-form/FormDataManager.js` | **Main public API** for form data. Start here for form-state work. |
-| `cookies-and-form/CookieManager.js` / `CookieHandler.js` | Read/write the `pl_checkin_data` cookie. |
+| `cookies-and-form/StorageManager.js` | Reads/writes `pl_checkin_data` in **localStorage** (envelope with 7-day `expiresAt`; falls back to cookies if localStorage is unavailable). Used only by `CoreDataManager`. |
+| `cookies-and-form/CookieManager.js` / `CookieHandler.js` | Generic cookie helpers (legacy `pl_checkin_data` cookie migration, small id cookies from `SubmissionManager`). |
 | `cookies-and-form/config.js` | Cookie/form configuration. |
 | `cookies-and-form/form-processor.js` | Processes/normalizes form data. |
 | `cookies-and-form/managers/` | Specialized managers (one concern each) — see below. |
@@ -188,7 +190,8 @@ The heart of the app. **`cookies-and-form/` is where most feature work happens.*
 | Path | What it does |
 |------|--------------|
 | `checkIn.blade.php` | Main check-in page (route `/check-in`). |
-| `view-check-in.blade.php`, `Process.blade.php` | View / process a check-in. |
+| `view-check-in.blade.php` | The client's current visit: **one card per booking** (every open pet); per-pet sections in `components/view-check-in/pet-section.blade.php`. |
+| `Process.blade.php` | The multi-step wizard (new / pre-filled / edit). |
 | `components/forms/` | Form partials: `pet-info`, `health-info`, `food-medication`, `inventory`, `owner-info`. |
 | `components/steps/` | One component per wizard step: `owner-info`, `pet-info`, `feeding-medication`, `health-info`, `inventory`, `grooming`, `review-submit`. |
 | `components/ui/` | Shared form/visual primitives: `input`, `select`, `radio`, `checkbox`, `date-picker`, `field`, `card`. |
@@ -207,7 +210,9 @@ The heart of the app. **`cookies-and-form/` is where most feature work happens.*
 
 ### Routes
 - `routes/web.php` — pages: `/check-in` (phone entry), `/new-form` (the actual multi-step
-  form), `/edit-check-in/{id}`, `/view-check-in`, `/drop-in`, `/petstaff/dashboard`,
+  form), `/edit-check-in/{id}` (edits the whole booking), `/view-check-in`,
+  `/delete-check-in/{id}` (one pet), `/delete-booking/{id}`, `POST /check-in/booking/prune`
+  (after an edit; web so it can see a staff session), `/drop-in`, `/petstaff/dashboard`,
   `/petstaff/terms`, `/signatures` (store/show), `/petstaff/check-in/{id}/document`,
   `/health`, admin monitoring.
 - `routes/api.php` — form API: `/api/checkin/submit`, `/api/checkin/autosave`,
@@ -232,12 +237,26 @@ The heart of the app. **`cookies-and-form/` is where most feature work happens.*
 The check-in form does **not** keep state in scattered variables. Instead:
 
 ```
-Database → Laravel Session → DOM data-* attributes → Cookie (pl_checkin_data) → Form UI
+Database → Laravel Session → DOM data-* attributes → localStorage (pl_checkin_data) → Form UI
 ```
 
+> **"Cookie" in this codebase means the `pl_checkin_data` localStorage entry.** It was a
+> real cookie until 2026-11-06, when multi-pet check-ins hit the 4 KB cookie cap
+> ("Cookie data too large"). The server never read it — data reaches Laravel only through
+> the step1–5 JSON bodies. Class/method names (`CookieReactivityManager`,
+> `getCookieSize`, …) were kept. Don't move it back to a cookie.
+
 Rules that keep this from breaking:
-1. **The cookie is the single source of truth.** All form state lives in `pl_checkin_data`.
-2. **Session data is merged into the cookie once** at init, in a specific order.
+1. **The cookie is the single source of truth.** All form state lives in `pl_checkin_data`;
+   read/write it only through `CoreDataManager` (which uses `StorageManager`).
+2. **Session data is merged into the cookie once** at init, in a specific order. The
+   wizard's prefill comes **only** from the one-shot flash key `wizard`
+   (`prefill` + `editing_check_in_id`, set by `CheckInFormController::editCheckIn`) —
+   never from `checkin_data`, which belongs to the drop-in flow. The draft also keeps a
+   `sessionSeed` so the same payload is never merged twice.
+   **UI renders per step:** `UIManager.updateUIFromCookieData` only paints the step in
+   `?step=`, so `NavigationManager.updateTabbarForStep` repaints the feeding/inventory
+   lists on step entry. A new list-type step needs the same.
 3. **Editing mode is explicit** — a dedicated flag tracks edit-vs-create, and an
    *original data snapshot* is stored so changes can be diffed and reset.
 4. **Transformations are lossless & null-safe** (see `CheckInTransformer`).
@@ -351,6 +370,12 @@ Rules that keep this from breaking:
    rejects before anything touches the disk.
 5. **Rows are append-only.** Re-signing inserts a new row; the newest one for a
    check-in is the effective signature. Never update or delete one.
+   **A signed check-in can only be deleted by pet staff or above**
+   (`User::isPetStaff()` = `PET_STAFF`/`SUPER_ADMIN`, same as `pet.staff.only`):
+   `CheckIn::canBeDeletedBy()` gates `deleteCheckIn`, `deleteBooking` (all or nothing)
+   and the edit prune (keeps signed rows, reports `kept_signed_check_in_ids`). Caveat:
+   `signatures.check_in_id` is `cascadeOnDelete`, so when staff does delete, the
+   signature rows go with it (the PNG stays on disk).
 6. **A drop-in cannot complete unsigned.** `DropInController::readyToPrint` returns
    `422 {requiresSignature: true}` when no `drop-in` signature exists for the
    check-in. The disabled print button is a convenience; this is the enforcement.
@@ -399,7 +424,8 @@ Common symptoms → look here:
 - **Changes not detected** → editing mode on? original snapshot stored?
 - **UI not updating** → reactivity listeners registered? console errors from
   MutationObserver? try `CookieReactivityManager.triggerCheck()`.
-- **Cookie too big** → too many pets/inventory items; check `debugCheckinData()`.
+- **"Cookie data too large"** → stale build from before the localStorage move; `npm run build` + hard reload.
+  Stored size: `debugCheckinData()` (DevTools → Application → Local Storage → `pl_checkin_data`).
 
 ---
 

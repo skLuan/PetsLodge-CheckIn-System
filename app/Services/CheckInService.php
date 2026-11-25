@@ -6,6 +6,7 @@ use App\Models\CheckIn;
 use App\Models\Item;
 use App\Models\ExtraService;
 use App\Models\Status;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -14,12 +15,6 @@ use Illuminate\Support\Facades\Log;
  */
 class CheckInService
 {
-    /**
-     * Statuses of a stay that is over. A row in one of these is history, never
-     * something a new or edited submission may write into.
-     */
-    private const CLOSED_STATUSES = ['CHECKED_OUT', 'CANCELLED'];
-
     /**
      * The pet's current, still-open stay, if any.
      *
@@ -34,10 +29,53 @@ class CheckInService
     public function findActiveCheckIn($pet): ?CheckIn
     {
         return CheckIn::where('pet_id', $pet->id)
-            ->whereNull('check_out')
-            ->whereHas('status', fn ($query) => $query->whereNotIn('name', self::CLOSED_STATUSES))
+            ->open()
             ->orderBy('id')
             ->first();
+    }
+
+    /**
+     * Delete one pet's row of a booking together with what hangs off it.
+     */
+    public function deleteCheckIn(CheckIn $checkIn): void
+    {
+        DB::transaction(function () use ($checkIn) {
+            $checkIn->foods()->delete();
+            $checkIn->medicines()->delete();
+            $checkIn->items()->delete();
+            $checkIn->extraServices()->detach();
+            $checkIn->delete();
+        });
+    }
+
+    /**
+     * After an edited booking is re-submitted, delete the rows of pets the
+     * client removed in the wizard. The submission only ever writes the pets it
+     * still has, so without this a removed pet stays in the booking.
+     *
+     * A signed row is only deleted when pet staff is the one editing; otherwise
+     * it is kept and reported back.
+     *
+     * @param  int[]  $keptPetIds  Pet ids the submission just saved.
+     * @return array{deleted: int[], kept_signed: int[]} Check-in ids.
+     */
+    public function pruneBooking(CheckIn $anchor, array $keptPetIds, ?User $actor = null): array
+    {
+        $removed = CheckIn::openBookingOf($anchor->user_id)
+            ->whereNotIn('pet_id', $keptPetIds)
+            ->withExists('signatures')
+            ->get();
+
+        [$deletable, $protected] = $removed->partition(fn (CheckIn $checkIn) => $checkIn->canBeDeletedBy($actor));
+
+        foreach ($deletable as $checkIn) {
+            $this->deleteCheckIn($checkIn);
+        }
+
+        return [
+            'deleted' => $deletable->pluck('id')->values()->all(),
+            'kept_signed' => $protected->pluck('id')->values()->all(),
+        ];
     }
 
     /**

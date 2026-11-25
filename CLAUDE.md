@@ -82,8 +82,11 @@ Older journal entries and done plans mention `AIplans/`, `plans/` and a root
 - `dropped_in()` sets `check_out = now()` like `checkout()` does. Looks wrong, is
   pre-existing — leave it (candidate for Plan 05).
 - The check-in wizard never produces a PDF; only the drop-in flow does.
-- A multi-pet booking = the owner's rows with `check_out IS NULL`
-  (`CheckIn::bookingSiblings()`): one drop-in signature and one PDF cover every pet.
+- A multi-pet booking = the owner's **open** rows (`check_out IS NULL` and not
+  `CANCELLED` — cancel leaves `check_out` null): `CheckIn::scopeOpen()`. Drop-in uses
+  `bookingSiblings()`, `/view-check-in` and Edit use `openBookingOf()`; one drop-in
+  signature and one PDF cover every pet. Don't query `whereNull('check_out')` alone.
+- A **signed** check-in can only be deleted by pet staff or above (`canBeDeletedBy()`).
 - **The app is not live yet**, which is why Plan 07 could be destructive. If real
   check-ins exist, destructive migrations without backfill are wrong — stop and re-plan.
 

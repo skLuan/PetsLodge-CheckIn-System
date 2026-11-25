@@ -67,14 +67,28 @@ document.addEventListener("DOMContentLoaded", async function () {
 
      // CRITICAL FIX #1: THEN merge session data and set editing mode
      // This ensures editing mode is preserved after initialization
+     //
+     // The Laravel session keeps `checkin_data` across reloads, so merge each payload
+     // only ONCE (tracked by `sessionSeed`). Re-merging on every reload overwrote the
+     // draft: deepMerge replaces arrays, wiping feeding/medication added since.
      if (sessionData && Object.keys(sessionData).length > 0) {
-         FormDataManager.mergeSessionDataIntoCookie(sessionData);
-         console.log('Session data merged into cookie for pre-population:', sessionData);
+         const sessionSeed = fingerprint(JSON.stringify(sessionData));
+         const alreadySeeded = FormDataManager.getCheckinData()?.sessionSeed === sessionSeed;
 
-         // If in editing mode, enable editing mode tracking
-         if (isEditingMode && editingCheckInId) {
-             FormDataManager.setEditingMode(editingCheckInId, sessionData);
-             console.log(`✏️ Editing mode enabled for check-in #${editingCheckInId}`);
+         if (!alreadySeeded) {
+             FormDataManager.mergeSessionDataIntoCookie(sessionData);
+             console.log('Session data merged into cookie for pre-population:', sessionData);
+
+             // If in editing mode, enable editing mode tracking
+             if (isEditingMode && editingCheckInId) {
+                 FormDataManager.setEditingMode(editingCheckInId, sessionData);
+                 console.log(`✏️ Editing mode enabled for check-in #${editingCheckInId}`);
+             }
+
+             // Goes through FormDataManager so the UI re-renders with the merged data
+             FormDataManager.updateCheckinData({ sessionSeed });
+         } else {
+             console.log('Session data already merged into this draft, keeping local changes');
          }
      }
 
@@ -247,6 +261,17 @@ document.addEventListener("DOMContentLoaded", async function () {
         });
     }
 });
+
+/**
+ * Short, stable hash of a string (djb2) — identifies a session payload
+ */
+function fingerprint(str) {
+    let hash = 5381;
+    for (let i = 0; i < str.length; i++) {
+        hash = ((hash << 5) + hash + str.charCodeAt(i)) | 0;
+    }
+    return (hash >>> 0).toString(36);
+}
 
 window.debugCookies = () => {
     return FormDataManager.debugCheckinData();

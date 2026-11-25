@@ -164,6 +164,33 @@ class CheckInTransformer
     }
 
     /**
+     * A booking shaped for the check-in wizard, so Edit opens every pet at once.
+     *
+     * Adds `grooming.pets` — the indexes of the pets that had services — which
+     * SubmissionManager reads to decide who gets grooming. Missing, it grooms
+     * every pet. Not part of transformCheckInsToCookieFormat(): the printed
+     * summary lists every truthy grooming key and would print "Pets".
+     *
+     * @param  \Illuminate\Support\Collection<int, CheckIn>  $checkIns  Relationships pre-loaded.
+     */
+    public function transformBookingForWizard($checkIns): array
+    {
+        $checkIns = $checkIns->values();
+        $data = $this->transformCheckInsToCookieFormat($checkIns);
+
+        $groomedPets = $checkIns
+            ->filter(fn (CheckIn $checkIn) => $checkIn->extraServices->isNotEmpty())
+            ->keys()
+            ->all();
+
+        if ($groomedPets !== []) {
+            $data['grooming']['pets'] = $groomedPets;
+        }
+
+        return $data;
+    }
+
+    /**
      * Transform cookie format data to check-in data structure
      *
      * PHASE 2.4: Implemented reverse transformation for submitting edited check-ins

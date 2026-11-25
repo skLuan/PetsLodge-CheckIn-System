@@ -30,6 +30,31 @@ class CheckIn extends Model
     ];
 
     /**
+     * Statuses of a stay that is over. A row in one of these is history, never
+     * part of the visit the client is looking at or editing.
+     */
+    public const CLOSED_STATUSES = ['CHECKED_OUT', 'CANCELLED'];
+
+    /**
+     * Rows still in progress. `CANCELLED` is excluded explicitly: cancelling
+     * sets the status but leaves `check_out` null.
+     */
+    public function scopeOpen($query)
+    {
+        return $query->whereNull('check_out')
+            ->whereHas('status', fn ($status) => $status->whereNotIn('name', self::CLOSED_STATUSES));
+    }
+
+    /**
+     * The owner's current visit as the client sees it: one row per pet,
+     * oldest first, so the first row's id is the booking's id.
+     */
+    public function scopeOpenBookingOf($query, int $userId)
+    {
+        return $query->where('user_id', $userId)->open()->orderBy('id');
+    }
+
+    /**
      * Every check-in row of the booking this one belongs to.
      *
      * The wizard writes one row per pet, so "one check-in with two pets" is two
@@ -37,17 +62,38 @@ class CheckIn extends Model
      * set, not the row: the owner's still-present pets, oldest first, with this
      * row's own id first in line as the anchor.
      *
-     * Scoped to `check_out IS NULL` — a pet already collected is not part of the
-     * booking being dropped in.
+     * Scoped to open rows — a pet already collected, or a cancelled one (cancel
+     * leaves `check_out` null), is not part of the booking being dropped in.
      */
     public function bookingSiblings()
     {
         return static::query()
             ->where('user_id', $this->user_id)
             ->where(function ($query) {
-                $query->whereNull('check_out')->orWhere('id', $this->id);
+                $query->where(fn ($open) => $open->open())->orWhere('id', $this->id);
             })
             ->orderBy('id');
+    }
+
+    /** Signing events for this row. Drop-in records one on every row of the booking. */
+    public function signatures()
+    {
+        return $this->hasMany(Signature::class);
+    }
+
+    /**
+     * A signed check-in is legal evidence of consent: only pet staff (or above)
+     * may delete it. `signatures_exists` is used when loaded via withExists().
+     */
+    public function isSigned(): bool
+    {
+        return (bool) ($this->signatures_exists ?? $this->signatures()->exists());
+    }
+
+    /** Whether $user may delete this row (null = guest). */
+    public function canBeDeletedBy(?User $user): bool
+    {
+        return ! $this->isSigned() || ($user?->isPetStaff() ?? false);
     }
 
     public function pet()

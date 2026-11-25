@@ -1,4 +1,5 @@
 import { CookieManager } from "../CookieManager.js";
+import { StorageManager } from "../StorageManager.js";
 import { CoreDataManager } from "./CoreDataManager.js";
 import { PetManager } from "./PetManager.js";
 
@@ -14,17 +15,17 @@ class UtilitiesManager {
         console.group("🍪 Checkin Debug Information");
         console.log("Full checkin data:", checkinData);
         console.log("Pets count:", checkinData?.pets?.length || 0);
-        console.log("Cookie size:", CookieManager.getCookieSize(), "bytes");
+        console.log("Stored size:", this.getCookieSize(), "characters (localStorage)");
         console.log("Auto-save active:", !!this.autoSaveTimer);
         console.groupEnd();
         return checkinData;
     }
 
     /**
-     * Obtiene el tamaño total de las cookies en bytes
+     * Tamaño de los datos del checkin guardados (localStorage)
      */
     static getCookieSize() {
-        return CookieManager.getCookieSize();
+        return StorageManager.size(CoreDataManager.CHECKIN_COOKIE_NAME);
     }
 
     /**

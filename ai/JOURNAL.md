@@ -10,6 +10,212 @@
 
 ---
 
+## Session 2026-11-06 (d) — Signed check-ins: staff-only delete; drop-in ignores cancelled
+
+**Branch:** `feature/07-printnode-base64-printing` (uncommitted, on top of (c)).
+
+**Requests:** (1) a signed check-in may only be deleted by pet staff or above;
+(2) cancelled check-ins must not appear in drop-in.
+
+### What changed
+
+- `User::isPetStaff()` (`PET_STAFF`/`SUPER_ADMIN`, case-insensitive) — `PetStaffOnly`
+  now uses it, so "staff or above" has one definition. `ADMIN` (monitoring) is not included.
+- `CheckIn::signatures()`, `isSigned()` (uses `withExists('signatures')` when loaded),
+  `canBeDeletedBy(?User)`. Drop-in writes a signature on every row of the booking, so
+  "signed" is per row.
+- `deleteCheckIn` / `deleteBooking` (all or nothing): a non-staff delete of a signed row →
+  `403 {message}` for JSON, redirect with `error` otherwise. The view hides those buttons
+  ("🔒 Signed — only pet staff can delete") and the JS alert now shows the server's message.
+- Prune moved from `api.php` to **web** `POST /check-in/booking/prune`
+  (`check-in.booking.prune`) — the api group is stateless and could never see the staff
+  session. Signed rows are kept unless staff is editing; reported as
+  `kept_signed_check_in_ids`, and `SubmissionManager` alerts the user.
+- Drop-in: `bookingSiblings()` now uses `open()` (anchor still always included);
+  `showDropConfirmation` and `DropInController::checkUser` pick the anchor with `open()`;
+  `CheckInApiController::checkUser`'s `hasCheckIn` uses `open()`. That last one is also the
+  `/check-in` phone-entry check — an owner whose only check-in was cancelled is now treated
+  as having none there too.
+
+### Verification
+
+- New tests: 3 in `DropInFlowTest` (cancelled pet not on the page / not the anchor; only
+  cancelled → no pad and `hasCheckIn: false`; signing skips a cancelled row), 5 in
+  `ViewCheckInBookingTest` (client/guest 403 on a signed pet and on a booking with one;
+  PET_STAFF and SUPER_ADMIN can; prune keeps signed unless staff; view hides the buttons).
+  8 red before, green after.
+- Full suite **152 passed / 4 failed** (same 4 known-red). Pint clean on touched model /
+  test / middleware files (Pint also fixed one `! ` spacing nit in `PetStaffOnly.php`).
+- `npm run build` OK; headless Chrome: edit → remove a pet → submit still prunes through the
+  new web route (CSRF + session OK). Throwaway owner `0999000111` deleted afterwards.
+
+### Left alone (noted, not fixed)
+
+- `signatures.check_in_id` is still `cascadeOnDelete`: when staff deletes a signed
+  check-in the signature rows go with it (the PNG stays on disk). Keeping them would need
+  a migration (`nullOnDelete`) — product decision.
+- Unsigned deletes are still allowed for anyone with the link (client self-service).
+
+### Left for a human
+
+- Decide whether `ADMIN` should also count as "pet staff or above".
+- Decide on the signature cascade above.
+
+---
+
+## Session 2026-11-06 (c) — One check-in per booking on `/view-check-in`
+
+**Branch:** `feature/07-printnode-base64-printing` (uncommitted, on top of (b); no new branch).
+
+**Report:** `/view-check-in?phone=…` showed one card per pet (#0031 Leouch, #0032
+Mauro), each with its own Edit/Delete and the shared items repeated. The client expects
+ONE check-in holding every pet they brought.
+
+### What changed (no schema change — still one `check_ins` row per pet)
+
+- `CheckIn::CLOSED_STATUSES`, `scopeOpen()` (`check_out IS NULL` + status not
+  CHECKED_OUT/CANCELLED) and `scopeOpenBookingOf($userId)`. `CheckInService` now uses
+  them instead of its private copy.
+- `viewCheckIn`: one card for the booking — header (first row's id, all pet names, Edit,
+  Delete), one section per pet (`components/view-check-in/pet-section.blade.php`, Remove
+  shown when >1 pet), inventory once (de-duplicated; step 5 copies it onto every row).
+  Cancelled rows no longer show (they did before).
+- `editCheckIn`: prefills the wizard with the **whole booking**
+  (`CheckInTransformer::transformBookingForWizard()` = `transformCheckInsToCookieFormat()`
+  + `grooming.pets` indexes — without it `SubmissionManager` grooms every pet);
+  `editing_check_in_id` = the booking's first id. Kept out of the shared method because
+  `pdf-for-print.blade.php` prints every truthy grooming key.
+- Pet removed in the wizard while editing → deleted on save (user's choice):
+  `SubmissionManager` collects the saved pet ids and calls new
+  `POST /api/checkin/booking/prune` (`pet_ids` min:1) → `CheckInService::pruneBooking()`.
+  Non-critical like the session update.
+- New `DELETE /delete-booking/{id}` (whole booking); `deleteCheckIn` (one pet) now goes
+  through `CheckInService::deleteCheckIn()` (transaction).
+
+### Verification
+
+- `tests/Feature/ViewCheckInBookingTest.php` (6 tests, through the routes): 5 red before,
+  all green after (the per-pet delete one is a regression guard).
+- Full suite **144 passed / 4 failed** — the same 4 known-red.
+- Pint clean on the new test, `CheckIn.php`, `CheckInTransformer.php`.
+  `CheckInFormController.php` / `CheckInService.php` / `CheckInApiController.php` were already
+  non-compliant at HEAD — not reformatted.
+- `npm run build` OK. Headless Chrome (CDP, scratchpad script) against a throwaway owner
+  `0999000111` in the dev DB (deleted afterwards): one card with 2 pets + item once; Edit
+  loads both pets with `grooming.pets=[1]`; removing one in the draft + Submit → prune
+  deleted its row, view shows one pet; Remove and Delete buttons work.
+
+### Left alone (noted, not fixed)
+
+- `/view-check-in` loads `form-processor.js` without the wizard DOM →
+  `PopupManager.initializeFeedingMedicationPopup` throws `Cannot read properties of null`.
+  Pre-existing (the script slot is unchanged from HEAD).
+- `CheckIn::bookingSiblings()` (drop-in, signatures) still includes CANCELLED rows.
+  *(Fixed in (d).)*
+- `PetManager.removePetFromCheckin()` does not re-index `grooming.pets`, so removing a pet
+  can shift grooming to the wrong pet. Pre-existing, also affects new check-ins.
+- `signatures.check_in_id` is `cascadeOnDelete` — deleting a signed check-in (one pet or
+  booking) deletes its signature rows, which are legal evidence. Pre-existing; the delete
+  routes are also unauthenticated. *(Signed deletes are staff-only since (d); the cascade remains.)*
+
+### Left for a human
+
+- Browser QA on the tablet: a 2–3 pet booking → view → Edit → remove one pet → Submit;
+  per-pet Remove; Delete check-in.
+- Decide whether deleting a signed check-in should be blocked (see signatures above).
+
+---
+
+## Session 2026-11-06 (b) — Bug: "Cookie data too large, cannot save"
+
+**Branch:** `feature/07-printnode-base64-printing` (uncommitted, on top of the edit-duplication fix below; no new branch created).
+
+**Report:** adding items in the check-in form logged `Cookie data too large, cannot save.
+Size limit exceeded.` (`CoreDataManager.js:84`) and the change was dropped.
+
+### Root cause
+
+`CookieManager.canSetCookie()` capped `pl_checkin_data` at 4096 chars **after**
+`encodeURIComponent` (JSON punctuation ×3 → ~2–2.5 KB real JSON). Edit mode stores a full
+`editingMode.originalData` copy in the same cookie, doubling it. The server never reads
+this cookie (no `$request->cookie` in `app/`), yet it was uploaded on every request.
+
+### Fix (option chosen with the user: localStorage, 7-day expiry — Plan 05 item 4)
+
+- New `resources/js/cookies-and-form/StorageManager.js`: localStorage with an envelope
+  `{v, expiresAt, data}`; expired/corrupt entries are removed and read as `null`; falls
+  back to `CookieManager` if localStorage is unavailable.
+- `CoreDataManager` reads/writes through it; 4 KB pre-check removed; soft
+  `FORM_CONFIG.STORAGE_WARN_SIZE` warning instead of `COOKIE_SIZE_LIMIT`.
+  `migrateLegacyCookie()` moves an existing cookie draft into localStorage and deletes the
+  cookie; `clearCheckinData()` removes both.
+- `UtilitiesManager.getCookieSize()` / `debugCheckinData()` report the stored size.
+- Reactivity untouched (it already reads via `CoreDataManager.getCheckinData()`); init
+  order in `form-processor.js` untouched.
+- Docs: `AGENTS.md` (§1, §5, §6, §8), `docs/DATA_FLOW.md`, Plan 05 item 4.
+
+### Verification
+
+- `npm run build` OK (the dynamic-import warnings are pre-existing).
+- Node sanity script with a fake localStorage/cookie jar: migration, a 7.3 KB-encoded
+  8-pet payload saved and read back, expiry, corrupt entry, clear — all pass.
+- PHP suite: **136 passed / 4 failed** — same 4 known-red, no new failures (JS-only change).
+- **Not verified in a real browser** (no browser available this session).
+
+### Follow-up bug: reload wiped feeding added while editing
+
+**Report:** after adding food in an edit, reloading showed an empty feeding step.
+**Cause (pre-existing, not from the localStorage move):** `CheckInFormController::editCheckIn`
+puts `checkin_data` in the Laravel session and nothing ever removes it, so
+`Process.blade.php` re-emits it on **every** load and `form-processor.js` re-merged it
+each time. `deepMerge` replaces arrays → `pets` came back from the DB without the new
+feeding. The merge also wrote via `CoreDataManager` (no reactivity trigger), so the
+screen and the stored draft disagreed.
+**Fix:** `form-processor.js` stores a `sessionSeed` (djb2 fingerprint of the session
+payload) in the draft and skips the merge when it matches; after a real merge it writes
+the seed through `FormDataManager.updateCheckinData()`, which re-renders the UI.
+**Verified** in headless Chrome over CDP against the dev DB: edit #28 → add item → two
+reloads keep it in storage and on screen; then edit #29 → new payload merges (5 foods
+shown); no console errors.
+**Server side, same session (user asked):** `editCheckIn` now `flash()`es
+`wizard.prefill` + `wizard.editing_check_in_id` (one request — the redirect), and
+`Process.blade.php` reads only those. The persistent `checkin_data` / `editing_mode` /
+`editing_check_in_id` are no longer read by the wizard, so reloads and the drop-in
+flow's `checkin_data` (`DropInController` lines ~59/134) can't leak in. Editing mode
+survives reloads through the draft's `editingMode`. Test:
+`tests/Feature/WizardPrefillSessionTest.php` (2 tests, red before / green after).
+
+### Follow-up bug 2: feeding empty after reload "sometimes"
+
+**Report:** add pet + food + items, reload → feeding step empty; reload again → fine.
+**Cause (pre-existing):** `UIManager.updateUIFromCookieData` only renders the step in
+`?step=`. Reloading on Inventory (step 4) and pressing Previous — or reloading on step 2
+and pressing Next — entered the feeding step without anything rendering its lists. The
+second reload happened *on* step 3, so it "worked". Reproduced in headless Chrome.
+**Fix:** `NavigationManager.updateTabbarForStep()` (called by `tabbar.js` on every step
+change) re-renders the feeding and inventory steps on entry, like it already did for the
+final summary.
+**Verified (headless Chrome, edit #29):** reload at 4 → Previous, reload at 3, reload at
+2 → Next all show the 5 DB foods + the added one; storage keeps it; no console errors.
+Full suite **138 passed / 4 failed** (same 4 known-red). Pint: new test clean;
+`CheckInFormController.php` already failed Pint at HEAD — not reformatted.
+
+### Left alone (noted, not fixed)
+
+- `updateCheckinData()` calls async `createInitialCheckin()` without `await` (the Promise
+  is always truthy). Harmless today because the write is synchronous.
+- `SubmissionManager` still sets small cookies `user.id`, `pet.info.petid`, `dbCheckInId`.
+- Lots of docs/comments still say "cookie" for the localStorage entry; AGENTS.md §6 says so.
+
+### Left for a human
+
+- Browser QA: 4–5 pets with feeding/medication + 10+ inventory items on `/new-form`;
+  reload at each step; submit; `/edit-check-in/{id}` with `hasDataChanged()` /
+  `resetToOriginal()`; DevTools → Local Storage shows `pl_checkin_data`, Cookies no longer do.
+- Tablets in production need a fresh `npm run build` deployed, otherwise they keep the old bundle.
+
+---
+
 ## Session 2026-11-06 — Bug: editing a check-in duplicated its pets
 
 **Branch:** `feature/07-printnode-base64-printing` (fix sits uncommitted on top of it).

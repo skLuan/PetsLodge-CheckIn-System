@@ -28,9 +28,6 @@
             </span>
         </label>
     </div>
-    <div class="pl-input-container my-10 w-full flex">
-        <x-primary-button id="addPetBtn" class="mx-auto bg-green-dark text-white !text-xs">Add Pet</x-primary-button>
-    </div>
 
     {{-- Health Information (per-pet) --}}
     <div class="mt-8 pt-6 border-t border-gray-200">
@@ -55,5 +52,8 @@
             <p class="text-sm text-gray mb-2">Health Matters, Special Care, Behavioral (Friendly with other dogs, Food Aggressive, Anxiety, Others)</p>
             <textarea class="w-full" id="warnings" name="warnings" rows="3" placeholder="Enter any warnings or special notes"></textarea>
         </div>
+    </div>
+    <div class="pl-input-container my-10 w-full flex">
+        <x-primary-button id="addPetBtn" class="mx-auto bg-green-dark text-white !text-xs">Add Pet</x-primary-button>
     </div>
 </form>

@@ -95,14 +95,23 @@ session('editing_check_in_id')    // ID of check-in being edited
 - Entities: `&quot;`, `&#039;`, `&amp;`, `&lt;`, `&gt;`
 - Decoded in JavaScript before parsing
 
-### Layer 4: Browser Cookies (Frontend)
+### Layer 4: Browser Storage (Frontend)
 
-**Location:** Browser cookie storage  
+**Location:** `localStorage` (since 2026-11-06; it was a cookie before)  
 **Responsibility:** Single source of truth for form data
 
-**Cookie Name:** `pl_checkin_data`  
-**Cookie Size:** Typically 2-4 KB (well under 4 KB limit)  
-**Persistence:** Across page reloads and browser sessions
+**Key:** `pl_checkin_data` — stored as an envelope `{ v, expiresAt, data }` by
+`StorageManager.js`; expires after `FORM_CONFIG.DEFAULT_COOKIE_DAYS` (7 days)  
+**Size:** No practical limit (~5 MB). The old 4 KB cookie cap (measured after
+URL-encoding, so ~2 KB of JSON) is what caused "Cookie data too large" on multi-pet
+check-ins. The server never read the cookie, so nothing server-side changed.  
+**Persistence:** Across page reloads and browser sessions  
+**Migration:** an old `pl_checkin_data` cookie is moved into localStorage on first read
+and deleted (`CoreDataManager.migrateLegacyCookie()`). If localStorage is unavailable,
+`StorageManager` falls back to the cookie.
+
+> The rest of this document still says "cookie" in many places — read it as "the
+> `pl_checkin_data` storage entry". All access goes through `CoreDataManager`.
 
 **Stored Data:**
 ```javascript
@@ -627,20 +636,16 @@ if (confirm("Discard all changes?")) {
    └─ Typically after successful submission
 ```
 
-### Cookie Size Monitoring
+### Size Monitoring
 
 ```javascript
-// Check current cookie size
+// Size in characters of the stored pl_checkin_data entry (localStorage)
 const size = FormDataManager.getCookieSize();
-console.log(`Cookies use ${size} bytes`);
-
-// Verify cookie can be set
-if (FormDataManager.canSetCookie("test", largeData)) {
-    // Safe to set
-} else {
-    console.warn("Cookie too large");
-}
+console.log(`Check-in data uses ${size} characters`);
 ```
+
+`CoreDataManager.updateCheckinData()` logs a warning above
+`FORM_CONFIG.STORAGE_WARN_SIZE` (1,000,000 chars); it never refuses to save.
 
 ---
 
@@ -746,30 +751,12 @@ FormDataManager.registerUIUpdateListener();
 2. Verify original data snapshot stored in [`EditingModeManager.enableEditingMode()`](resources/js/cookies-and-form/managers/EditingModeManager.js)
 3. Check for data transformation issues in [`CheckInTransformer.php`](app/Services/CheckInTransformer.php)
 
-### Issue: Cookie Size Exceeds Limit
+### Issue: "Cookie data too large, cannot save"
 
-**Symptoms:**
-- Cookie fails to set
-- Data loss when adding pets or inventory
-- Console errors about cookie size
-
-**Diagnosis:**
-```javascript
-// Check cookie size
-const size = FormDataManager.getCookieSize();
-console.log(`Cookie size: ${size} bytes`);
-
-// Check if specific data can be set
-if (!FormDataManager.canSetCookie("pl_checkin_data", largeData)) {
-    console.warn("Cookie too large");
-}
-```
-
-**Solutions:**
-1. Reduce number of pets (typically 1-2 pets per check-in)
-2. Reduce inventory item descriptions
-3. Clear unnecessary data before submission
-4. Consider splitting data across multiple cookies (not recommended)
+**Fixed 2026-11-06** by moving the form state to localStorage (see Layer 4). If the
+message appears again, the browser is running an old build — rebuild assets
+(`npm run build`) and hard-reload. If saving fails with "storage could not be written",
+check `FormDataManager.getCookieSize()` and whether the browser blocks site storage.
 
 ### Issue: Data Loss During Transformation
 

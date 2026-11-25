@@ -27,7 +27,8 @@ the **single source of truth**; the UI reacts automatically to changes.
 - `GET /check-in` → `checkIn` view (landing / start).
 - `GET /new-form` → `CheckInFormController@newForm` (blank form).
 - `GET /new-form-pre-filled` → `CheckInFormController@newFormPreFilled` (pre-filled by phone).
-- `GET /view-check-in` → `CheckInFormController@viewCheckIn`.
+- `GET /view-check-in` → `CheckInFormController@viewCheckIn` (one card per booking: all the owner's open pets).
+- `DELETE /delete-check-in/{id}` (one pet) / `DELETE /delete-booking/{id}` (the whole booking).
 
 **API** (`routes/api.php` → `CheckInApiController`):
 - `POST /api/checkin/submit` → `submitCheckIn` (one-shot whole-form submit).
@@ -37,6 +38,7 @@ the **single source of truth**; the UI reacts automatically to changes.
 - `POST /api/checkin/step3/pet-health` → `submitPetHealth`
 - `POST /api/checkin/step4/checkin-data` → `submitCheckInData`
 - `POST /api/checkin/step5/extra-info` → `submitExtraInfo`
+- (web) `POST /check-in/booking/prune` → `pruneBooking` (after an edit: delete the pets removed in the wizard; signed rows only by staff)
 - `POST /api/update-session-checkin` → `updateSessionCheckIn` (refresh server session
   with the just-created check-in so confirmation pages aren't stale).
 - `POST /api/check-user` → `checkUser` (lookup by phone; reports `hasCheckIn`).

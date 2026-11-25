@@ -32,7 +32,8 @@ class DropInController extends Controller
         // a previous booking from the check-in wizard. Trusting the session here
         // meant the page could render a stale (or absent) check-in id, and the
         // signature pad would then post `check_in_id: ''` and 422 silently.
-        $latestCheckIn = $user?->checkIns()->whereNull('check_out')->latest()->first();
+        // open(): a cancelled row keeps `check_out` null but is not something to drop in.
+        $latestCheckIn = $user?->checkIns()->open()->latest()->first();
 
         $checkinData = $latestCheckIn ? [] : session('checkin_data', []);
 
@@ -113,7 +114,7 @@ class DropInController extends Controller
         if ($responseData->userExists === true && $responseData->hasCheckIn === true) {
             // Get the user and their latest check-in to populate session data
             $user = User::findOrFail($responseData->userId);
-            $latestCheckIn = $user->checkIns()->latest()->first();
+            $latestCheckIn = $user->checkIns()->open()->latest()->first();
 
             if ($latestCheckIn) {
                 // Eager load all relationships needed by the transformer

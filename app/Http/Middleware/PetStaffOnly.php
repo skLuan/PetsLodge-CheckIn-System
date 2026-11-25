@@ -16,13 +16,12 @@ class PetStaffOnly
     public function handle(Request $request, Closure $next): Response
     {
         // Check if user is authenticated
-        if (!auth()->check()) {
+        if (! auth()->check()) {
             return redirect('/')->with('error', 'You must be logged in to access this resource.');
         }
 
         // Check if user has PET_STAFF or SUPER_ADMIN role
-        $userRole = auth()->user()->role;
-        if ($userRole !== 'PET_STAFF' && $userRole !== 'SUPER_ADMIN' && $userRole !== 'pet_staff' && $userRole !== 'super_admin') {
+        if (! auth()->user()->isPetStaff()) {
             return redirect('/')->with('error', 'You do not have permission to access this resource. PET_STAFF or SUPER_ADMIN access required.');
         }
 

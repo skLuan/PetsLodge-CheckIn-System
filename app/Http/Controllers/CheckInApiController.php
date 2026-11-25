@@ -54,7 +54,8 @@ class CheckInApiController extends Controller
             return response()->json(['userExists' => false]);
         }
 
-        $hasCheckIn = CheckIn::where('user_id', $user->id)->whereNull('check_out')->exists();
+        // open(): cancelled rows keep `check_out` null but are not an active check-in.
+        $hasCheckIn = CheckIn::where('user_id', $user->id)->open()->exists();
 
         return response()->json([
             'userExists' => true,
@@ -566,6 +567,74 @@ class CheckInApiController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to submit extra info: ' . $e->getMessage(),
+                'timestamp' => $timestamp
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete the booking's pets that an edit removed in the wizard.
+     *
+     * Called once after the step 1-5 sequence of an edited booking, with the
+     * pet ids it just saved. Every open row of the owner for any other pet is
+     * deleted, so a pet removed in the wizard leaves the check-in — except a
+     * SIGNED row, which only pet staff may delete; it is kept and reported in
+     * `kept_signed_check_in_ids`.
+     *
+     * Routed in web.php, not api.php: the api group is stateless and could
+     * never see that the editor is a logged-in staff member.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function pruneBooking(Request $request)
+    {
+        $timestamp = now()->toISOString();
+
+        // min:1 — an empty list would delete the whole booking.
+        $validator = Validator::make($request->all(), [
+            'check_in_id' => 'required|integer|exists:check_ins,id',
+            'pet_ids' => 'required|array|min:1',
+            'pet_ids.*' => 'integer',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid booking data',
+                'errors' => $validator->errors(),
+                'timestamp' => $timestamp
+            ], 422);
+        }
+
+        try {
+            $anchor = CheckIn::findOrFail($request->input('check_in_id'));
+            $result = $this->checkInService->pruneBooking($anchor, $request->input('pet_ids'), $request->user());
+
+            Log::info("CheckInApiController: booking pruned [{$timestamp}]", [
+                'check_in_id' => $anchor->id,
+                'deleted_check_in_ids' => $result['deleted'],
+                'kept_signed_check_in_ids' => $result['kept_signed'],
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Booking updated',
+                'data' => [
+                    'deleted_check_in_ids' => $result['deleted'],
+                    'kept_signed_check_in_ids' => $result['kept_signed'],
+                ],
+                'timestamp' => $timestamp
+            ]);
+        } catch (\Exception $e) {
+            Log::error("CheckInApiController: booking prune failed [{$timestamp}]", [
+                'error' => $e->getMessage(),
+                'request_data' => $request->all()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update booking: ' . $e->getMessage(),
                 'timestamp' => $timestamp
             ], 500);
         }

@@ -79,6 +79,10 @@ Route::get('/new-form-pre-filled', [App\Http\Controllers\CheckInFormController::
 Route::get('/view-check-in', [App\Http\Controllers\CheckInFormController::class, 'viewCheckIn'])->name('view-check-in');
 Route::get('/edit-check-in/{checkInId}', [App\Http\Controllers\CheckInFormController::class, 'editCheckIn'])->name('edit-check-in');
 Route::delete('/delete-check-in/{checkInId}', [App\Http\Controllers\CheckInFormController::class, 'deleteCheckIn'])->name('delete-check-in');
+Route::delete('/delete-booking/{checkInId}', [App\Http\Controllers\CheckInFormController::class, 'deleteBooking'])->name('delete-booking');
+// After an edited booking is re-submitted: delete the pets removed in the wizard.
+// web, not api: deleting a SIGNED pet needs to see the staff session.
+Route::post('/check-in/booking/prune', [App\Http\Controllers\CheckInApiController::class, 'pruneBooking'])->name('check-in.booking.prune');
 
 // Health check routes
 Route::get('/health', [HealthCheckController::class, 'index'])->name('health.check');

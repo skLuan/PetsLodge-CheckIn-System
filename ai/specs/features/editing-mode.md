@@ -18,18 +18,32 @@ Editing flags are passed through the Laravel session:
 
 ## Routes & endpoints
 
+Editing works on the **booking**: the owner's open rows, one per pet
+(`CheckIn::openBookingOf()` — `check_out IS NULL`, status not `CHECKED_OUT`/`CANCELLED`).
+
 - `GET /edit-check-in/{checkInId}` → `CheckInFormController@editCheckIn` — loads the
-  check-in with all relations, transforms it to cookie format via
-  `CheckInTransformer`, stores `checkin_data` + editing flags in session, then
+  row's whole booking (the row alone if it is closed), transforms it with
+  `CheckInTransformer::transformBookingForWizard()` (every pet + `grooming.pets` indexes),
+  flashes `wizard.prefill` + `wizard.editing_check_in_id` (= the booking's first id), then
   redirects to `/new-form-pre-filled?phone=...`.
-- `DELETE /delete-check-in/{checkInId}` → `CheckInFormController@deleteCheckIn` —
-  removes foods, medicines, items, detaches extra services, deletes the check-in.
-- `GET /view-check-in?phone=...` → `viewCheckIn` — lists a user's active check-ins
-  (with foods/medicines/items), each with edit/delete actions.
+- After the step 1–5 loop of an edit, `SubmissionManager` calls
+  `POST /check-in/booking/prune` (web route; `check_in_id`, `pet_ids` min 1) →
+  `CheckInService::pruneBooking()` deletes the rows of pets removed in the wizard.
+  A **signed** row is kept unless pet staff is logged in (`kept_signed_check_in_ids`;
+  the wizard alerts). Non-critical: a failure only warns, the redirect still happens.
+- Deleting a signed check-in (one pet or the booking) needs pet staff or above:
+  otherwise `403 {message}` (JSON) / redirect with `error`. The view hides those
+  buttons and shows "🔒 Signed — only pet staff can delete".
+- `DELETE /delete-check-in/{checkInId}` → `deleteCheckIn` — removes ONE pet's row
+  (`CheckInService::deleteCheckIn()`: foods, medicines, items, extra services, row).
+- `DELETE /delete-booking/{checkInId}` → `deleteBooking` — removes every row of the booking.
+- `GET /view-check-in?phone=...` → `viewCheckIn` — ONE card for the booking: Edit /
+  Delete in the header, one section per pet (`components/view-check-in/pet-section.blade.php`,
+  with Remove when there is more than one pet), the inventory listed once.
 
 ## Backend
 
-- Controller: `CheckInFormController` (`editCheckIn`, `deleteCheckIn`, `viewCheckIn`).
+- Controller: `CheckInFormController` (`editCheckIn`, `deleteCheckIn`, `deleteBooking`, `viewCheckIn`).
 - Transformer: `CheckInTransformer::transformCheckInToCookieFormat()` eager-loads
   `pet.gender`, `pet.kindOfPet`, `pet.castrated`, `user.emergencyContacts`,
   `foods.momentOfDay`, `medicines.momentOfDay`, `items`, `extraServices`.
