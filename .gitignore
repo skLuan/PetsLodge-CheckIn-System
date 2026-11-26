@@ -4,6 +4,8 @@
 /public/hot
 /public/storage
 **/.htaccess
+# …except Laravel's own rewrite rules, which the deploy needs (see ai/plans/active/08-*).
+!public/.htaccess
 /storage/*.key
 /temp
 /vendor

@@ -58,6 +58,28 @@ The project runs in Docker. `docker-compose.yml` defines five services: `app`
 > `docker compose restart app queue`. The project is bind-mounted, so PHP/blade edits
 > need only a restart — no rebuild.
 
+> **`vendor/` is a named volume (`vendor_data`), not the bind mount.** The repo lives on
+> a Windows path, so the bind mount crosses the WSL2 9p bridge where a single `stat()`
+> costs ~5.9 ms. A Laravel bootstrap includes 455 PHP files, 421 of them under `vendor/`
+> — ~2.7 s of filesystem latency on *every* request. Serving `vendor/` from the
+> container's ext4 took a bare 302 from **2.83 s → 0.17 s**.
+>
+> The volume is seeded from the image **once, at creation**. Consequences:
+> - `composer install` on the **host** no longer affects the containers.
+> - After changing `composer.json`/`composer.lock`:
+>   `docker compose down && docker volume rm petslodge_vendor_data && docker compose up -d --build`
+>
+> The image therefore installs **dev** dependencies (no `--no-dev`), or `artisan test`
+> inside the container dies on a missing PHPUnit.
+
+> **Only the `app` container may run migrations, seeding, cache clearing or
+> `storage:link`.** `docker-entrypoint.sh` gates all of it behind `SKIP_SHARED_SETUP`
+> (set on `queue`; the old name `SKIP_MIGRATIONS` is still honoured). Both containers
+> share one bind mount, so an unguarded `view:clear` from the queue worker wipes the
+> compiled Blade views the app is serving from — and `--max-time=3600` restarts that
+> worker every hour. That was the real cause of "the app got slow after I added the
+> queue".
+
 ```bash
 # Start everything (app, MySQL, Redis)
 docker compose up -d
@@ -79,9 +101,29 @@ docker compose down
 **Frontend assets** are built with Vite. During active UI work you usually want:
 ```bash
 npm install          # first time only
-npm run dev          # hot-reload dev server (Vite)
+npm run dev          # hot-reload dev server (Vite) — run on the HOST, not in Docker
 npm run build        # production build
 ```
+
+> ⚠️ **`public/build` is gitignored, so `git pull` never updates compiled assets.** Any
+> pull that touches `resources/js` or `resources/css` needs `npm run build` or the
+> browser keeps running the previous bundle against the new markup. Rebuilding the
+> **image** does not help: the Dockerfile runs `npm run build`, but the bind mount hides
+> the image's `public/build` behind the host's copy. Only a host-side build counts.
+>
+> This has already bitten once: a stale 7-step `tabbar.js` ran against 6-step markup and
+> threw `can't access property "classList", document.getElementById(...) is null`.
+
+> ⚠️ **A leftover `public/hot` silently breaks every asset.** `@vite` loads from the Vite
+> dev server whenever that file exists, so if `npm run dev` dies without cleaning up, the
+> page requests `127.0.0.1:5173` and **no JS or CSS loads at all** (`ERR_CONNECTION_REFUSED`
+> in the console). Fix: start the dev server, or `rm public/hot`. It is gitignored and
+> regenerated automatically.
+
+> **Don't move `npm run dev` into Docker.** `node_modules` sits on the slow bind mount,
+> so a containerised dev server recreates the exact 9p problem the `vendor_data` volume
+> solves — it would need its own named volume. The browser runs on the host and reaches
+> `localhost:5173` directly, and `vite.config.js` is already set to `host: '127.0.0.1'`.
 
 **Non-Docker (local) fallback** (see README for full steps): `composer install`,
 `npm install`, copy `.env.example` → `.env`, `php artisan key:generate`,
@@ -172,7 +214,8 @@ The heart of the app. **`cookies-and-form/` is where most feature work happens.*
 | `components/CheckInHandler.js`, `datePicker.js` | Check-in orchestration & date picker. |
 | `components/SignaturePad.js` | Signature capture (`window.SignatureCapture`). Wraps `signature_pad`; handles devicePixelRatio + POSTs the PNG. |
 | `config/checkInConfig.js` | Check-in front-end config. |
-| `Pill.js`, `tabbar.js`, `Utils.js`, `app.js`, `bootstrap.js` | UI widgets, tab bar, utilities, entry points. |
+| `Pill.js`, `Utils.js`, `app.js`, `bootstrap.js` | UI widgets, utilities, entry points. |
+| `tabbar.js` | Wizard step navigation. **Discovers its steps from the DOM** (`.step[id^='step']`) instead of hard-coding a count, and guards every `getElementById`. Both exist because the hard-coded `1..7` loop crashed when the wizard dropped to 6 steps. Don't reintroduce a literal step count. |
 
 **`managers/`** (each handles one slice of the form):
 `EditingModeManager` (edit vs. create + original snapshot), `CoreDataManager`,
@@ -192,8 +235,8 @@ The heart of the app. **`cookies-and-form/` is where most feature work happens.*
 | `checkIn.blade.php` | Main check-in page (route `/check-in`). |
 | `view-check-in.blade.php` | The client's current visit: **one card per booking** (every open pet); per-pet sections in `components/view-check-in/pet-section.blade.php`. |
 | `Process.blade.php` | The multi-step wizard (new / pre-filled / edit). |
-| `components/forms/` | Form partials: `pet-info`, `health-info`, `food-medication`, `inventory`, `owner-info`. |
-| `components/steps/` | One component per wizard step: `owner-info`, `pet-info`, `feeding-medication`, `health-info`, `inventory`, `grooming`, `review-submit`. |
+| `components/forms/` | Form partials: `pet-info` (**includes the health fields**), `food-medication`, `inventory`, `owner-info`. |
+| `components/steps/` | One component per wizard step — **6 of them**, in this order: `owner-info` (step1), `pet-info` (step2), `feeding-medication` (step3), `inventory` (step4), `grooming` (step5), `review-submit` (step6). |
 | `components/ui/` | Shared form/visual primitives: `input`, `select`, `radio`, `checkbox`, `date-picker`, `field`, `card`. |
 | `components/wizard/` | Sticky wizard header (progress bar + pet pills). |
 | `components/pop-ups/` | Modals: `feeding-medication`, `grooming`, `terms-conditions`. |
@@ -268,6 +311,37 @@ Rules that keep this from breaking:
 
 If you touch form state, go through **`FormDataManager`** rather than writing cookies
 directly.
+
+---
+
+## 6a. Per-pet health: three names for one value
+
+Health lives on the **pet**, inside step 2 (`#petInfoForm`) — there is no separate health
+step any more. The same value is called three different things, and the renames are
+deliberate boundaries, not bugs:
+
+| Layer | Name |
+|---|---|
+| DOM field (`forms/pet-info.blade.php`) | `healthBehaviorDetails` |
+| Cookie + API payload (`PetManager.js` maps it) | `healthBehaviors` |
+| Database (`pets.health_conditions`) | the "Which?" **text**, or `'Yes'` when the owner said Yes without details |
+
+Rules:
+
+1. **`pets.health_conditions` stores the details, never the Yes/No flag.** It used to
+   store the boolean (`"1"`), which threw the text away and rendered "⚠️ 1" on
+   `/view-check-in`. Write it only through `CheckInPetService::healthConditionsFrom()`.
+2. **Legacy rows still hold `"1"`/`"0"`.** `CheckInTransformer` and
+   `components/view-check-in/pet-section.blade.php` both translate them; keep any new
+   reader consistent with those two.
+3. **`warnings` alone must not flip `unusualHealthBehavior` to Yes** — they are
+   independent fields. Covered by `MultiPetHealthFoodTest`.
+4. **The standalone health step is gone.** `components/steps/health-info.blade.php`,
+   `components/forms/health-info.blade.php` and `app/View/Components/forms.health-info.php`
+   were orphaned and were deleted on 2026-11-26 (`6b7ef33`). The last could never autoload
+   anyway — `class formsHealthInfo` in a file named `forms.health-info.php` breaks PSR-4.
+   Don't recreate a separate health step: health belongs to the pet, and the old step
+   component carried `id="step4"`, which now belongs to `inventory`.
 
 ---
 
@@ -425,6 +499,11 @@ Common symptoms → look here:
 - **UI not updating** → reactivity listeners registered? console errors from
   MutationObserver? try `CookieReactivityManager.triggerCheck()`.
 - **"Cookie data too large"** → stale build from before the localStorage move; `npm run build` + hard reload.
+- **No JS/CSS at all, `ERR_CONNECTION_REFUSED` on `127.0.0.1:5173`** → leftover
+  `public/hot` from a dev server that died. Start `npm run dev` or `rm public/hot`.
+- **JS throws against markup that looks correct** (e.g. `getElementById(...) is null`) →
+  stale bundle. `public/build` is gitignored, so a `git pull` never refreshes it: run
+  `npm run build` on the host. Restarting the container cannot fix this.
   Stored size: `debugCheckinData()` (DevTools → Application → Local Storage → `pl_checkin_data`).
 
 ---
