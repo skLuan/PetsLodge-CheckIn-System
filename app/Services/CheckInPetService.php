@@ -18,6 +18,24 @@ use Illuminate\Support\Facades\Log;
 class CheckInPetService
 {
     /**
+     * What goes into `pets.health_conditions`: the "Which?" text, only when the
+     * owner answered Yes. It used to store the Yes/No boolean itself ("1"),
+     * which threw the details away and showed "⚠️ 1" on /view-check-in.
+     */
+    public static function healthConditionsFrom(array $health): ?string
+    {
+        if (! filter_var($health['unusualHealthBehavior'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            return null;
+        }
+
+        $details = trim((string) ($health['healthBehaviors'] ?? ''));
+
+        // "Yes" with no details still has to round-trip as Yes (the transformer
+        // derives the radio from a non-empty value).
+        return $details !== '' ? $details : 'Yes';
+    }
+
+    /**
      * Process pet data from check-in form
      *
      * @param \App\Models\User $user The user instance
@@ -56,7 +74,7 @@ class CheckInPetService
             'race' => $petInfo['petBreed'],
             'color' => $petInfo['petColor'],
             'weight' => $petInfo['petWeight'] ?? null,
-            'health_conditions' => $petData['health']['unusualHealthBehavior'] ?? null,
+            'health_conditions' => self::healthConditionsFrom($petData['health'] ?? []),
             'warnings' => $petData['health']['warnings'] ?? null,
             'gender_id' => $gender->id,
             'kind_of_pet_id' => $kindOfPet->id,

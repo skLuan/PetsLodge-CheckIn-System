@@ -10,6 +10,21 @@
 
 ---
 
+## Session 2026-11-25 — Plan 04 audit + health-details fix
+
+**Branch:** `feature/04-multi-pet-health-food` (from `feature/07-…` @ `033f61f`; uncommitted).
+
+- Audit: per-pet health (inside `#petInfoForm`) and per-pet food are already live; the
+  standalone health step is not rendered, so draft `04b` is obsolete. Details in the
+  plan's "Current data flow" section.
+- Fix: `pets.health_conditions` stored `"1"` instead of the "Which?" text. New
+  `CheckInPetService::healthConditionsFrom()`; transformer + `pet-section` handle legacy rows;
+  warnings alone no longer make the edit form say "Yes".
+- Tests: `MultiPetHealthFoodTest` (4, red→green). Suite **156 passed / 4 failed** (known-red).
+- Not done: browser QA, removal of the dead health-info views.
+
+---
+
 ## Session 2026-11-06 (d) — Signed check-ins: staff-only delete; drop-in ignores cancelled
 
 **Branch:** `feature/07-printnode-base64-printing` (uncommitted, on top of (c)).

@@ -346,8 +346,8 @@ class CheckInApiController extends Controller
 
             // Update pet health info
             $pet->update([
-                'health_conditions' => $healthData['unusualHealthBehavior'] ?? null,
-                'warnings' => $healthData['warnings'] ?? null,
+                'health_conditions' => CheckInPetService::healthConditionsFrom($healthData),
+                'warnings' => ($healthData['warnings'] ?? '') !== '' ? $healthData['warnings'] : null,
             ]);
 
             // The pet's open stay — the row being edited, or a new CHECKED_IN

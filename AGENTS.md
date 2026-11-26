@@ -119,7 +119,7 @@ php artisan test --filter=SomeTest              # single test
 
 **Known-red tests (pre-existing, not your change):** `ExampleTest`, `Auth\RegistrationTest
 > new users can register`, and both `CheckInSubmissionTest` cases. The practical gate is
-"**no new failures**", not "all green". Current baseline: **152 passed / 4 failed** (booking view + signed-delete guard, 2026-11-06).
+"**no new failures**", not "all green". Current baseline: **156 passed / 4 failed** (Plan 04 health-details fix, 2026-11-25).
 
 > The two `CheckInSubmissionTest` failures are caused by `CheckInApiController::submitCheckIn`
 > calling `CheckInService::submitCheckIn()`, **a method that does not exist** — so

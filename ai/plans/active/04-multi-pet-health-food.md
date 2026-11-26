@@ -59,6 +59,40 @@ The health step and food step render scoped to the **currently selected pet pill
 5. Submit → DB rows correct per pet; summary + printed PDF show per-pet sections.
 6. Legacy cookie (crafted with old schema) → loads without JS errors.
 
+## Current data flow (verified 2026-11-25, branch `feature/04-multi-pet-health-food`)
+
+Most of Option A had already landed in earlier sessions; the plan text above predates it.
+
+- **Health is already per pet.** The health questions live inside `#petInfoForm`
+  (`forms/pet-info.blade.php`), not a separate step. `PetManager` stores them under
+  `pets[i].health`; pill select (`form-processor.js` `pet:select-request`) calls
+  `HealthFormManager.loadPetHealth(index)`. `forms/health-info.blade.php` /
+  `steps/health-info.blade.php` are **not rendered** by `Process.blade.php` (dead), so
+  draft `04b` is obsolete.
+- **Food is already per pet**: `pets[i].feeding` / `.medication`, with the
+  "Same feeding for all" toggle and `#feedingGroupedByPet` in `UIManager`.
+- **Backend is per pet**: `SubmissionManager` posts step 3 once per pet with that pet's
+  `health_data` / `feeding_data` / `medication_data`.
+
+### Bug found and fixed
+
+`pets.health_conditions` stored the Yes/No **boolean** (`"1"`), not the "Which?" text, in
+both `submitPetHealth` and `CheckInPetService`. The details were lost, `/view-check-in`
+showed "⚠️ 1", and the edit form re-opened with "1" in the details box. Also the
+transformer flipped the radio to Yes whenever a pet only had warnings.
+
+- `CheckInPetService::healthConditionsFrom()` — details text when Yes (`'Yes'` if empty),
+  `null` when No. Used by both writers.
+- `CheckInTransformer` derives the radio from `health_conditions` only and maps legacy
+  `"1"`/`"0"` rows; `pet-section.blade.php` renders legacy values readably.
+- `tests/Feature/MultiPetHealthFoodTest.php` (4 tests).
+
+### Still open
+
+- Manual browser QA script above (not run this session).
+- Delete the dead `forms/health-info.blade.php`, `steps/health-info.blade.php` and the
+  `04b` draft once a human confirms.
+
 ## Acceptance criteria
 
 - [ ] Warnings, unusual-behavior and food are unambiguously per-pet in UI, cookie, API and DB.

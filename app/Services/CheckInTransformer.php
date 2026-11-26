@@ -39,8 +39,12 @@ class CheckInTransformer
                 'petSpayed' => $pet->castrated->status ?? '',
             ],
             'health' => [
-                'unusualHealthBehavior' => ! empty($pet->health_conditions) || ! empty($pet->warnings),
-                'healthBehaviors' => $pet->health_conditions ?? '',
+                // health_conditions holds the "Which?" text when the answer was Yes
+                // (CheckInPetService::healthConditionsFrom). Legacy rows stored the
+                // boolean itself: "1" = Yes without details, "0"/"" = No.
+                'unusualHealthBehavior' => ! in_array((string) $pet->health_conditions, ['', '0'], true),
+                'healthBehaviors' => in_array((string) $pet->health_conditions, ['', '0', '1', 'Yes'], true)
+                    ? '' : $pet->health_conditions,
                 'warnings' => $pet->warnings ?? '',
             ],
             'feeding' => [],

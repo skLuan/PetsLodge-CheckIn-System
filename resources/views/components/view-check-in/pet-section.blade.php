@@ -57,12 +57,20 @@
                         @endif
                     </div>
                 </div>
-                @if ($pet->health_conditions || $pet->warnings)
+                @php
+                    // Legacy rows stored the Yes/No flag ("1"/"0") instead of the details.
+                    $healthConditions = match ((string) $pet->health_conditions) {
+                        '', '0' => null,
+                        '1', 'Yes' => 'Unusual health behavior reported',
+                        default => $pet->health_conditions,
+                    };
+                @endphp
+                @if ($healthConditions || $pet->warnings)
                     <div>
                         <h6 class="font-semibold text-red-600 mb-2">Health Notes:</h6>
                         <div class="text-sm text-gray-600 ml-auto">
-                            @if ($pet->health_conditions)
-                                <p>⚠️ {{ $pet->health_conditions }}</p>
+                            @if ($healthConditions)
+                                <p>⚠️ {{ $healthConditions }}</p>
                             @endif
                             @if ($pet->warnings)
                                 <p>⚠️ {{ $pet->warnings }}</p>
