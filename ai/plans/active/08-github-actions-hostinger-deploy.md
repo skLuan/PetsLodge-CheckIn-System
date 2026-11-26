@@ -1,52 +1,66 @@
 # Plan 08 — Deploy to Hostinger with GitHub Actions
 
-**Status:** Pending. Draft 2026-11-26; decisions 1–4 settled with the user the same day.
-**Target:** `petlogde.fun` on Hostinger **shared** hosting.
-**Companion:** `docs/DEPLOYMENT_GUIDE.md` already covers SMTP, the queue cron and the
-manual deploy. This plan only covers **automating** it and the shared-hosting constraints.
+**Status:** Pending. Draft 2026-11-26; decisions 1–4 settled, then **rewritten the same
+day against two working deployments of the user's own** (see "Prior art").
+**Target:** `https://petlodge.fun/` on Hostinger **shared** hosting.
+**Companion:** `docs/DEPLOYMENT_GUIDE.md` covers SMTP and the queue cron. This plan covers
+**automating** the deploy and the shared-hosting constraints.
 
-> **Domain spelling:** every config in the repo uses **`petlogde.fun`**
-> (`.env.docker`, `docs/DEPLOYMENT_GUIDE.md`, `MAIL_FROM_ADDRESS`). "petlodge.fun" has
-> been typed in chat — confirm which is the registered domain before the first deploy,
-> because every path below contains it.
-
----
-
-## Problem
-
-A plain `git pull` on the server cannot deploy this app, for four separate reasons:
-
-1. **`public/build` is gitignored.** Compiled Vite assets are never in a checkout, so a
-   git-based deploy ships markup with no (or stale) JS/CSS. This already broke the wizard
-   locally — see `ai/JOURNAL.md` 2026-11-26.
-2. **`public/.htaccess` was gitignored too** (`.gitignore` had a blanket `**/.htaccess`),
-   so a clean checkout had no rewrite rules and every route except `/` would 404.
-3. **`symlink()` is disabled** in Hostinger's PHP, so `php artisan storage:link` cannot run.
-4. **The docroot is fixed at `public_html`**, but Laravel must serve from its `public/`.
+> The domain is **`petlodge.fun`**. "petlogde.fun" was a typo and was corrected across the
+> whole repo on 2026-11-26 (36 occurrences in 10 files). ⚠️ The Hostinger mailbox must
+> therefore be **`no-reply@petlodge.fun`** — Hostinger rejects mail whose From header is
+> not the authenticated mailbox (`AGENTS.md` §6b), so a mailbox still named with the old
+> spelling will silently break every client email.
 
 ---
 
-## Decisions (settled 2026-11-26)
+## Prior art — don't invent this, copy it
+
+The user already runs two Laravel deployments to Hostinger. Both were read in full on
+2026-11-26; this plan is mostly "do what those do".
+
+| | `skLuan/PersonalLaravelWepPage` (luane.online) | `skLuan/thelamb.studio-web` |
+|---|---|---|
+| Laravel root | **the domain dir**, `~/domains/luane.online/` | a separate `HOSTINGER_APP_PATH` |
+| Docroot strategy | `public_html` → `public` (whole-dir symlink) | `public_html` stays a **real dir**; every entry of `public/` is symlinked into it (`scripts/hostinger/link-docroot.sh`) |
+| Why | simplest | Hostinger only allows subdomains *inside* `public_html` (staging lives at `public_html/testing`), so it cannot be a symlink |
+| PHP / Node | 8.2 / 20 | **8.3 / 22** |
+| Caching | `optimize:clear`, `config:cache`, `view:cache` — **no `route:cache`** | `config:clear` before migrate, `optimize` after |
+| `storage:link` | `ln -s ../storage/app/public public/storage` (bash, because PHP's `symlink()` is disabled) | same |
+| Environments | single `production` | reusable workflow + `staging`/`production` GitHub Environments |
+| Migration helper | `scripts/hostinger/migrate-layout.sh` (+ `rollback-layout.sh`) | — |
+
+**Both confirm the two facts this plan was built on:** Hostinger disables PHP `symlink()`
+(and `exec()`), and shell `ln -s` works fine as the workaround.
+
+---
+
+## Decisions
 
 | # | Question | Decision |
 |---|---|---|
-| 1 | Server PHP version | **8.3** |
-| 2 | `public/.htaccess` | **Done** — `!public/.htaccess` added to `.gitignore`, file now tracked |
-| 3 | Document root | **Cannot be changed on shared hosting.** Keep `public_html` as the docroot and point it at the app (see Blocker 3) |
-| 4 | Laravel root on the server | **`domains/petlogde.fun/laravel/`**, not `domains/petlogde.fun/` |
-| 5–7 | SSH vs FTP, `clear` vs `cache`, dry-run rollout | Still open |
+| 1 | Server PHP | **8.3.** Local Docker moved to `php:8.3-fpm-alpine` on 2026-11-26, so local = CI = production |
+| 2 | `public/.htaccess` | **Done** — `!public/.htaccess` in `.gitignore`, file tracked |
+| 3 | Document root | **Cannot be changed on Hostinger shared hosting.** Keep `public_html` and link into it |
+| 4 | Laravel root | **`~/domains/petlodge.fun/`** (the domain dir), matching luane.online — see below |
+| 5 | SSH vs FTP | **SSH** — both existing deployments use it; FTP would rule out `ln -s`, `migrate --force` and the smoke tests |
+| 6 | `clear` vs `cache` | **`config:cache` + `view:cache`, never `route:cache` or `optimize`** — see "Caching" |
+| 7 | Rollout | Dry-run rsync first, then the migration script's own dry run, then deploy |
 
-### Why `laravel/` and not `domains/petlogde.fun/` directly
+### Revisiting decision 4
 
-The deciding reason is **`rsync --delete`**. `domains/petlogde.fun/` is Hostinger-managed:
-it contains `public_html` and the domain's `logs/`. If that directory were the deploy
-target, a sync with `--delete` would try to remove everything CI did not send — including
-`public_html` and Hostinger's own folders. One mistake in the exclude file takes the site
-down.
+An earlier draft argued for a `laravel/` subdirectory because `rsync --delete` aimed at
+the domain dir could wipe `public_html` and Hostinger's `logs/`. That risk is real, but
+**luane.online already solves it with one line** — `--exclude='/public_html'` — and has
+been running that way. Consistency with a deployment the user already operates and can
+debug beats a second layout, so: **Laravel root = `~/domains/petlodge.fun/`**.
 
-A dedicated `laravel/` subdirectory is owned entirely by CI, so `--delete` can only ever
-affect files the deploy is responsible for. It also keeps the app tree from mixing with
-whatever Hostinger adds to the domain folder later.
+The leading `/` in the exclude patterns matters: `/public_html` anchors to the transfer
+root, so it cannot accidentally match something deeper.
+
+**Switch to thelamb's layout instead if** a subdomain is ever needed under `public_html`
+(e.g. `staging.petlodge.fun` served from `public_html/staging`). A whole-directory
+symlink makes that impossible, which is exactly why thelamb links per entry.
 
 ---
 
@@ -54,44 +68,28 @@ whatever Hostinger adds to the domain folder later.
 
 | Fact | Evidence |
 |---|---|
-| **`storage:link` is NOT needed in production** | Nothing serves files through the public disk. `Signature::url()` returns `route('signatures.show', …)`; `PdfService::DISK = 'local'`; `.env.production` sets `FILESYSTEM_DISK=local`. Blocker 3's symlink restriction therefore does not block the deploy. |
-| Hostinger shared hosting cannot change the document root | Hostinger support docs: the root is `public_html`, and they recommend a VPS if it must change. Corroborated by multiple Laracasts threads. |
-| `public/.htaccess` is now tracked | `git ls-files public/.htaccess` → `public/.htaccess` |
-| No CI exists yet | `.github/` absent |
-| Server PHP **8.3**; `composer.json` allows `^8.1`, no platform pin; Dockerfile builds **8.2** | User-confirmed + `composer.json` / `Dockerfile` |
-| Queue is `database` + per-minute cron | `docs/DEPLOYMENT_GUIDE.md` §3 |
-| Server root | `/home/u189079842/domains/petlogde.fun/` |
+| **`storage:link` is not needed by PetsLodge** | Nothing uses the public disk: `Signature::url()` → `route('signatures.show', …)`, `PdfService::DISK = 'local'`, `.env.production` has `FILESYSTEM_DISK=local`. (Both reference repos *do* need it, and create it with `ln -s`. Copy that if a public disk ever appears.) |
+| **`route:cache` will fail** | 3 live closure routes in `routes/web.php` — `/check-in` (:27), `/dashboard` (:31), `/admin/monitoring-dashboard` (:92). Laravel 10's `optimize` runs `config:cache` + `route:cache`, so `optimize` is out too. |
+| Hostinger shared hosting cannot change the docroot | Hostinger support docs (they suggest a VPS instead); both reference repos work around it rather than changing it |
+| `public/.htaccess` is tracked | `git ls-files public/.htaccess` |
+| Local/CI/prod PHP all 8.3 | Dockerfile bumped 2026-11-26; `composer.json` still says `^8.1` with no platform pin |
+| Queue = `database` + per-minute cron | `docs/DEPLOYMENT_GUIDE.md` §3 |
 
-> ⚠️ The `storage:link` row is the one most likely to go stale. The moment anything starts
-> using `Storage::disk('public')` or `asset('storage/…')`, it becomes a real blocker.
-> Re-run that grep before trusting it.
-
-### PHP version drift — decide before writing the workflow
-
-Production is **8.3**, local Docker is **8.2**, and `composer.json` pins nothing. CI
-resolving `vendor/` against the wrong version fails at *runtime*, not at build time.
-Two ways out, **A preferred**:
-
-- **A. Move local Docker to 8.3** (`FROM php:8.3-fpm-alpine`) so local, CI and production
-  all match, then pin `config.platform.php` to `8.3`. Removes the drift instead of
-  documenting it.
-- **B. Keep Docker on 8.2** and pin `config.platform.php` to **`8.2`** — the *lowest*
-  environment — so resolved packages run on both. Never pin 8.3 while local runs 8.2.
+> ⚠️ The `storage:link` row is the likeliest to go stale. The moment anything uses
+> `Storage::disk('public')` or `asset('storage/…')`, add the `ln -s` line.
 
 ---
 
 ## Target layout on the server
 
 ```
-/home/u189079842/domains/petlogde.fun/
-├── laravel/                 ← the application (deploy target, owned by CI)
-│   ├── app/ bootstrap/ config/ database/ resources/ routes/ vendor/
-│   ├── public/              ← what public_html must resolve to
-│   ├── storage/             ← PERSISTS between deploys, never synced over
-│   ├── artisan
-│   └── .env                 ← lives ONLY on the server, never produced by CI
-├── public_html/             ← docroot, fixed by Hostinger (see Blocker 3)
-└── logs/                    ← Hostinger-managed, must never be in rsync's path
+~/domains/petlodge.fun/              ← HOSTINGER_DEPLOY_PATH (Laravel root)
+├── app/ bootstrap/ config/ database/ resources/ routes/ vendor/
+├── public/                          ← the only web-served directory
+├── storage/                         ← PERSISTS between deploys; never synced over
+├── artisan
+├── .env                             ← server-only, never produced by CI
+└── public_html -> public            ← relative symlink; excluded from rsync
 ```
 
 **`storage/app/signatures/` is legal evidence** (CLAUDE.md §5). It must survive every
@@ -99,137 +97,129 @@ deploy and be backed up. Any `rsync --delete` that can reach it is a data-loss b
 
 ---
 
-## Blocker 1 — assets must be built in CI
+## Step 0 — the one-time migration (do this first, by hand)
 
-Build in the workflow and ship the result; never build on the shared host (no Node, tight
-memory limits).
+PetsLodge is currently served **entirely out of `public_html`**, so `.env`, `vendor/` and
+`storage/` are reachable from the web. That is the security problem this plan fixes, and
+it is exactly what `PersonalLaravelWepPage/scripts/hostinger/migrate-layout.sh` was
+written for:
 
-```yaml
-- uses: actions/setup-node@v4
-  with: { node-version: '22', cache: 'npm' }
-- run: npm ci --legacy-peer-deps      # --legacy-peer-deps matches the Dockerfile
-- run: npm run build                  # writes public/build/
+```
+Before:  ~/domains/petlodge.fun/public_html/{app,vendor,.env,public,...}
+After:   ~/domains/petlodge.fun/{app,vendor,.env,public,...}
+         ~/domains/petlodge.fun/public_html -> public
 ```
 
-`vendor/` likewise: build it in CI with `--no-dev`, ship it, so the server never runs
-Composer.
+Port that script into `scripts/hostinger/migrate-layout.sh` here, changing only
+`DOMAIN_DIR` (default `$HOME/domains/petlodge.fun`). Keep its behaviour as-is — it already
+does the right things:
 
-## Blocker 2 — `.htaccess` must reach the server ✅ DONE
+- refuses to run if `public_html` is already a symlink, or if `artisan` isn't there
+- checks for name clashes **before** moving anything
+- backs up to `~/backups/public_html-<stamp>.tar.gz` first
+- `artisan down` → move → symlink → recreate caches → `artisan up`
+- **dry run by default**; `--apply` to commit
+- `rollback-layout.sh` undoes it
 
-`.gitignore` keeps the blanket `**/.htaccess` guard but now carries `!public/.htaccess`,
-and the file is tracked. Keep the workflow assertion anyway, as a regression guard:
-
-```yaml
-- run: test -s public/.htaccess || { echo "::error::public/.htaccess missing"; exit 1; }
-```
-
-## Blocker 3 — getting `public_html` to serve `laravel/public`
-
-**An earlier draft of this plan recommended changing the document root in hPanel. That is
-wrong for this hosting plan** — on Hostinger *shared* hosting the root is fixed at
-`public_html`, and Hostinger's own docs say to move to a VPS if it must change. Both
-options below leave the docroot alone.
-
-Either option meets the security goal that prompted this: today the whole app is served
-out of `public_html`, which exposes `.env`, `vendor/` and `storage/` to anything that can
-guess a URL. After this, only `public/` content is reachable.
-
-### Option A (try first) — symlink `public_html` → `laravel/public`
-
-One-off, over SSH, **not** part of the deploy:
+Run the dry run, read the plan it prints, then `--apply`. Verify before touching CI:
 
 ```bash
-cd ~/domains/petlogde.fun
-rm -rf public_html              # back it up first if anything live is still in there
-ln -s laravel/public public_html
-readlink public_html            # must print: laravel/public
+readlink ~/domains/petlodge.fun/public_html   # → public
+curl -sI https://petlodge.fun/ | head -1       # → 200
+curl -s -o /dev/null -w '%{http_code}\n' https://petlodge.fun/.env   # → 403 or 404
 ```
-
-`ln` is a shell binary, **not** PHP's disabled `symlink()`, so the `disable_functions`
-setting does not apply.
-
-- **Pros:** one command; `public/` stays a single source of truth; CI deploys to one
-  destination; no patched `index.php`.
-- **Cons:** needs SSH; requires `FollowSymLinks` (normally on); **hPanel can recreate
-  `public_html` as a real directory** during domain operations, which silently breaks the
-  site. Re-run `readlink public_html` after any hPanel change to the domain.
-
-### Option B (fallback) — split: ship `public/` into `public_html/`
-
-If the symlink is refused or keeps getting clobbered, deploy the *contents* of `public/`
-into `public_html/` and keep the rest of the app in `laravel/`. `public_html/index.php`
-must then be patched, because Laravel's stock file resolves `__DIR__.'/../vendor'`:
-
-```php
-<?php // deploy/public_html/index.php — deployed over public_html/index.php
-use Illuminate\Contracts\Http\Kernel;
-use Illuminate\Http\Request;
-
-define('LARAVEL_START', microtime(true));
-
-$base = __DIR__.'/../laravel';
-
-if (file_exists($maintenance = $base.'/storage/framework/maintenance.php')) {
-    require $maintenance;
-}
-
-require $base.'/vendor/autoload.php';
-$app = require_once $base.'/bootstrap/app.php';
-
-$kernel = $app->make(Kernel::class);
-$response = $kernel->handle($request = Request::capture())->send();
-$kernel->terminate($request, $response);
-```
-
-- **Pros:** no symlink, survives hPanel recreating `public_html`, works on any shared host.
-- **Cons:** CI deploys to **two** destinations; `public/` is split from the app; the
-  patched `index.php` must be kept in step with Laravel upgrades.
-- Verify `storage_path()`, `public_path()` and `asset()` by hand if you go this way —
-  `public_path()` will point at `laravel/public`, not at the served directory.
-
-## Non-blocker — `storage:link`
-
-Not needed today (see Verified facts). **Do not put `php artisan storage:link` in the
-workflow** — it will fail on the disabled `symlink()`. If a public disk is ever
-introduced, either create the link once over SSH with
-`ln -s ../storage/app/public public/storage`, or serve that feature through an
-authenticated route as signatures and PDFs already do.
 
 ---
 
-## The workflow (sketch — `.github/workflows/deploy.yml`)
+## Blocker 1 — assets must be built in CI
 
-Written for **Option A**. For Option B, add a second rsync of `public/` into
-`public_html/` plus a copy of `deploy/public_html/index.php`.
+`public/build` is gitignored, so a git checkout never carries compiled assets, and the
+shared host has no Node. Build in the workflow and rsync the result. Same for `vendor/`
+(`--no-dev`), so the server never runs Composer.
+
+## Blocker 2 — `.htaccess` ✅ DONE
+
+`.gitignore` keeps the blanket `**/.htaccess` guard plus `!public/.htaccess`, and the file
+is tracked.
+
+> Note both reference repos **exclude** `.htaccess` from rsync and manage it on the server
+> (thelamb's `link-docroot.sh` copies it into the docroot with a managed marker). Here the
+> docroot *is* `public/` via the symlink, so shipping `public/.htaccess` from the repo is
+> simpler and keeps it in version control. Don't also add an rsync `--exclude='.htaccess'`,
+> or the file will never arrive.
+
+## Blocker 3 — docroot: `public_html -> public`
+
+Handled by Step 0's migration script; nothing in the deploy touches it. The workflow only
+*asserts* it, because hPanel can recreate `public_html` as a real directory during domain
+operations:
+
+```bash
+[ -L public_html ] || { echo "::error::public_html is not a symlink — site is serving the wrong directory"; exit 1; }
+```
+
+---
+
+## The workflow (`.github/workflows/deploy.yml`)
+
+Modelled on thelamb's, which is the more hardened of the two. Highlights worth keeping,
+each of which exists because something broke once:
+
+- **SSH key normalisation.** A key copied on Windows carries CRLF and OpenSSH fails with
+  `error in libcrypto`. Strip it and validate with `ssh-keygen -y` before connecting.
+- **`ssh-keyscan`** into `known_hosts` instead of disabling host checking.
+- **Server `.env` preflight** — fail if `APP_KEY` is missing (every session route 500s) or
+  `APP_DEBUG=true` (that 500 then shows a stack trace to the public).
+- **`config:clear` *before* `migrate`** — the previous deploy's cached config would
+  otherwise make `migrate` use stale credentials.
+- **`trap 'artisan up' EXIT`** so a failed step never leaves the site in maintenance mode.
+- **`HOSTINGER_PHP` variable** for when `php` over SSH isn't the hPanel version
+  (e.g. `/opt/alt/php83/usr/bin/php`).
+- **`vars.` not `secrets.`** for `SITE_URL` / non-secret paths — stored as a secret,
+  `vars.X` silently reads empty and the deploy half-works.
 
 ```yaml
 name: Deploy to Hostinger
+
 on:
   push:
-    branches: [main]        # decide: main, or a dedicated `production` branch
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
-  group: deploy-production  # never let two deploys overlap
+  group: production-deploy
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
+env:
+  PHP_VERSION: '8.3'     # matches Hostinger and local Docker
+  NODE_VERSION: '22'
+
 jobs:
+  test:
+    uses: ./.github/workflows/tests.yml     # see "Tests as a gate"
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://petlodge.fun
     steps:
       - uses: actions/checkout@v4
 
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'            # matches the Hostinger server
+          php-version: ${{ env.PHP_VERSION }}
           extensions: pdo_mysql, zip, intl, gd, bcmath
-
-      - run: composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+          coverage: none
+      - run: composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader
 
       - uses: actions/setup-node@v4
-        with: { node-version: '22', cache: 'npm' }
-      - run: npm ci --legacy-peer-deps
-      - run: npm run build
+        with: { node-version: '22', cache: npm }
+      - run: npm ci --legacy-peer-deps --no-audit --no-fund && npm run build
 
       - name: Guard against shipping a broken release
         run: |
@@ -238,135 +228,164 @@ jobs:
           test -f vendor/autoload.php        || { echo "::error::vendor missing"; exit 1; }
           test ! -e public/hot               || { echo "::error::public/hot would disable all assets"; exit 1; }
 
-      - name: Rsync to Hostinger
-        uses: burnett01/rsync-deployments@v7   # pin to a commit SHA in the real workflow
-        with:
-          switches: -avzr --delete --exclude-from=deploy/rsync-exclude.txt
-          path: ./
-          remote_path: /home/u189079842/domains/petlogde.fun/laravel/
-          remote_host: ${{ secrets.HOSTINGER_SSH_HOST }}
-          remote_port: ${{ secrets.HOSTINGER_SSH_PORT }}
-          remote_user: ${{ secrets.HOSTINGER_SSH_USER }}
-          remote_key:  ${{ secrets.HOSTINGER_SSH_KEY }}
+      - name: Prepare SSH key
+        env:
+          SSH_KEY: ${{ secrets.HOSTINGER_SSH_KEY }}
+          SSH_HOST: ${{ secrets.HOSTINGER_SSH_HOST }}
+          SSH_PORT: ${{ secrets.HOSTINGER_SSH_PORT }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keygen -y -P '' -f ~/.ssh/deploy_key > /dev/null \
+            || { echo "::error::HOSTINGER_SSH_KEY is not a valid passphrase-less OpenSSH private key"; exit 1; }
+          ssh-keyscan -p "$SSH_PORT" "$SSH_HOST" >> ~/.ssh/known_hosts
 
-      - name: Post-deploy
-        uses: appleboy/ssh-action@v1           # pin to a commit SHA
-        with:
-          host: ${{ secrets.HOSTINGER_SSH_HOST }}
-          port: ${{ secrets.HOSTINGER_SSH_PORT }}
-          username: ${{ secrets.HOSTINGER_SSH_USER }}
-          key: ${{ secrets.HOSTINGER_SSH_KEY }}
-          script: |
-            set -e
-            cd /home/u189079842/domains/petlogde.fun/laravel
-            readlink ../public_html || echo "::warning::public_html is not a symlink"
-            php artisan down --retry=15 || true
-            php artisan migrate --force
-            php artisan config:clear
-            php artisan route:clear
-            php artisan view:clear
-            php artisan queue:restart
-            php artisan up
+      - name: Upload files (rsync)
+        run: |
+          rsync -az --delete --no-perms --omit-dir-times --itemize-changes \
+            -e "ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes -p ${{ secrets.HOSTINGER_SSH_PORT }}" \
+            --exclude='/public_html' \
+            --exclude='.git/' --exclude='.github/' --exclude='node_modules/' \
+            --exclude='tests/' --exclude='docker/' --exclude='docker-compose.yml' \
+            --exclude='Dockerfile*' --exclude='ai/' --exclude='docs/' --exclude='*.md' \
+            --exclude='/.env' --exclude='/.env.*' \
+            --exclude='/storage/' --exclude='/bootstrap/cache/*.php' \
+            --exclude='/public/storage' --exclude='/public/hot' \
+            --exclude='error_log' --exclude='.well-known/' \
+            ./ "${{ secrets.HOSTINGER_SSH_USER }}@${{ secrets.HOSTINGER_SSH_HOST }}:${{ secrets.HOSTINGER_DEPLOY_PATH }}/"
+
+      - name: Migrate and rebuild caches
+        run: |
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes -p "${{ secrets.HOSTINGER_SSH_PORT }}" \
+            "${{ secrets.HOSTINGER_SSH_USER }}@${{ secrets.HOSTINGER_SSH_HOST }}" \
+            "DEPLOY_PATH='${{ secrets.HOSTINGER_DEPLOY_PATH }}' PHP='${{ vars.HOSTINGER_PHP || 'php' }}' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd "$DEPLOY_PATH"
+          [ -f artisan ] || { echo "::error::artisan not found in DEPLOY_PATH"; exit 1; }
+          [ -L public_html ] || { echo "::error::public_html is not a symlink"; exit 1; }
+          [ -f .env ] || { echo "::error::no .env on the server"; exit 1; }
+          grep -Eq '^APP_KEY=["'"'"']?base64:' .env || { echo "::error::APP_KEY is empty on the server"; exit 1; }
+          grep -Eiq '^APP_DEBUG=["'"'"']?(true|1|on|yes)' .env && { echo "::error::APP_DEBUG=true in production"; exit 1; }
+          mkdir -p storage/framework/{cache,sessions,views} storage/logs bootstrap/cache
+          $PHP -v | head -1
+          $PHP artisan config:clear          # stale cache would poison migrate
+          $PHP artisan down --retry=15 || true
+          trap '$PHP artisan up' EXIT
+          $PHP artisan migrate --force
+          $PHP artisan optimize:clear
+          $PHP artisan config:cache
+          $PHP artisan view:cache
+          # NO route:cache / optimize — closure routes in web.php cannot serialize.
+          $PHP artisan queue:restart
+          REMOTE
+
+      - name: Smoke test
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' -L https://petlodge.fun/)
+          echo "https://petlodge.fun/ -> $code"; [ "$code" = "200" ]
+          # Nothing outside public/ may be reachable.
+          leak=0
+          for p in /.env /artisan /composer.json /composer.lock /vendor/autoload.php \
+                   /storage/logs/laravel.log /storage/app/signatures/ /public/index.php; do
+            c=$(curl -s -o /dev/null -w '%{http_code}' "https://petlodge.fun$p")
+            echo "$p -> $c"
+            [ "$c" = "200" ] && { echo "::error::$p is publicly reachable"; leak=1; }
+          done
+          exit $leak
+
+      - name: Clean up SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
 ```
 
-> The `remote_path` ends at `laravel/`, never at `domains/petlogde.fun/` — see
-> "Why `laravel/`" above. Getting this wrong plus `--delete` removes `public_html`.
+### Caching — why not `optimize`
 
-### `deploy/rsync-exclude.txt`
+`routes/web.php` defines 3 routes as closures, and a closure cannot be serialised, so
+`route:cache` fails. Laravel 10's `optimize` runs `config:cache` **and** `route:cache`
+(`Foundation/Console/OptimizeCommand.php`), so `optimize` is out as well. Use
+`config:cache` + `view:cache`, which is what luane.online already does.
 
-```
-.git/
-.github/
-node_modules/
-storage/
-.env
-.env.*
-tests/
-ai/
-docs/
-docker/
-docker-compose.yml
-Dockerfile*
-*.md
-```
+To unlock `optimize` later, move those 3 closures into controller actions.
 
-> `storage/` and `.env` are excluded **because `--delete` is on**. Removing either line
-> destroys the signatures (legal evidence) or the production credentials. Prove the
-> exclude file is honoured with a `--dry-run` deploy before the first real one.
+> Whichever is used, the rule holds: **any `.env` edit on the server requires re-running
+> the cache commands**, or the old values keep winning. That is the trap
+> `docs/DEPLOYMENT_GUIDE.md` already warns about.
 
-### Caching: `clear` vs `cache` (open — decision 6)
+### Tests as a gate
 
-The script above uses `config:clear`, matching `docs/DEPLOYMENT_GUIDE.md`, which warns
-that a cached config outranks `.env` and has already hidden changed mail credentials.
-`config:cache` + `route:cache` + `view:cache` is the faster production choice **only** if
-the rule "any `.env` edit requires re-running the cache commands" is actually followed.
-Decide before executing; do not mix the two.
+Both reference repos run tests before deploying. PetsLodge cannot yet: 4 tests are
+known-red (`AGENTS.md` §4), so the gate would never pass. Either fix those first (Plan 05
+owns the two `CheckInSubmissionTest` cases) or start with `deploy.yml` having no `needs:
+test` and add it later. Don't paper over it with `continue-on-error`.
 
 ---
 
-## Secrets to create (repo → Settings → Secrets and variables → Actions)
+## Secrets and variables
+
+**Secrets** (Settings → Secrets and variables → Actions → Secrets):
 
 | Secret | Notes |
 |---|---|
-| `HOSTINGER_SSH_HOST` | Hostinger SSH host |
-| `HOSTINGER_SSH_PORT` | Usually not 22 on shared plans |
+| `HOSTINGER_SSH_HOST` | |
+| `HOSTINGER_SSH_PORT` | usually not 22 on shared plans |
 | `HOSTINGER_SSH_USER` | e.g. `u189079842` |
-| `HOSTINGER_SSH_KEY` | Private half of a **deploy-only** keypair; add the public half in hPanel → SSH Access |
+| `HOSTINGER_SSH_KEY` | private half of a **deploy-only** passphrase-less OpenSSH key; public half in hPanel → SSH Access |
+| `HOSTINGER_DEPLOY_PATH` | `/home/u189079842/domains/petlodge.fun` |
 
-**If the plan has no SSH** (decision 5), swap both steps for an FTP action
-(`SamKirkland/FTP-Deploy-Action`) and run the artisan commands from the existing
-per-minute cron instead. Two consequences: Blocker 3 Option A becomes impossible (no shell
-for `ln -s`), forcing Option B; and there is no trigger for `migrate --force`, so every
-schema change becomes manual.
+**Variables** (same screen → Variables, *not* Secrets):
+
+| Variable | Notes |
+|---|---|
+| `HOSTINGER_PHP` | optional; set if `php` over SSH isn't 8.3 (e.g. `/opt/alt/php83/usr/bin/php`) |
+
+> thelamb's workflow carries an explicit warning about this split: a value stored as a
+> secret reads **empty** through `vars.`, and the deploy fails in a confusing way.
 
 ---
 
-## Step-by-step execution order
+## Execution order
 
-1. ~~Confirm the server PHP version~~ → **8.3**. Set `php-version: '8.3'` in the workflow
-   and resolve the drift (Dockerfile 8.2) per "PHP version drift" above.
-2. ~~Fix Blocker 2~~ → **done 2026-11-26**; `public/.htaccess` is tracked.
-3. Apply Blocker 3 **Option A** (symlink). Verify with `readlink public_html` and by
-   loading the site **before** wiring any CI. Fall back to Option B if hPanel clobbers it.
-4. Create `laravel/` on the server and upload `.env` **once**, by hand. Confirm
-   `storage/` exists, is writable, and still holds the existing `app/signatures/`.
-5. Add `deploy/rsync-exclude.txt`, then the workflow with `--dry-run` in `switches`.
-   Read the output — especially that nothing under `storage/`, `public_html/` or `logs/`
-   is listed for deletion.
-6. Remove `--dry-run`, deploy, then walk the acceptance criteria.
-7. Confirm the queue cron from `docs/DEPLOYMENT_GUIDE.md` §3 points at the new
-   `laravel/` path, not at `public_html`.
+1. ~~PHP version~~ → **8.3** everywhere (done locally 2026-11-26). Optionally pin
+   `config.platform.php` to `8.3` in `composer.json`.
+2. ~~`.htaccess`~~ → **done**.
+3. Confirm the Hostinger mailbox is `no-reply@petlodge.fun` (see the note at the top).
+4. Port `migrate-layout.sh` + `rollback-layout.sh` from `PersonalLaravelWepPage`, adjust
+   `DOMAIN_DIR`, run the **dry run**, read it, then `--apply`. Verify with the three
+   commands in Step 0.
+5. Create the GitHub secrets/variables above.
+6. Add the workflow with `--dry-run` appended to the rsync switches. Read the
+   `--itemize-changes` output — confirm nothing under `storage/`, `public_html/` or the
+   domain's `logs/` is listed for deletion.
+7. Remove `--dry-run`, deploy, walk the acceptance criteria.
+8. Repoint the queue cron (`docs/DEPLOYMENT_GUIDE.md` §3) at the new Laravel root — it
+   currently ends in `public_html`, which after Step 0 is a symlink to `public/`, so
+   `artisan` is no longer there.
 
 ---
 
 ## Acceptance criteria
 
-- [ ] A push to the deploy branch produces a working site with **no manual step**.
-- [ ] `https://petlogde.fun/` loads, and a deep route (`/check-in`) returns 200, not 404
-      (proves `.htaccess` arrived and rewriting works).
-- [ ] **`https://petlogde.fun/.env` returns 403/404, not the file.** Same for
-      `/vendor/autoload.php` and `/storage/logs/laravel.log`. This is the security fix.
-- [ ] Browser console is clean and assets load from `/build/assets/…` (proves the Vite
-      build shipped and that no stale `public/hot` exists on the server).
-- [ ] A drop-in produces a PDF and a signature, both readable only through their
-      authenticated routes.
-- [ ] `storage/app/signatures/` still contains every pre-deploy file.
-- [ ] `php artisan migrate:status` shows all migrations run, with the `jobs` table present.
-- [ ] A queued email is delivered within ~2 minutes of the cron tick.
-- [ ] Two deploys in a row are safe — nothing duplicated, nothing wiped.
-- [ ] `readlink public_html` still resolves (Option A only).
+- [ ] A push to `main` produces a working site with **no manual step**.
+- [ ] `https://petlodge.fun/` → 200; a deep route (`/check-in`) → 200, not 404.
+- [ ] The leak loop passes: `/.env`, `/vendor/autoload.php`, `/storage/logs/laravel.log`,
+      `/storage/app/signatures/` all non-200. **This is the security fix.**
+- [ ] Console clean; assets load from `/build/assets/…`; no `public/hot` on the server.
+- [ ] A drop-in produces a PDF and a signature, each readable only via its authenticated route.
+- [ ] `storage/app/signatures/` still holds every pre-migration file (and the Step 0 backup exists).
+- [ ] `readlink public_html` → `public`.
+- [ ] `php artisan migrate:status` all run; `jobs` table present.
+- [ ] A queued email arrives within ~2 minutes of the cron tick, From `no-reply@petlodge.fun`.
+- [ ] Two consecutive deploys are safe.
 
 ---
 
 ## Out of scope
 
-- Zero-downtime atomic releases (`releases/` + a swapped symlink). Possible over SSH, but
-  it adds a second symlink dependency on a host that already fights them; `artisan down/up`
-  is the compromise here.
-- A staging environment.
-- Automated DB backups before `migrate --force` — **strongly recommended** before the
-  first production deploy carrying a destructive migration, but it belongs in its own plan.
-- Running PHPUnit as a deploy gate. Worth adding once the 4 known-red tests
-  (`AGENTS.md` §4) are fixed; until then the gate could never be green.
-- Moving to a VPS, which is Hostinger's own answer to the document-root limitation. Worth
-  revisiting if the symlink proves unstable in practice.
+- **Staging.** thelamb's reusable-workflow + Environments pattern is the model when it is
+  wanted; note it needs the per-entry `link-docroot.sh` layout, not the whole-dir symlink.
+- Zero-downtime atomic releases — `artisan down/up` with the `trap` is the compromise.
+- Automated DB backup before `migrate --force`. **Strongly recommended** before the first
+  deploy carrying a destructive migration; own plan.
+- Fixing the 4 known-red tests so the test gate can be enabled (Plan 05).
+- Moving the 3 closure routes into controllers to unlock `optimize`.

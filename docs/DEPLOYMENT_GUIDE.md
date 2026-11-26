@@ -30,11 +30,11 @@ a slow or dead mail server must never block the check-in flow.
 > **Never commit credentials.** They belong in the production `.env` only, which is
 > gitignored. `.env.example` documents the *keys*, never the values.
 
-Production uses **Hostinger SMTP** from the mailbox **`no-reply@petlogde.fun`**.
+Production uses **Hostinger SMTP** from the mailbox **`no-reply@petlodge.fun`**.
 
 `.env.production` in the repo root is already filled in with everything except the
 password — copy it to the server as `.env` and add `MAIL_PASSWORD`. Get that value
-from hPanel → **Emails → no-reply@petlogde.fun → Connect Devices / Configure
+from hPanel → **Emails → no-reply@petlodge.fun → Connect Devices / Configure
 Desktop App**:
 
 | Key | Production value |
@@ -43,7 +43,7 @@ Desktop App**:
 | `MAIL_HOST` | `smtp.hostinger.com` |
 | `MAIL_PORT` | `465` (SSL) — or `587` with `MAIL_ENCRYPTION=tls` |
 | `MAIL_ENCRYPTION` | `ssl` (or `tls` on 587) |
-| `MAIL_USERNAME` | the full mailbox address: `no-reply@petlogde.fun` |
+| `MAIL_USERNAME` | the full mailbox address: `no-reply@petlodge.fun` |
 | `MAIL_PASSWORD` | that mailbox's password (from hPanel) |
 | `MAIL_FROM_ADDRESS` | same as `MAIL_USERNAME` — must match, or mail gets rejected/spam-filed |
 | `MAIL_FROM_NAME` | `"Pet Lodge & Spa"` |
@@ -96,7 +96,7 @@ php artisan migrate --force        # creates `jobs` and `failed_jobs`
 Set the schedule to **every minute** and use:
 
 ```
-cd /home/u189079842/domains/petlogde.fun/public_html && /usr/bin/php artisan queue:work --stop-when-empty --tries=3 --backoff=30 --max-time=55 >> storage/logs/queue.log 2>&1
+cd /home/u189079842/domains/petlodge.fun/public_html && /usr/bin/php artisan queue:work --stop-when-empty --tries=3 --backoff=30 --max-time=55 >> storage/logs/queue.log 2>&1
 ```
 
 Why each flag matters on shared hosting:

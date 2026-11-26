@@ -1,5 +1,5 @@
-# Use PHP 8.2 FPM Alpine base image
-FROM php:8.2-fpm-alpine
+# Use PHP 8.3 FPM Alpine base image — matches the Hostinger production server (8.3).
+FROM php:8.3-fpm-alpine
 
 # Install system dependencies
 RUN apk add --no-cache \

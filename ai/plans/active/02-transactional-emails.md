@@ -170,7 +170,7 @@ Required `jobs` table was missing entirely and has been added
 - [x] Queue config for both environments; `jobs` migration (reversible).
 - [x] Docker: queue worker restart policy, migration-race guard, bind mount,
       single-source-of-truth env via `.env.docker`.
-- [x] `.env.production` rewritten for Laravel 10 + Hostinger (`no-reply@petlogde.fun`),
+- [x] `.env.production` rewritten for Laravel 10 + Hostinger (`no-reply@petlodge.fun`),
       everything filled except `MAIL_PASSWORD`.
 - [x] `php artisan mail:test` diagnostic command.
 - [x] Full pipeline verified end-to-end against mailpit (event → Redis → worker → SMTP).
@@ -179,7 +179,7 @@ Required `jobs` table was missing entirely and has been added
 ### Blocking the last acceptance criterion
 
 - [ ] **A real message through Hostinger.** Needs the mailbox password. Then:
-      `php artisan mail:test you@petlogde.fun`
+      `php artisan mail:test you@petlodge.fun`
 - [ ] hPanel cron job added; `migrate --force` run on prod; SPF/DKIM verified.
 
 Do not archive this plan to `ai/plans/done/` until a real Hostinger email is delivered.

@@ -31,7 +31,7 @@ source of truth, with automatic UI updates when the data changes.
 
 | Layer        | Technology                                                        |
 |--------------|-------------------------------------------------------------------|
-| Backend      | **Laravel 10**, PHP 8.1+                                           |
+| Backend      | **Laravel 10**, PHP **8.3** (Docker + Hostinger both 8.3 since 2026-11-26; `composer.json` floor is still `^8.1`, unpinned) |
 | Database     | **MySQL 8.0** (via Docker); Redis 7 for cache/session/queue       |
 | Auth         | Laravel Breeze + Sanctum                                           |
 | Frontend     | **Vite**, **Tailwind CSS**, **Alpine.js**, vanilla JS, Iconify    |
@@ -66,8 +66,19 @@ The project runs in Docker. `docker-compose.yml` defines five services: `app`
 >
 > The volume is seeded from the image **once, at creation**. Consequences:
 > - `composer install` on the **host** no longer affects the containers.
-> - After changing `composer.json`/`composer.lock`:
->   `docker compose down && docker volume rm petslodge_vendor_data && docker compose up -d --build`
+> - After changing `composer.json`/`composer.lock` (or the PHP version), rebuild and
+>   reseed — **one service first**:
+>   ```bash
+>   docker compose down
+>   docker volume rm petslodge_vendor_data
+>   docker compose build
+>   docker compose up -d app   # seeds the empty volume with a SINGLE container
+>   docker compose up -d       # then the rest
+>   ```
+>   `docker compose up -d` straight onto an empty `vendor_data` fails: `app` and `queue`
+>   both mount it and Docker seeds it per container, so they race and the loser dies with
+>   `failed to mkdir .../vendor/_data/brick: file exists`. Seeding with one service first
+>   avoids it. (Hit for real on 2026-11-26 during the PHP 8.3 bump.)
 >
 > The image therefore installs **dev** dependencies (no `--no-dev`), or `artisan test`
 > inside the container dies on a missing PHPUnit.
@@ -521,6 +532,7 @@ Common symptoms → look here:
 | `docs/DEPLOYMENT_GUIDE.md` / `DEPLOYMENT_LOG.md` | Deploy & rollback. |
 | `docs/MIGRATION_GUIDE.md` | Upgrading between versions of the system. |
 | `DOCKER_README.md` | Docker details. |
+| `ai/plans/active/08-github-actions-hostinger-deploy.md` | **Deploying.** Hostinger/GitHub-Actions plan, built on the user's two working deployments (`skLuan/PersonalLaravelWepPage`, `skLuan/thelamb.studio-web`). Read before touching deployment. |
 | `CHECKIN_COOKIE_REFACTOR_README.md` | History/rationale of the cookie refactor. |
 | `ai/plans/active/`, `ai/plans/done/` | Pending plans / executed plans with Execution notes. |
 | `ai/plans/archive/` | Legacy (Jan–Mar 2026) data-flow refactor plans & phase reports. Gitignored, local only. |

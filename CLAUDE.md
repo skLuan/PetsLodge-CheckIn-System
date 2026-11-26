@@ -95,7 +95,7 @@ Older journal entries and done plans mention `AIplans/`, `plans/` and a root
 Check `ai/JOURNAL.md` for the current list; as of the last session:
 
 - **Hostinger SMTP send never happened** (Plan 02 stays in `active/` until it does):
-  `MAIL_PASSWORD` on the server, the `no-reply@petlogde.fun` mailbox, the cron line from
+  `MAIL_PASSWORD` on the server, the `no-reply@petlodge.fun` mailbox, the cron line from
   `docs/DEPLOYMENT_GUIDE.md` §3, `migrate --force` for `jobs`, SPF/DKIM.
 - `LODGE_ADDRESS` / `LODGE_PHONE` / `LODGE_EMAIL` are empty → emails have a name-only footer.
 - `.env.docker` holds the **live PrintNode key**. It is gitignored — keep it that way.

@@ -10,6 +10,91 @@
 
 ---
 
+## Session 2026-11-26 (b) — PHP 8.3, domain typo fixed, Plan 08 rewritten from prior art
+
+**Branch:** `feature/04-multi-pet-health-food` (uncommitted, on top of `6b7ef33`).
+
+### Domain: `petlogde.fun` → `petlodge.fun`
+
+The old spelling was a typo. Production is **https://petlodge.fun/**. Replaced in **36
+places across 10 files**: `.env`, `.env.docker`, `.env.example`, `.env.production`,
+`CLAUDE.md`, `ai/JOURNAL.md`, the master plan, `02-transactional-emails.md`, Plan 08 and
+`docs/DEPLOYMENT_GUIDE.md`. No occurrence left anywhere outside `vendor/`.
+
+**Left for a human:** the Hostinger mailbox must now be `no-reply@petlodge.fun`.
+`AGENTS.md` §6b: Hostinger rejects mail whose From is not the authenticated mailbox, so a
+mailbox still on the old spelling breaks every client email silently.
+
+### PHP 8.3
+
+`Dockerfile` → `php:8.3-fpm-alpine`, matching the Hostinger server. Local, CI and
+production are now all 8.3. Verified `PHP 8.3.37` in both the app and queue containers,
+extensions intact (`pdo_mysql redis intl gd zip bcmath`), vendor still on ext4 with dev
+deps. Suite: **156 passed / 4 failed** — identical to the 8.2 baseline, same known-red
+four.
+
+**Bug found in our own documented procedure.** The reseed command written yesterday
+(`docker compose down && docker volume rm petslodge_vendor_data && docker compose up -d
+--build`) **fails**: `app` and `queue` both mount `vendor_data`, Docker seeds it per
+container, and on an empty volume they race —
+`failed to mkdir .../vendor/_data/brick: file exists`. Correct sequence, now in both
+`AGENTS.md` §3 and `docker-compose.yml`:
+
+```bash
+docker compose down
+docker volume rm petslodge_vendor_data
+docker compose build
+docker compose up -d app   # seed with ONE service
+docker compose up -d       # then the rest
+```
+
+### Plan 08 rewritten against two working deployments
+
+The user pointed at `skLuan/PersonalLaravelWepPage` (luane.online) and
+`skLuan/thelamb.studio-web`, both already deploying Laravel to Hostinger via GitHub
+Actions. Both were read in full; Plan 08 is now mostly "copy what those do". Key
+corrections to the earlier draft:
+
+- **Laravel root = the domain dir** `~/domains/petlodge.fun/`, not a `laravel/`
+  subdirectory. The earlier draft argued `--delete` could wipe `public_html`; luane.online
+  solves that with `--exclude='/public_html'` and has been running that way. Consistency
+  with a deployment the user already operates wins.
+- **`public_html -> public`** (whole-dir symlink), created by a one-time
+  `migrate-layout.sh` ported from the personal repo — which does exactly the move
+  PetsLodge needs (the app is currently served *from* `public_html`, exposing `.env`,
+  `vendor/` and `storage/`). Dry-run by default, backs up first, has a rollback script.
+- thelamb uses a different docroot strategy (`link-docroot.sh`, per-entry symlinks into a
+  real `public_html`) because Hostinger only allows **subdomains inside `public_html`**.
+  Noted as the switch-to option if staging is ever wanted.
+- **Decision 6 answered with evidence: no `route:cache`, no `optimize`.**
+  `routes/web.php` has 3 closure routes (`/check-in`, `/dashboard`,
+  `/admin/monitoring-dashboard`); closures cannot serialize. Laravel 10's `optimize` runs
+  `config:cache` + `route:cache` (`Foundation/Console/OptimizeCommand.php`), so it is out
+  too. Use `config:cache` + `view:cache`, which is exactly what luane.online does.
+- Adopted from thelamb: SSH key CRLF normalisation + `ssh-keygen -y` validation (a key
+  copied on Windows fails with `error in libcrypto`), `ssh-keyscan`, server-side `.env`
+  preflight (APP_KEY set, APP_DEBUG false), `trap 'artisan up' EXIT`, `HOSTINGER_PHP`
+  override, and the warning that `HOSTINGER_DOCROOT`/`SITE_URL` must be **variables, not
+  secrets** or `vars.` reads them empty.
+- Adopted from the personal repo: the **leak loop** smoke test asserting `/.env`,
+  `/vendor/autoload.php`, `/storage/logs/laravel.log` etc. are not 200.
+- **Decision 5: SSH**, not FTP — FTP would rule out `ln -s`, `migrate --force` and the
+  smoke tests.
+- Tests cannot gate the deploy yet: 4 known-red tests mean the gate could never pass.
+
+### Left for a human
+
+- Plan 08 is still **unexecuted**. Step 0 (the layout migration) is manual and must be
+  done before any CI runs.
+- Hostinger mailbox rename (above).
+- `.env.production:90` still says "PrintNode pulls the PDF over HTTP, so APP_URL must be
+  the public https URL" — stale since Plan 07 (`AGENTS.md` §6d rule 6: APP_URL no longer
+  affects printing). Left alone; one-line comment fix.
+- `composer.json` still has no `config.platform.php` pin.
+- Nothing committed this session.
+
+---
+
 ## Session 2026-11-26 — Docker performance audit, tabbar hardening, deploy plan
 
 **Branch:** `feature/04-multi-pet-health-food` (uncommitted, on top of the 2026-11-25 work).
@@ -920,7 +1005,7 @@ Laravel 10 — the immediate path is `$mailable->to(...)->send(app(Mailer::class
   same 4 pre-existing failures, no new ones.
 - **Queued path end-to-end:** dispatched a real `PetDroppedIn`; worker log shows
   `SendDropInNotification RUNNING → DONE` then `DropInMail RUNNING → DONE`, and the
-  message landed in mailpit — correct subject, recipient, and `no-reply@petlogde.fun`
+  message landed in mailpit — correct subject, recipient, and `no-reply@petlodge.fun`
   sender. Re-verified *after* the config refactor.
 - **All 3 templates** sent via `mail:test --template=…`; confirmation body checked
   for pet name, check-in ID, date and footer. Blank `LODGE_*` fields are correctly
@@ -933,13 +1018,13 @@ Laravel 10 — the immediate path is `$mailable->to(...)->send(app(Mailer::class
 
 1. **The Hostinger send has still never happened.** Put the mailbox password into
    `MAIL_PASSWORD` in the server's `.env` (`.env.production` is otherwise complete)
-   and run `php artisan mail:test you@petlogde.fun`.
-2. **Create the `no-reply@petlogde.fun` mailbox** in hPanel if it does not exist.
+   and run `php artisan mail:test you@petlodge.fun`.
+2. **Create the `no-reply@petlodge.fun` mailbox** in hPanel if it does not exist.
 3. **Add the cron job** — the exact line is in `docs/DEPLOYMENT_GUIDE.md` §3.
    Confirm the PHP binary path first (`ls /usr/bin/php*`); Hostinger sometimes
    needs a versioned path.
 4. **Run `php artisan migrate --force` on production** to create `jobs`.
-5. **Verify SPF/DKIM** for petlogde.fun (`dig` commands in §1) or Gmail spam-files it.
+5. **Verify SPF/DKIM** for petlodge.fun (`dig` commands in §1) or Gmail spam-files it.
 6. **`LODGE_ADDRESS` / `LODGE_PHONE` / `LODGE_EMAIL` are still empty.** Emails ship
    with a name-only footer until filled. Nothing invented was put in them.
 7. **Security: `.env.v0` is staged for commit and contains a live

@@ -43,7 +43,9 @@ x-app-volumes: &app-volumes
   # CAVEAT: the volume is seeded from the image ONCE, when it is first created.
   # After changing composer.json/composer.lock you must rebuild AND drop it:
   #   docker compose down && docker volume rm petslodge_vendor_data
-  #   docker compose up -d --build
+  #   docker compose build
+  #   docker compose up -d app   # seed with ONE service first,
+  #   docker compose up -d       # then the rest: app+queue race on an empty volume
   # A `composer install` run on the HOST no longer affects the containers.
   - vendor_data:/var/www/vendor
 
