@@ -125,11 +125,12 @@ jobs:
           # /storage/ holds signatures (legal evidence) and must never be synced over.
           rsync -az --delete --no-perms --omit-dir-times --itemize-changes "${extra[@]}" \
             -e "ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes -p $SSH_PORT" \
-            --exclude='/public_html' --exclude='/logs/' --exclude='/.htaccess.public_html-old' \
+            --exclude='/public_html' --exclude='/logs/' --exclude='/.htaccess.public_html-old' --exclude='/DO_NOT_UPLOAD_HERE' \
             --exclude='.git/' --exclude='/.github/' --exclude='node_modules/' \
             --exclude='/tests/' --exclude='/docker/' --exclude='/docker-compose.yml' \
             --exclude='/Dockerfile*' --exclude='/docker-entrypoint.sh' \
             --exclude='/ai/' --exclude='/docs/' --exclude='/*.md' \
+            --exclude='/screenshots/' --exclude='/scripts/' --exclude='/LICENCE' --exclude='/phpunit.xml' \
             --exclude='/.env' --exclude='/.env.*' \
             --exclude='/storage/' --exclude='/bootstrap/cache/*.php' \
             --exclude='/public/storage' --exclude='/public/hot' \
