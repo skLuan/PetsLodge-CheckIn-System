@@ -106,10 +106,11 @@ jobs:
           SSH_USER: ${{ secrets.HOSTINGER_SSH_USER }}
           DEPLOY_PATH: ${{ secrets.HOSTINGER_DEPLOY_PATH }}
         run: |
-          # Refuse to rsync --delete into a directory that is not the migrated Laravel root.
+          # Refuse to rsync --delete into a directory that is not the prepared Laravel root.
+          # (No `artisan` check: on a first install it only arrives with the first rsync.)
           ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
-            "cd '$DEPLOY_PATH' && [ -L public_html ] && [ -f artisan ] && [ -d storage ] && [ -f .env ]" \
-            || { echo "::error::$DEPLOY_PATH is not the migrated layout (need public_html symlink, artisan, storage/, .env). Run scripts/hostinger/migrate-layout.sh first."; exit 1; }
+            "cd '$DEPLOY_PATH' && [ -L public_html ] && [ -d storage ] && [ -f .env ]" \
+            || { echo "::error::$DEPLOY_PATH is not the migrated layout (need public_html symlink, storage/, .env). Run scripts/hostinger/migrate-layout.sh first."; exit 1; }
 
       - name: Upload files (rsync)
         env:
