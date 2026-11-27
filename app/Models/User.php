@@ -49,7 +49,18 @@ class User extends Authenticatable
         'password' => 'hashed',
     ];
 
-    
+    /** Roles allowed through `pet.staff.only` (PetStaffOnly). */
+    public const PET_STAFF_ROLES = ['PET_STAFF', 'SUPER_ADMIN'];
+
+    /**
+     * Pet staff or above. Case-insensitive: some rows were seeded lowercase.
+     * `ADMIN` is the monitoring role, not staff — it is deliberately not here.
+     */
+    public function isPetStaff(): bool
+    {
+        return in_array(strtoupper((string) $this->role), self::PET_STAFF_ROLES, true);
+    }
+
     public function emergencyContact()
     {
         return $this->hasOne(EmergencyContact::class);

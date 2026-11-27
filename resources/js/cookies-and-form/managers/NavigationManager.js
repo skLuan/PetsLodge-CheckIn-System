@@ -23,6 +23,9 @@ class NavigationManager {
         CookieReactivityManager.addListener((cookieData) => {
             this.updateNavigationState(cookieData);
         });
+
+        // Start observing pet pills container so label stays in sync automatically
+        this.initializePetPillsLabelObserver();
     }
 
     /**
@@ -62,6 +65,85 @@ class NavigationManager {
     }
 
     /**
+     * Syncs the visibility of #petPillsLabel with whether #petPillsContainer has children.
+     */
+    static syncPetPillsLabel() {
+        const container = document.getElementById('petPillsContainer');
+        const label = document.getElementById('petPillsLabel');
+        if (!label) return;
+
+        // If the pills container itself is hidden, always hide the label too
+        const containerVisible = container && !container.classList.contains('hidden');
+        const hasChildren = containerVisible && container.children.length > 0;
+        label.classList.toggle('hidden', !hasChildren);
+    }
+
+    /**
+     * Syncs #nowEditContainer and #nowEditingName with the currently selected pill.
+     * Shows the container with the pet name when a pill is selected; hides it otherwise.
+     */
+    static syncNowEditingLabel() {
+        const nowEditContainer = document.getElementById('nowEditContainer');
+        const nowEditingName = document.getElementById('nowEditingName');
+        if (!nowEditContainer || !nowEditingName) return;
+
+        const pillsContainer = document.getElementById('petPillsContainer');
+        const containerVisible = pillsContainer && !pillsContainer.classList.contains('hidden');
+
+        // If the pills container is hidden, always hide the now-editing banner
+        if (!containerVisible) {
+            nowEditingName.textContent = '';
+            nowEditContainer.classList.add('hidden');
+            return;
+        }
+
+        // "Same feeding for all" checked → show "All"
+        const sameFeedingForAll = document.getElementById('sameFeedingForAll');
+        if (sameFeedingForAll && sameFeedingForAll.checked) {
+            nowEditingName.textContent = 'All';
+            nowEditContainer.classList.remove('hidden');
+            return;
+        }
+
+        const selectedPill = document.querySelector('#petPillsContainer .pill.selected');
+        if (selectedPill) {
+            const nameSpan = selectedPill.querySelector('span');
+            nowEditingName.textContent = nameSpan ? nameSpan.textContent : '';
+            nowEditContainer.classList.remove('hidden');
+        } else {
+            nowEditingName.textContent = '';
+            nowEditContainer.classList.add('hidden');
+        }
+    }
+
+    /**
+     * Observes #petPillsContainer for child additions/removals and class changes
+     * on pill elements, keeping #petPillsLabel and #nowEditContainer in sync automatically.
+     */
+    static initializePetPillsLabelObserver() {
+        const container = document.getElementById('petPillsContainer');
+        if (!container) return;
+
+        const observer = new MutationObserver(() => {
+            this.syncPetPillsLabel();
+            this.syncNowEditingLabel();
+        });
+
+        // childList: detects pills added/removed
+        // subtree + attributes + attributeFilter: detects .selected toggled on any pill
+        observer.observe(container, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['class'],
+        });
+
+        // Run once immediately to set the initial state
+        this.syncPetPillsLabel();
+        this.syncNowEditingLabel();
+    }
+
+    /**
      * Updates the tab bar based on current step and form state
      */
     static updateTabbarForStep() {
@@ -69,22 +151,36 @@ class NavigationManager {
         const nextButton = document.querySelector("#nextStep");
         const thankYouTitle = document.getElementById('thankYouTitle');
         const petPillsContainer = document.getElementById('petPillsContainer');
+        const petPillsLabel = document.getElementById('petPillsLabel');
 
         if (!nextButton) return;
 
-        // Update grooming summary when reaching final step
-        if (currentStep === FORM_CONFIG.STEPS.INVENTORY) {
+        // List steps are only rendered for the step that is current when data changes
+        // (UIManager.updateUIFromCookieData). Render them on step entry too, otherwise
+        // reloading on another step and navigating here shows them empty.
+        if (currentStep === FORM_CONFIG.STEPS.FEEDING_MEDICATION - 1 || currentStep === FORM_CONFIG.STEPS.INVENTORY - 1) {
+            const cookieData = FormDataManager.getCheckinData();
+            if (cookieData) {
+                FormDataManager.updateUIFromCookieData(cookieData);
+            }
+        }
+
+        // Update grooming summary when reaching the grooming or final step
+        if (currentStep === FORM_CONFIG.STEPS.GROOMING - 1 || currentStep === FORM_CONFIG.STEPS.THANKS - 1) {
             PopupManager.updateGroomingSummary();
         }
 
         // Toggle thank you title and pet pills container
-        if (currentStep === FORM_CONFIG.STEPS.INVENTORY) { // Step 6 (0-based: 5)
+        if (currentStep === FORM_CONFIG.STEPS.THANKS - 1) { // Final step (0-based: 6)
             // Hide next button in final step
             nextButton.style.display = 'none';
 
-            // Show thank you title, hide pet pills
+            // Show thank you title, hide pet pills, label, and now-editing banner
             if (thankYouTitle) thankYouTitle.classList.remove('hidden');
             if (petPillsContainer) petPillsContainer.classList.add('hidden');
+            if (petPillsLabel) petPillsLabel.classList.add('hidden'); // Always hidden on final step
+            const nowEditContainer = document.getElementById('nowEditContainer');
+            if (nowEditContainer) nowEditContainer.classList.add('hidden');
 
             // Update grooming summary and check grooming acknowledgment
             PopupManager.updateGroomingSummary();
@@ -94,13 +190,36 @@ class NavigationManager {
             if (cookieData) {
                 SummaryRenderer.updateCheckinSummary(cookieData);
             }
+
+            // Update submit button state based on grooming acknowledgment AND terms acceptance
+            const groomingAcknowledged = cookieData?.groomingAcknowledged;
+            const termsAccepted = cookieData?.termsAccepted;
+            const finalSubmitButton = document.querySelector("#finalSubmit");
+            if (finalSubmitButton) {
+                finalSubmitButton.disabled = !groomingAcknowledged || !termsAccepted;
+                if (finalSubmitButton.disabled) {
+                    finalSubmitButton.classList.add('opacity-50', 'cursor-not-allowed');
+                } else {
+                    finalSubmitButton.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
+            }
         } else {
             // Show next button for other steps
             nextButton.style.display = '';
-
-            // Hide thank you title, show pet pills
             if (thankYouTitle) thankYouTitle.classList.add('hidden');
-            if (petPillsContainer) petPillsContainer.classList.remove('hidden');
+
+            if (currentStep === FORM_CONFIG.STEPS.INVENTORY - 1) {
+                // Inventory step — hide pet pills, label, and now-editing banner
+                if (petPillsContainer) petPillsContainer.classList.add('hidden');
+                if (petPillsLabel) petPillsLabel.classList.add('hidden');
+                const nowEditContainerInv = document.getElementById('nowEditContainer');
+                if (nowEditContainerInv) nowEditContainerInv.classList.add('hidden');
+            } else {
+                // All other steps — show pet pills container; label/banner managed dynamically
+                if (petPillsContainer) petPillsContainer.classList.remove('hidden');
+                this.syncPetPillsLabel();
+                this.syncNowEditingLabel();
+            }
 
             if (currentStep === FORM_CONFIG.STEPS.INVENTORY - 1) {
                 // Inventory step - change to "Complete Inventory"
@@ -165,24 +284,8 @@ class NavigationManager {
                 } else {
                     nextButton.classList.remove('opacity-50', 'cursor-not-allowed');
                 }
-            } else if (currentStep === FORM_CONFIG.STEPS.INVENTORY) { // Step 6 - Final step
-                // In final step, check grooming acknowledgment and terms acceptance
-                const checkinData = FormDataManager.getCheckinData();
-                const groomingAcknowledged = checkinData?.groomingAcknowledged;
-                const termsAccepted = checkinData?.termsAccepted;
-
-                // Update submit button state based on grooming acknowledgment AND terms acceptance
-                const finalSubmitButton = document.querySelector("#finalSubmit");
-                if (finalSubmitButton) {
-                    finalSubmitButton.disabled = !groomingAcknowledged || !termsAccepted;
-                    if (finalSubmitButton.disabled) {
-                        finalSubmitButton.classList.add('opacity-50', 'cursor-not-allowed');
-                    } else {
-                        finalSubmitButton.classList.remove('opacity-50', 'cursor-not-allowed');
-                    }
-                }
             } else {
-                // Other steps - normal "Next"
+                // Other steps (incl. grooming) - normal "Next"
                 nextButton.innerHTML = 'Next <iconify-icon class="text-3xl" icon="fluent:next-frame-20-filled"></iconify-icon>';
                 nextButton.disabled = false;
                 nextButton.classList.remove('opacity-50', 'cursor-not-allowed');
@@ -203,7 +306,7 @@ class NavigationManager {
      * @returns {boolean} True if current step is the final step
      */
     static isFinalStep() {
-        return this.getCurrentStep() === (FORM_CONFIG.STEPS.INVENTORY - 1);
+        return this.getCurrentStep() === (FORM_CONFIG.STEPS.THANKS - 1);
     }
 }
 

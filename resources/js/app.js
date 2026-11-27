@@ -1,6 +1,8 @@
 import './bootstrap';
 import "iconify-icon";
 import { CheckInHandler } from './components/CheckInHandler.js';
+// Registers window.SignatureCapture for the drop-in signature pad (Plan 03).
+import './components/SignaturePad.js';
 import { checkInConfig, dropInConfig, isCheckInPage, isDropInPage } from './config/checkInConfig.js';
 
 import Alpine from 'alpinejs';

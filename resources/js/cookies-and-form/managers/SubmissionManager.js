@@ -59,6 +59,13 @@ class SubmissionManager {
 
             let lastCheckinId = null;
 
+            // Editing a booking: pets removed in the wizard are pruned after the loop.
+            // Read now — clearCheckinData() below drops the editing state.
+            const editingCheckInId = FormDataManager.isEditingMode()
+                ? FormDataManager.getEditingCheckInId()
+                : null;
+            const submittedPetIds = [];
+
             for (let i = 0; i < pets.length; i++) {
                 const petData = pets[i];
                 const petName = petData?.info?.petName || `Pet ${i + 1}`;
@@ -71,6 +78,7 @@ class SubmissionManager {
                 }
 
                 CookieManager.setCookie("pet.info.petid", petResult.data.pet_id);
+                submittedPetIds.push(petResult.data.pet_id);
                 console.log(`💾 [${new Date().toISOString()}] Pet ID stored in cookie: ${petResult.data.pet_id}`);
 
                 // Step 3: Send Pet Health, Feeding, and Medication
@@ -98,9 +106,17 @@ class SubmissionManager {
 
                 // Step 5: Send Extra Info
                 console.log(`📦 [${new Date().toISOString()}] Step 5: Sending extra info for ${petName}...`);
+
+                // Grooming is per-mascot: only submit it for pets selected in grooming.pets.
+                const grooming = checkinData.grooming || {};
+                const selectedGroomingPets = grooming.pets;
+                const petTakesGrooming = Array.isArray(selectedGroomingPets)
+                    ? selectedGroomingPets.includes(i)
+                    : true; // backward-compat: no pets array → apply to all
+
                 const extraResult = await this.submitExtraInfo(lastCheckinId, {
                     inventory: checkinData.inventory || [],
-                    grooming: checkinData.grooming || {}
+                    grooming: petTakesGrooming ? grooming : {}
                 });
                 if (!extraResult.success) {
                     throw new Error(`Step 5 failed for ${petName}: ${extraResult.message}`);
@@ -111,6 +127,10 @@ class SubmissionManager {
 
             const endTime = new Date().toISOString();
             console.log(`✅ [${endTime}] Sequential check-in completed successfully!`);
+
+            if (editingCheckInId) {
+                await this.pruneBooking(editingCheckInId, submittedPetIds);
+            }
 
             // CRITICAL FIX: Update server session with newly created check-in data
             // This ensures the confirmation page loads the correct new check-in, not the old one
@@ -433,6 +453,43 @@ class SubmissionManager {
         } catch (error) {
             console.error(`❌ [${new Date().toISOString()}] Step 5 network error:`, error);
             throw error;
+        }
+    }
+
+    /**
+     * After an edited booking is saved, delete the pets removed from it in the wizard.
+     * Non-critical: everything kept is already saved, and a leftover pet can still be
+     * removed from /view-check-in.
+     * @param {number|string} checkInId - The booking being edited (its first check-in)
+     * @param {number[]} petIds - Pet ids the submission just saved
+     * @returns {Promise<void>}
+     */
+    static async pruneBooking(checkInId, petIds) {
+        try {
+            // web route, not /api: it needs the session to tell whether staff is editing.
+            const response = await fetch('/check-in/booking/prune', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                },
+                body: JSON.stringify({
+                    check_in_id: Number(checkInId),
+                    pet_ids: petIds
+                })
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                console.log(`✂️ [${new Date().toISOString()}] Booking pruned:`, result.data.deleted_check_in_ids);
+                if (result.data.kept_signed_check_in_ids?.length) {
+                    alert('A pet you removed has already signed its drop-in, so it stays on the check-in. Only pet staff can remove it.');
+                }
+            } else {
+                console.warn(`⚠️ [${new Date().toISOString()}] Booking prune failed (non-critical):`, result);
+            }
+        } catch (error) {
+            console.warn(`⚠️ [${new Date().toISOString()}] Booking prune failed (non-critical):`, error.message);
         }
     }
 

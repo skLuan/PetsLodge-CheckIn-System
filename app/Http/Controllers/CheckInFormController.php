@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\CheckIn;
+use App\Services\CheckInService;
 use App\Services\CheckInTransformer;
 use Illuminate\Http\Request;
 
@@ -47,7 +48,7 @@ class CheckInFormController extends Controller
         $user = User::where('phone', $phone)->with('pets.kindOfPet', 'pets.gender', 'pets.castrated')->first();
 
         if (!$user) {
-            return redirect()->route('new-form')->with('error', 'User not found');
+            return redirect()->route('new-form', ['phone' => $phone])->with('error', 'User not found');
         }
 
         // Pre-fill form with user data
@@ -69,12 +70,18 @@ class CheckInFormController extends Controller
             return redirect()->route('CheckIn')->with('error', 'User not found');
         }
 
-        $checkIns = CheckIn::where('user_id', $user->id)
-                            ->whereNull('check_out')
-                            ->with('pet', 'foods.momentOfDay', 'medicines.momentOfDay', 'items')
+        // One row per pet, shown as ONE check-in: the client brought them together.
+        $checkIns = CheckIn::openBookingOf($user->id)
+                            ->with(CheckIn::SUMMARY_RELATIONS)
+                            ->withExists('signatures')
                             ->get();
 
-        return view('view-check-in', compact('checkIns', 'user'));
+        // Step 5 copies the booking's inventory onto every pet's row; list it once.
+        $bookingItems = $checkIns->flatMap->items
+                            ->unique(fn ($item) => $item->name.'|'.$item->description)
+                            ->values();
+
+        return view('view-check-in', compact('checkIns', 'user', 'bookingItems'));
     }
 
      /**
@@ -88,25 +95,30 @@ class CheckInFormController extends Controller
       */
      public function editCheckIn(Request $request, $checkInId)
      {
-         $checkIn = CheckIn::with([
-             'pet.gender',
-             'pet.kindOfPet',
-             'pet.castrated',
-             'user.emergencyContacts',
-             'foods.momentOfDay',
-             'medicines.momentOfDay',
-             'items',
-             'extraServices'
-         ])->findOrFail($checkInId);
-         $cookieData = $this->transformer->transformCheckInToCookieFormat($checkIn);
-         //dd($cookieData);
+         $checkIn = CheckIn::with('user')->findOrFail($checkInId);
 
-         // PHASE 2.2: Store editing mode flags in session
-         // These will be extracted by form-processor.js and used to enable editing mode tracking
-         session([
-             'checkin_data' => $cookieData,
-             'editing_mode' => true,
-             'editing_check_in_id' => $checkInId
+         // Edit the whole booking: every pet the client brought opens in the wizard.
+         // A closed row (checked out / cancelled) is not part of one — edit it alone.
+         $booking = CheckIn::openBookingOf($checkIn->user_id)
+             ->with(CheckIn::SUMMARY_RELATIONS)
+             ->get();
+
+         if (! $booking->contains('id', $checkIn->id)) {
+             $booking = CheckIn::with(CheckIn::SUMMARY_RELATIONS)->whereKey($checkIn->id)->get();
+         }
+
+         $cookieData = $this->transformer->transformBookingForWizard($booking);
+         // The booking's id; SubmissionManager prunes the pets removed from it.
+         $checkInId = $booking->first()->id;
+
+         // Hand the check-in to the wizard for ONE request (the redirect below).
+         // form-processor.js copies it into the browser draft, which is the source of
+         // truth from then on. A persistent session key was re-sent on every reload
+         // and merged over the draft again, wiping feeding added since.
+         // Own key, not `checkin_data`: the drop-in flow writes that one too.
+         session()->flash('wizard', [
+             'prefill' => $cookieData,
+             'editing_check_in_id' => $checkInId,
          ]);
 
          return redirect()->route('new-form-pre-filled', ['phone' => $checkIn->user->phone]);
@@ -115,22 +127,65 @@ class CheckInFormController extends Controller
     /**
      * Delete a check-in and its related records
      *
+     * A signed check-in is legal evidence: only pet staff (or above) may delete it.
+     *
+     * @param Request $request
      * @param int $checkInId
-     * @return \Illuminate\Http\RedirectResponse
+     * @return \Illuminate\Http\Response|\Illuminate\Http\RedirectResponse
      */
-    public function deleteCheckIn($checkInId)
+    public function deleteCheckIn(Request $request, $checkInId)
     {
-        $checkIn = CheckIn::with(['foods', 'medicines', 'items', 'extraServices'])->findOrFail($checkInId);
+        $checkIn = CheckIn::findOrFail($checkInId);
         $phone = $checkIn->user->phone;
 
-        // Delete related records
-        $checkIn->foods()->delete();
-        $checkIn->medicines()->delete();
-        $checkIn->items()->delete();
-        $checkIn->extraServices()->detach();
-        $checkIn->delete();
+        if (! $checkIn->canBeDeletedBy($request->user())) {
+            return $this->signedCheckInForbidden($request, $phone);
+        }
+
+        app(CheckInService::class)->deleteCheckIn($checkIn);
 
         return redirect()->route('view-check-in', ['phone' => $phone])
             ->with('success', 'Check-in deleted successfully.');
+    }
+
+    /**
+     * Delete the whole booking the check-in belongs to — every pet's row.
+     *
+     * All or nothing: if any pet is signed and the user is not pet staff,
+     * nothing is deleted.
+     *
+     * @param Request $request
+     * @param int $checkInId
+     * @return \Illuminate\Http\Response|\Illuminate\Http\RedirectResponse
+     */
+    public function deleteBooking(Request $request, $checkInId)
+    {
+        $checkIn = CheckIn::findOrFail($checkInId);
+        $phone = $checkIn->user->phone;
+        $booking = CheckIn::openBookingOf($checkIn->user_id)->withExists('signatures')->get();
+
+        if ($booking->contains(fn (CheckIn $row) => ! $row->canBeDeletedBy($request->user()))) {
+            return $this->signedCheckInForbidden($request, $phone);
+        }
+
+        $service = app(CheckInService::class);
+
+        foreach ($booking as $row) {
+            $service->deleteCheckIn($row);
+        }
+
+        return redirect()->route('view-check-in', ['phone' => $phone])
+            ->with('success', 'Check-in deleted successfully.');
+    }
+
+    private function signedCheckInForbidden(Request $request, ?string $phone)
+    {
+        $message = 'This check-in has been signed. Only pet staff can delete it.';
+
+        if ($request->expectsJson()) {
+            return response()->json(['message' => $message], 403);
+        }
+
+        return redirect()->route('view-check-in', ['phone' => $phone])->with('error', $message);
     }
 }

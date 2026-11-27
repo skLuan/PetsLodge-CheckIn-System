@@ -1,4 +1,5 @@
 import { CookieManager } from "../CookieManager.js";
+import { StorageManager } from "../StorageManager.js";
 import config from "../config.js";
 import { EditingModeManager } from "./EditingModeManager.js";
 
@@ -6,6 +7,9 @@ const { FORM_CONFIG, DEFAULT_CHECKIN_STRUCTURE } = config;
 
 /**
  * Core Data Manager - Handles basic checkin data storage and retrieval
+ *
+ * The data lives in localStorage under CHECKIN_COOKIE_NAME (see StorageManager).
+ * The name is kept from when it was a cookie, so debug output stays recognisable.
  */
 class CoreDataManager {
     static CHECKIN_COOKIE_NAME = "pl_checkin_data";
@@ -29,7 +33,7 @@ class CoreDataManager {
             initialCheckin = this.deepMerge(initialCheckin, this.sessionData);
         }
 
-        const success = CookieManager.setCookie(
+        const success = StorageManager.set(
             this.CHECKIN_COOKIE_NAME,
             initialCheckin,
             FORM_CONFIG.DEFAULT_COOKIE_DAYS
@@ -48,7 +52,38 @@ class CoreDataManager {
      * Obtiene los datos completos del checkin desde la cookie
      */
     static getCheckinData() {
-        return CookieManager.getCookie(this.CHECKIN_COOKIE_NAME);
+        const data = StorageManager.get(this.CHECKIN_COOKIE_NAME);
+        if (data !== null || !StorageManager.isAvailable()) {
+            return data;
+        }
+
+        return this.migrateLegacyCookie();
+    }
+
+    /**
+     * Moves a form draft saved by the old cookie-based version into localStorage,
+     * then deletes the cookie so the browser stops uploading it on every request.
+     */
+    static migrateLegacyCookie() {
+        if (!CookieManager.hasCookie(this.CHECKIN_COOKIE_NAME)) {
+            return null;
+        }
+
+        const legacyData = CookieManager.getCookie(this.CHECKIN_COOKIE_NAME);
+        CookieManager.deleteCookie(this.CHECKIN_COOKIE_NAME);
+
+        if (!legacyData || typeof legacyData !== "object") {
+            return null;
+        }
+
+        StorageManager.set(
+            this.CHECKIN_COOKIE_NAME,
+            legacyData,
+            FORM_CONFIG.DEFAULT_COOKIE_DAYS
+        );
+        console.log("Migrated checkin data from cookie to localStorage");
+
+        return legacyData;
     }
 
     /**
@@ -79,30 +114,23 @@ class CoreDataManager {
         const updatedData = this.deepMerge(currentData, updates);
         updatedData.lastUpdated = new Date().toISOString();
 
-        // Check cookie size before setting to prevent data loss
-        if (!CookieManager.canSetCookie(this.CHECKIN_COOKIE_NAME, updatedData)) {
-            console.error("Cookie data too large, cannot save. Size limit exceeded.");
-            return false;
+        const size = JSON.stringify(updatedData).length;
+        if (size > FORM_CONFIG.STORAGE_WARN_SIZE) {
+            console.warn("Checkin data is unusually large:", size, "characters");
         }
 
-        const success = CookieManager.setCookie(
+        const success = StorageManager.set(
             this.CHECKIN_COOKIE_NAME,
             updatedData,
-            FORM_CONFIG.DEFAULT_COOKIE_DAYS,
-            {
-                secure: window.location.protocol === 'https:',
-                sameSite: 'Lax',
-                obfuscate: false // Set to true for sensitive data in production
-            }
+            FORM_CONFIG.DEFAULT_COOKIE_DAYS
         );
 
         if (success) {
             console.log("Checkin data updated successfully");
-            console.log("Cookie size:", JSON.stringify(updatedData).length, "characters");
+            console.log("Checkin data size:", size, "characters");
         } else {
-            console.error("Failed to update checkin data - cookie could not be set");
-            console.error("Data size attempted:", JSON.stringify(updatedData).length, "characters");
-            console.error("Cookie limit: 4096 characters");
+            console.error("Failed to update checkin data - storage could not be written");
+            console.error("Data size attempted:", size, "characters");
             // Don't show alert to user, just log for debugging
         }
 
@@ -113,6 +141,8 @@ class CoreDataManager {
      * Limpia todos los datos del checkin
      */
     static clearCheckinData() {
+        StorageManager.remove(this.CHECKIN_COOKIE_NAME);
+        // Also drop a cookie left behind by the old cookie-based version
         CookieManager.deleteCookie(this.CHECKIN_COOKIE_NAME);
         console.log("🗑️ Checkin data cleared");
     }

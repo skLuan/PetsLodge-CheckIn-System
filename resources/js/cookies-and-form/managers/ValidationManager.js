@@ -30,41 +30,6 @@ class ValidationManager {
                 // Este paso se maneja desde los popups específicos
                 return true;
 
-            case FORM_CONFIG.STEPS.HEALTH_INFO - 1: // step 3 = HEALTH_INFO
-                // Health info applies to all pets or selected pet
-                const healthData = {
-                    unusualHealthBehavior: formData.unusualHealthBehavior === 'yes',
-                    healthBehaviors: formData.healthBehaviorDetails || '',
-                    warnings: formData.warnings || '',
-                };
-
-                if (selectedPetIndex !== null) {
-                    this.updatePetHealthInfo(selectedPetIndex, healthData);
-                } else {
-                    // Apply to all pets if none selected
-                    const checkinData = CoreDataManager.getCheckinData();
-                    if (checkinData && checkinData.pets) {
-                        checkinData.pets.forEach((_, index) => {
-                            this.updatePetHealthInfo(index, healthData);
-                        });
-                    }
-                }
-
-                // Handle grooming data (global, not per-pet)
-                const groomingData = {};
-                if (formData.grooming && Array.isArray(formData.grooming)) {
-                    formData.grooming.forEach(service => {
-                        groomingData[service] = true;
-                    });
-                }
-
-                // Preserve existing inventory data - don't overwrite with empty array
-                const existingData = CoreDataManager.getCheckinData();
-                const existingInventory = existingData?.inventory || [];
-                this.updateGroomingAndInventory(groomingData, existingInventory, formData.groomingDetails || '');
-
-                return true;
-
             case FORM_CONFIG.STEPS.INVENTORY - 1: // step 4 = INVENTORY
                 // Inventory is managed separately via add/remove and checkbox
                 // Validate both inventory completion and terms acceptance

@@ -89,194 +89,63 @@
             @endif
 
             @if ($checkIns->count() > 0)
-                <div class="space-y-6">
-                    @foreach ($checkIns as $checkIn)
-                        <div
-                            class="bg-white rounded-lg shadow-md border border-green border-opacity-40 overflow-hidden">
-                            <!-- Check-in Header -->
-                            <div class="p-4 border-b border-green">
-                                <div class="flex justify-between items-center">
-                                    <div>
-                                        <h4 class="text-lg font-semibold">
-                                            Check-in ID# {{ str_pad($checkIn->id, 4, '0', STR_PAD_LEFT) }} for:
-                                        </h4>
-                                        <h2 class="text-xl font-bold text-green-dark">
-                                            {{ $checkIn->pet->name ?? 'Unnamed Pet' }}
-                                            ({{ $checkIn->pet->kindOfPet->name ?? 'Unknown type' }})
-                                        </h2>
-                                        <p class="text-sm text-gray-600">
-                                            created at:
-                                            {{ $checkIn->check_in ? $checkIn->check_in->format('M j, Y g:i A') : 'N/A' }}
-                                        </p>
-                                    </div>
-                                    <div class="flex flex-col gap-2">
-                                        <button type="button" onclick="editCheckIn({{ $checkIn->id }})"
-                                            class="edit-button bg-yellow-second hover:bg-yellow text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200">
-                                            Edit
-                                        </button>
-                                        <button type="button" onclick="deleteCheckIn({{ $checkIn->id }}, '{{ addslashes($checkIn->pet->name ?? 'this pet') }}')"
-                                            class="bg-red-500 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 text-sm">
-                                            Delete
-                                        </button>
-                                    </div>
-                                </div>
+                @php
+                    $booking = $checkIns->first();
+                    $petLabels = $checkIns->map(fn ($c) => ($c->pet->name ?? 'Unnamed Pet') . ' (' . ($c->pet->kindOfPet->name ?? 'Unknown type') . ')');
+                @endphp
+                {{-- One card per visit: the wizard stores a row per pet, the client brought them together. --}}
+                <div class="bg-white rounded-lg shadow-md border border-green border-opacity-40 overflow-hidden">
+                    <!-- Check-in Header -->
+                    <div class="p-4 border-b border-green">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <h4 class="text-lg font-semibold">
+                                    Check-in ID# {{ str_pad($booking->id, 4, '0', STR_PAD_LEFT) }} for:
+                                </h4>
+                                <h2 class="text-xl font-bold text-green-dark">
+                                    {{ $petLabels->implode(', ') }}
+                                </h2>
+                                <p class="text-sm text-gray-600">
+                                    created at:
+                                    {{ $booking->check_in ? $booking->check_in->format('M j, Y g:i A') : 'N/A' }}
+                                </p>
                             </div>
-
-                            <!-- Pet Information -->
-                            <div class="p-4">
-                                <div class="mb-4">
-                                    <h4 class="font-semibold text-green-dark mb-3">🐾 Pet Information</h4>
-                                    <div class="bg-gray-50 rounded-lg p-2">
-                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div class="">
-                                                <div class="text-sm text-gray-600 space-y-1">
-                                                    @if ($checkIn->pet->race)
-                                                        <div class="flex justify-between"><strong>Breed:</strong>
-                                                            {{ $checkIn->pet->race }}</div>
-                                                    @endif
-                                                    @if ($checkIn->pet->color)
-                                                        <div class="flex justify-between"><strong>Color:</strong>
-                                                            {{ $checkIn->pet->color }}</div>
-                                                    @endif
-                                                    @if ($checkIn->pet->birth_date)
-                                                        <div class="flex justify-between"><strong>Age:</strong>
-                                                            {{ \Carbon\Carbon::parse($checkIn->pet->birth_date)->age }}
-                                                            years old</div>
-                                                    @endif
-                                                    @if ($checkIn->pet->gender)
-                                                        <div class="flex justify-between"><strong>Gender:</strong>
-                                                            {{ $checkIn->pet->gender->name }}</div>
-                                                    @endif
-                                                    @if ($checkIn->pet->castrated)
-                                                        <div class="flex justify-between">
-                                                            <strong>Spayed/Neutered:</strong>
-                                                            {{ $checkIn->pet->castrated->status }}
-                                                        </div>
-                                                    @endif
-                                                </div>
-                                            </div>
-                                            @if ($checkIn->pet->health_conditions || $checkIn->pet->warnings)
-                                                <div>
-                                                    <h6 class="font-semibold text-red-600 mb-2">Health Notes:</h6>
-                                                    <div class="text-sm text-gray-600 ml-auto">
-                                                        @if ($checkIn->pet->health_conditions)
-                                                            <p>⚠️ {{ $checkIn->pet->health_conditions }}</p>
-                                                        @endif
-                                                        @if ($checkIn->pet->warnings)
-                                                            <p>⚠️ {{ $checkIn->pet->warnings }}</p>
-                                                        @endif
-                                                    </div>
-                                                </div>
-                                            @endif
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Feeding Schedule -->
-                                @if ($checkIn->foods->count() > 0)
-                                    <div class="mb-4">
-                                        <h4 class="font-semibold text-green-dark mb-2">🍽️ Feeding Schedule</h4>
-                                        <div class="bg-blue-50 rounded-lg p-3">
-                                            @php
-                                                $feedingByTime = [];
-                                                foreach ($checkIn->foods as $food) {
-                                                    $time = $food->momentOfDay->name ?? $food->moment_of_day_id;
-                                                    if (!isset($feedingByTime[$time])) {
-                                                        $feedingByTime[$time] = [];
-                                                    }
-                                                    $feedingByTime[$time][] =
-                                                        $food->name .
-                                                        ($food->description ? ' - ' . $food->description : '');
-                                                }
-                                            @endphp
-                                            @foreach ($feedingByTime as $time => $items)
-                                                <div class="text-sm mb-1 flex justify-between">
-                                                    <strong>{{ ucfirst($time) }}:</strong> {{ implode(', ', $items) }}
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                    </div>
-                                @endif
-
-                                <!-- Medication Schedule -->
-                                @if ($checkIn->medicines->count() > 0)
-                                    <div class="mb-4">
-                                        <h4 class="font-semibold text-green-dark mb-2">💊 Medication Schedule</h4>
-                                        <div class="bg-red-50 rounded-lg p-3">
-                                            @php
-                                                $medByTime = [];
-                                                foreach ($checkIn->medicines as $medicine) {
-                                                    $time = $medicine->momentOfDay->name ?? $medicine->moment_of_day_id;
-                                                    if (!isset($medByTime[$time])) {
-                                                        $medByTime[$time] = [];
-                                                    }
-                                                    $medByTime[$time][] =
-                                                        $medicine->name .
-                                                        ($medicine->description ? ' - ' . $medicine->description : '');
-                                                }
-                                            @endphp
-                                            @foreach ($medByTime as $time => $items)
-                                                <div class="text-sm mb-1 flex justify-between">
-                                                    <strong>{{ ucfirst($time) }}:</strong> {{ implode(', ', $items) }}
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                    </div>
-                                @endif
-
-                                <!-- Inventory Items -->
-                                @if ($checkIn->items->count() > 0)
-                                    <div class="mb-4">
-                                        <h4 class="font-semibold text-green-dark mb-2">🎒 Items to Store</h4>
-                                        <div class="bg-yellow-50 rounded-lg p-3">
-                                            <ul class="text-sm list-disc list-inside">
-                                                @foreach ($checkIn->items as $item)
-                                                    <li>{{ $item->name }}{{ $item->description ? ' - ' . $item->description : '' }}
-                                                    </li>
-                                                @endforeach
-                                            </ul>
-                                        </div>
-                                    </div>
-                                @endif
-
-                                <!-- Extra Services -->
-                                @if ($checkIn->extraServices->count() > 0)
-                                    <div class="mb-4">
-                                        <h4 class="font-semibold text-green-dark mb-2">✂️ Grooming Services</h4>
-                                        <div class="bg-purple-50 rounded-lg p-3">
-                                            <div class="flex flex-wrap gap-2 mb-3 justify-end">
-                                                @foreach ($checkIn->extraServices as $service)
-                                                    <span
-                                                        class="bg-purple-200 text-purple-800 px-3 py-1 rounded-full text-sm">
-                                                        {{ $service->name }}
-                                                    </span>
-                                                @endforeach
-                                            </div>
-                                            
-                                            <!-- Grooming Appointment Day -->
-                                            @php
-                                                $appointmentDay = null;
-                                                foreach ($checkIn->extraServices as $service) {
-                                                    if ($service->pivot && $service->pivot->grooming_appointment_day) {
-                                                        $appointmentDay = $service->pivot->grooming_appointment_day;
-                                                        break;
-                                                    }
-                                                }
-                                            @endphp
-                                            
-                                            @if ($appointmentDay)
-                                                <div class="border-t border-purple-200 pt-3">
-                                                    <div class="text-sm">
-                                                        <strong>📅 Appointment Day:</strong> {{ $appointmentDay }}
-                                                    </div>
-                                                </div>
-                                            @endif
-                                        </div>
-                                    </div>
+                            <div class="flex flex-col gap-2">
+                                <button type="button" onclick="editCheckIn({{ $booking->id }})"
+                                    class="edit-button bg-yellow-second hover:bg-yellow text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200">
+                                    Edit
+                                </button>
+                                @if ($checkIns->contains(fn ($c) => ! $c->canBeDeletedBy(auth()->user())))
+                                    {{-- Signed check-ins are legal evidence; the server enforces this too. --}}
+                                    <span class="text-sm text-gray-500 max-w-[10rem] text-center">🔒 Signed — only pet staff can delete</span>
+                                @else
+                                <button type="button" onclick="deleteCheckIn('{{ route('delete-booking', $booking->id) }}', 'Delete this check-in for {{ addslashes($checkIns->map(fn ($c) => $c->pet->name ?? 'this pet')->implode(', ')) }}? This action cannot be undone.')"
+                                    class="bg-red-500 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 text-sm">
+                                    Delete
+                                </button>
                                 @endif
                             </div>
                         </div>
+                    </div>
+
+                    @foreach ($checkIns as $checkIn)
+                        <x-view-check-in.pet-section :checkIn="$checkIn" :removable="$checkIns->count() > 1" />
                     @endforeach
+
+                    <!-- Inventory Items (booking-level) -->
+                    @if ($bookingItems->count() > 0)
+                        <div class="p-4">
+                            <h4 class="font-semibold text-green-dark mb-2">🎒 Items to Store</h4>
+                            <div class="bg-yellow-50 rounded-lg p-3">
+                                <ul class="text-sm list-disc list-inside">
+                                    @foreach ($bookingItems as $item)
+                                        <li>{{ $item->name }}{{ $item->description ? ' - ' . $item->description : '' }}
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        </div>
+                    @endif
                 </div>
             @else
                 <div class="text-center py-12">
@@ -302,22 +171,25 @@
             window.location.href = `/edit-check-in/${checkInId}`;
         }
 
-        function deleteCheckIn(checkInId, petName) {
-            if (!confirm(`Are you sure you want to delete the check-in for ${petName}? This action cannot be undone.`)) {
+        // url: delete-check-in (one pet) or delete-booking (the whole check-in)
+        function deleteCheckIn(url, message) {
+            if (!confirm(message)) {
                 return;
             }
 
-            fetch(`/delete-check-in/${checkInId}`, {
+            fetch(url, {
                 method: 'DELETE',
                 headers: {
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
                     'Accept': 'application/json',
                 },
-            }).then(response => {
+            }).then(async response => {
                 if (response.ok || response.redirected) {
                     window.location.reload();
                 } else {
-                    alert('Failed to delete check-in. Please try again.');
+                    // 403 carries the reason, e.g. a signed check-in a client may not delete.
+                    const body = await response.json().catch(() => ({}));
+                    alert(body.message || 'Failed to delete check-in. Please try again.');
                 }
             }).catch(() => {
                 alert('An error occurred. Please try again.');

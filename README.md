@@ -155,9 +155,9 @@ The application will be available at `http://localhost:8000`
 - [Deployment Guide](docs/DEPLOYMENT_GUIDE.md) - Deployment procedures
 
 ### Implementation & Testing Documentation
-- [Phase 3 Fixes Summary](plans/PHASE_3_FIXES_SUMMARY.md) - Critical data flow fixes and improvements
-- [Phase 4 Test Results](plans/PHASE_4_TEST_RESULTS_SUMMARY.md) - Comprehensive testing results
-- [Implementation Summary](plans/IMPLEMENTATION_SUMMARY.md) - Feature implementation details
+- [Phase 3 Fixes Summary](ai/plans/archive/PHASE_3_FIXES_SUMMARY.md) - Critical data flow fixes and improvements
+- [Phase 4 Test Results](ai/plans/archive/PHASE_4_TEST_RESULTS_SUMMARY.md) - Comprehensive testing results
+- [Implementation Summary](ai/plans/archive/IMPLEMENTATION_SUMMARY.md) - Feature implementation details
 - [Deployment Log](DEPLOYMENT_LOG.md) - Deployment history and monitoring setup
 - [Check-in Cookie Refactor](CHECKIN_COOKIE_REFACTOR_README.md) - Cookie-based state management details
 
@@ -246,10 +246,11 @@ PetsLodge/
 │   ├── API_REFERENCE.md          # API documentation
 │   ├── DEPLOYMENT_GUIDE.md       # Deployment procedures
 │   └── MIGRATION_GUIDE.md        # Migration guide
-├── plans/                         # Implementation plans and reports
-│   ├── PHASE_3_FIXES_SUMMARY.md  # Critical fixes documentation
-│   ├── PHASE_4_TEST_RESULTS_SUMMARY.md # Testing results
-│   └── IMPLEMENTATION_SUMMARY.md # Feature implementation details
+├── ai/                            # AI-agent workspace (see ai/README.md)
+│   ├── JOURNAL.md                # Log of agent sessions
+│   ├── plans/                    # Roadmap + active / done / archive plans
+│   ├── specs/                    # OpenSpec feature specs
+│   └── implementation/           # Implementation notes
 └── database/
     ├── migrations/                # Database migrations
     └── seeders/                   # Database seeders
@@ -330,13 +331,13 @@ Contributions are welcome! Please follow these guidelines:
 - Verify checkboxes are selected (not radio buttons)
 - Check that at least one time is selected
 - Verify form submission includes all selected times
-- See [`plans/IMPLEMENTATION_SUMMARY.md`](plans/IMPLEMENTATION_SUMMARY.md) for details
+- See [`ai/plans/archive/IMPLEMENTATION_SUMMARY.md`](ai/plans/archive/IMPLEMENTATION_SUMMARY.md) for details
 
 For more troubleshooting help, see:
 - [`docs/DATA_FLOW.md`](docs/DATA_FLOW.md) - Data flow troubleshooting
 - [`docs/DEVELOPER_GUIDE.md`](docs/DEVELOPER_GUIDE.md) - Debugging tips
 - [`docs/DEPLOYMENT_GUIDE.md`](docs/DEPLOYMENT_GUIDE.md) - Deployment troubleshooting
-- [`plans/PHASE_3_FIXES_SUMMARY.md`](plans/PHASE_3_FIXES_SUMMARY.md) - Critical fixes documentation
+- [`ai/plans/archive/PHASE_3_FIXES_SUMMARY.md`](ai/plans/archive/PHASE_3_FIXES_SUMMARY.md) - Critical fixes documentation
 
 ## Recent Updates
 
@@ -367,8 +368,8 @@ For more troubleshooting help, see:
 - ✅ Change detection mechanisms tested
 
 For detailed information on recent changes, see:
-- [`plans/PHASE_3_FIXES_SUMMARY.md`](plans/PHASE_3_FIXES_SUMMARY.md) - Critical fixes
-- [`plans/PHASE_4_TEST_RESULTS_SUMMARY.md`](plans/PHASE_4_TEST_RESULTS_SUMMARY.md) - Testing results
+- [`ai/plans/archive/PHASE_3_FIXES_SUMMARY.md`](ai/plans/archive/PHASE_3_FIXES_SUMMARY.md) - Critical fixes
+- [`ai/plans/archive/PHASE_4_TEST_RESULTS_SUMMARY.md`](ai/plans/archive/PHASE_4_TEST_RESULTS_SUMMARY.md) - Testing results
 - [`DEPLOYMENT_LOG.md`](DEPLOYMENT_LOG.md) - Deployment history
 
 ## License

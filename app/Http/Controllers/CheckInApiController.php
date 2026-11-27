@@ -2,15 +2,16 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
+use App\Events\CheckInCompleted;
 use App\Models\CheckIn;
-use App\Models\Status;
+use App\Models\User;
+use App\Services\CheckInPetService;
 use App\Services\CheckInService;
 use App\Services\CheckInUserService;
-use App\Services\CheckInPetService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 
 /**
  * Controller for handling API-based check-in operations
@@ -18,7 +19,9 @@ use Illuminate\Support\Facades\Log;
 class CheckInApiController extends Controller
 {
     protected CheckInService $checkInService;
+
     protected CheckInUserService $userService;
+
     protected CheckInPetService $petService;
 
     public function __construct(
@@ -34,26 +37,26 @@ class CheckInApiController extends Controller
     /**
      * Check if user exists and has active check-in
      *
-     * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function checkUser(Request $request)
     {
         $phone = $request->input('phone');
 
-        if (!$phone) {
+        if (! $phone) {
             return response()->json([
-                'error' => 'Phone number is required'
+                'error' => 'Phone number is required',
             ], 400);
         }
 
         $user = User::where('phone', $phone)->first();
 
-        if (!$user) {
+        if (! $user) {
             return response()->json(['userExists' => false]);
         }
 
-        $hasCheckIn = CheckIn::where('user_id', $user->id)->whereNull('check_out')->exists();
+        // open(): cancelled rows keep `check_out` null but are not an active check-in.
+        $hasCheckIn = CheckIn::where('user_id', $user->id)->open()->exists();
 
         return response()->json([
             'userExists' => true,
@@ -66,9 +69,31 @@ class CheckInApiController extends Controller
     }
 
     /**
+     * Is this email already taken by a user other than the owner of $phone?
+     * Step 1 matches owners by phone, so the same email on the same phone is fine.
+     */
+    public function checkEmail(Request $request)
+    {
+        $email = trim((string) $request->input('email'));
+        $phone = trim((string) $request->input('phone'));
+
+        if ($email === '') {
+            return response()->json(['emailTaken' => false]);
+        }
+
+        return response()->json(['emailTaken' => $this->emailTakenByOther($email, $phone)]);
+    }
+
+    private function emailTakenByOther(string $email, ?string $phone): bool
+    {
+        return User::where('email', $email)
+            ->when($phone, fn ($q) => $q->where(fn ($q) => $q->where('phone', '!=', $phone)->orWhereNull('phone')))
+            ->exists();
+    }
+
+    /**
      * Submit complete check-in data from cookie (legacy method)
      *
-     * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function submitCheckIn(Request $request)
@@ -86,17 +111,18 @@ class CheckInApiController extends Controller
 
             if ($validator->fails()) {
                 Log::error('CheckInApiController: Validation failed', ['errors' => $validator->errors()]);
+
                 return response()->json([
                     'success' => false,
                     'message' => 'Invalid check-in data',
-                    'errors' => $validator->errors()
+                    'errors' => $validator->errors(),
                 ], 422);
             }
 
             $checkinData = $request->input('checkin_data');
             Log::info('CheckInApiController: Validation passed, processing check-in data', [
                 'user_info' => $checkinData['user']['info'] ?? null,
-                'pet_count' => count($checkinData['pets'] ?? [])
+                'pet_count' => count($checkinData['pets'] ?? []),
             ]);
 
             // Submit check-in using service
@@ -107,18 +133,18 @@ class CheckInApiController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Check-in submitted successfully',
-                'data' => $result
+                'data' => $result,
             ]);
 
         } catch (\Exception $e) {
             Log::error('CheckInApiController: Check-in submission failed', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to submit check-in: ' . $e->getMessage()
+                'message' => 'Failed to submit check-in: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -126,7 +152,6 @@ class CheckInApiController extends Controller
     /**
      * Step 1: Submit User Info (create or verify user)
      *
-     * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function submitUserInfo(Request $request)
@@ -145,19 +170,30 @@ class CheckInApiController extends Controller
 
             if ($validator->fails()) {
                 Log::error("CheckInApiController: Step 1 - User Info validation failed [{$timestamp}]", ['errors' => $validator->errors()]);
+
                 return response()->json([
                     'success' => false,
                     'message' => 'Invalid user info data',
                     'errors' => $validator->errors(),
-                    'timestamp' => $timestamp
+                    'timestamp' => $timestamp,
                 ], 422);
             }
 
             $userInfo = $request->input('user_info');
+
+            if ($this->emailTakenByOther($userInfo['email'], $userInfo['phone'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This email already exist',
+                    'errors' => ['user_info.email' => ['This email already exist']],
+                    'timestamp' => $timestamp,
+                ], 422);
+            }
+
             Log::info("CheckInApiController: Step 1 - Processing user info [{$timestamp}]", [
                 'phone' => $userInfo['phone'],
                 'name' => $userInfo['name'],
-                'email' => $userInfo['email']
+                'email' => $userInfo['email'],
             ]);
 
             // Process user using service (always create new for sequential submission)
@@ -167,7 +203,7 @@ class CheckInApiController extends Controller
             if (isset($userInfo['emergencyContactName']) && isset($userInfo['emergencyContactPhone'])) {
                 $emergencyContact = [
                     'name' => $userInfo['emergencyContactName'],
-                    'phone' => $userInfo['emergencyContactPhone']
+                    'phone' => $userInfo['emergencyContactPhone'],
                 ];
                 $this->userService->processEmergencyContact($user, $emergencyContact);
                 Log::info("CheckInApiController: Step 1 - Emergency contact processed [{$timestamp}]", ['user_id' => $user->id]);
@@ -176,7 +212,7 @@ class CheckInApiController extends Controller
             Log::info("CheckInApiController: Step 1 - User info submitted successfully [{$timestamp}]", [
                 'user_id' => $user->id,
                 'user_name' => $user->name,
-                'user_email' => $user->email
+                'user_email' => $user->email,
             ]);
 
             return response()->json([
@@ -186,9 +222,9 @@ class CheckInApiController extends Controller
                     'user_id' => $user->id,
                     'user_name' => $user->name,
                     'user_email' => $user->email,
-                    'user_phone' => $user->phone
+                    'user_phone' => $user->phone,
                 ],
-                'timestamp' => $timestamp
+                'timestamp' => $timestamp,
             ]);
 
         } catch (\Exception $e) {
@@ -196,13 +232,13 @@ class CheckInApiController extends Controller
             Log::error("CheckInApiController: Step 1 - User info submission failed [{$timestamp}]", [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
-                'request_data' => $request->all()
+                'request_data' => $request->all(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to submit user info: ' . $e->getMessage(),
-                'timestamp' => $timestamp
+                'message' => 'Failed to submit user info: '.$e->getMessage(),
+                'timestamp' => $timestamp,
             ], 500);
         }
     }
@@ -213,7 +249,6 @@ class CheckInApiController extends Controller
      * Handles both new pet creation (sequential form submission) and pet updates (fast check-in).
      * If petId is provided, updates the existing pet instead of creating a new one.
      *
-     * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function submitPetInfo(Request $request)
@@ -234,11 +269,12 @@ class CheckInApiController extends Controller
 
             if ($validator->fails()) {
                 Log::error("CheckInApiController: Step 2 - Pet Info validation failed [{$timestamp}]", ['errors' => $validator->errors()]);
+
                 return response()->json([
                     'success' => false,
                     'message' => 'Invalid pet info data',
                     'errors' => $validator->errors(),
-                    'timestamp' => $timestamp
+                    'timestamp' => $timestamp,
                 ], 422);
             }
 
@@ -252,7 +288,7 @@ class CheckInApiController extends Controller
                 'pet_name' => $petInfo['petName'],
                 'pet_type' => $petInfo['petType'],
                 'pet_breed' => $petInfo['petBreed'],
-                'is_fast_checkin' => !is_null($petId)
+                'is_fast_checkin' => ! is_null($petId),
             ]);
 
             // Get user
@@ -265,7 +301,7 @@ class CheckInApiController extends Controller
                 'pet_id' => $pet->id,
                 'pet_name' => $pet->name,
                 'user_id' => $userId,
-                'was_updated' => !is_null($petId)
+                'was_updated' => ! is_null($petId),
             ]);
 
             return response()->json([
@@ -276,9 +312,9 @@ class CheckInApiController extends Controller
                     'pet_name' => $pet->name,
                     'pet_type' => $pet->kindOfPet->name ?? $petInfo['petType'],
                     'pet_breed' => $pet->race,
-                    'pet_color' => $pet->color
+                    'pet_color' => $pet->color,
                 ],
-                'timestamp' => $timestamp
+                'timestamp' => $timestamp,
             ]);
 
         } catch (\Exception $e) {
@@ -286,13 +322,13 @@ class CheckInApiController extends Controller
             Log::error("CheckInApiController: Step 2 - Pet info submission failed [{$timestamp}]", [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
-                'request_data' => $request->all()
+                'request_data' => $request->all(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to submit pet info: ' . $e->getMessage(),
-                'timestamp' => $timestamp
+                'message' => 'Failed to submit pet info: '.$e->getMessage(),
+                'timestamp' => $timestamp,
             ], 500);
         }
     }
@@ -300,7 +336,6 @@ class CheckInApiController extends Controller
     /**
      * Step 3: Submit Pet Health, Feeding, and Medication
      *
-     * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function submitPetHealth(Request $request)
@@ -319,11 +354,12 @@ class CheckInApiController extends Controller
 
             if ($validator->fails()) {
                 Log::error("CheckInApiController: Step 3 - Pet Health validation failed [{$timestamp}]", ['errors' => $validator->errors()]);
+
                 return response()->json([
                     'success' => false,
                     'message' => 'Invalid pet health data',
                     'errors' => $validator->errors(),
-                    'timestamp' => $timestamp
+                    'timestamp' => $timestamp,
                 ], 422);
             }
 
@@ -336,7 +372,7 @@ class CheckInApiController extends Controller
                 'pet_id' => $petId,
                 'feeding_count' => count($feedingData),
                 'medication_count' => count($medicationData),
-                'has_health_warnings' => !empty($healthData['warnings'])
+                'has_health_warnings' => ! empty($healthData['warnings']),
             ]);
 
             // Get pet
@@ -344,35 +380,28 @@ class CheckInApiController extends Controller
 
             // Update pet health info
             $pet->update([
-                'health_conditions' => $healthData['unusualHealthBehavior'] ?? null,
-                'warnings' => $healthData['warnings'] ?? null,
+                'health_conditions' => CheckInPetService::healthConditionsFrom($healthData),
+                'warnings' => ($healthData['warnings'] ?? '') !== '' ? $healthData['warnings'] : null,
             ]);
 
-            // Get CHECKED_IN status
-            $checkedInStatus = Status::where('name', 'CHECKED_IN')->first();
-            if (!$checkedInStatus) {
-                throw new \Exception('CHECKED_IN status not found in database');
-            }
+            // The pet's open stay — the row being edited, or a new CHECKED_IN
+            // row for a new check-in. Step 4 resolves the same row.
+            $tempCheckIn = DB::transaction(function () use ($pet, $feedingData, $medicationData) {
+                $checkIn = $this->checkInService->findOrCreateActiveCheckIn($pet);
 
-            // Create a temporary check-in for feeding/medication (will be updated in step 4)
-            $tempCheckIn = \App\Models\CheckIn::create([
-                'check_in' => now(),
-                'pet_id' => $petId,
-                'user_id' => $pet->user_id,
-                'status_id' => $checkedInStatus->id,
-            ]);
+                $this->petService->processFeedingAndMedication($pet, $checkIn, [
+                    'feeding' => $feedingData,
+                    'medication' => $medicationData,
+                ]);
 
-            // Process feeding and medication
-            $this->petService->processFeedingAndMedication($pet, $tempCheckIn, [
-                'feeding' => $feedingData,
-                'medication' => $medicationData
-            ]);
+                return $checkIn;
+            });
 
             Log::info("CheckInApiController: Step 3 - Pet health submitted successfully [{$timestamp}]", [
                 'pet_id' => $petId,
                 'temp_checkin_id' => $tempCheckIn->id,
                 'feeding_count' => count($feedingData),
-                'medication_count' => count($medicationData)
+                'medication_count' => count($medicationData),
             ]);
 
             return response()->json([
@@ -382,9 +411,9 @@ class CheckInApiController extends Controller
                     'pet_id' => $petId,
                     'temp_checkin_id' => $tempCheckIn->id,
                     'feeding_count' => count($feedingData),
-                    'medication_count' => count($medicationData)
+                    'medication_count' => count($medicationData),
                 ],
-                'timestamp' => $timestamp
+                'timestamp' => $timestamp,
             ]);
 
         } catch (\Exception $e) {
@@ -392,13 +421,13 @@ class CheckInApiController extends Controller
             Log::error("CheckInApiController: Step 3 - Pet health submission failed [{$timestamp}]", [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
-                'request_data' => $request->all()
+                'request_data' => $request->all(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to submit pet health data: ' . $e->getMessage(),
-                'timestamp' => $timestamp
+                'message' => 'Failed to submit pet health data: '.$e->getMessage(),
+                'timestamp' => $timestamp,
             ], 500);
         }
     }
@@ -406,7 +435,6 @@ class CheckInApiController extends Controller
     /**
      * Step 4: Submit Check-In Data
      *
-     * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function submitCheckInData(Request $request)
@@ -423,11 +451,12 @@ class CheckInApiController extends Controller
 
             if ($validator->fails()) {
                 Log::error("CheckInApiController: Step 4 - Check-In Data validation failed [{$timestamp}]", ['errors' => $validator->errors()]);
+
                 return response()->json([
                     'success' => false,
                     'message' => 'Invalid check-in data',
                     'errors' => $validator->errors(),
-                    'timestamp' => $timestamp
+                    'timestamp' => $timestamp,
                 ], 422);
             }
 
@@ -437,7 +466,7 @@ class CheckInApiController extends Controller
             Log::info("CheckInApiController: Step 4 - Processing check-in data [{$timestamp}]", [
                 'pet_id' => $petId,
                 'grooming_services' => array_keys($checkinData['grooming'] ?? []),
-                'inventory_items' => count($checkinData['inventory'] ?? [])
+                'inventory_items' => count($checkinData['inventory'] ?? []),
             ]);
 
             // Get pet and user
@@ -450,7 +479,7 @@ class CheckInApiController extends Controller
             Log::info("CheckInApiController: Step 4 - Check-in data submitted successfully [{$timestamp}]", [
                 'checkin_id' => $checkIn->id,
                 'pet_id' => $petId,
-                'user_id' => $user->id
+                'user_id' => $user->id,
             ]);
 
             return response()->json([
@@ -460,9 +489,9 @@ class CheckInApiController extends Controller
                     'checkin_id' => $checkIn->id,
                     'pet_id' => $petId,
                     'user_id' => $user->id,
-                    'checkin_time' => $checkIn->check_in->toISOString()
+                    'checkin_time' => $checkIn->check_in->toISOString(),
                 ],
-                'timestamp' => $timestamp
+                'timestamp' => $timestamp,
             ]);
 
         } catch (\Exception $e) {
@@ -470,13 +499,13 @@ class CheckInApiController extends Controller
             Log::error("CheckInApiController: Step 4 - Check-in data submission failed [{$timestamp}]", [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
-                'request_data' => $request->all()
+                'request_data' => $request->all(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to submit check-in data: ' . $e->getMessage(),
-                'timestamp' => $timestamp
+                'message' => 'Failed to submit check-in data: '.$e->getMessage(),
+                'timestamp' => $timestamp,
             ], 500);
         }
     }
@@ -484,7 +513,6 @@ class CheckInApiController extends Controller
     /**
      * Step 5: Submit Extra Info (Inventory, Grooming, etc.)
      *
-     * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function submitExtraInfo(Request $request)
@@ -501,11 +529,12 @@ class CheckInApiController extends Controller
 
             if ($validator->fails()) {
                 Log::error("CheckInApiController: Step 5 - Extra Info validation failed [{$timestamp}]", ['errors' => $validator->errors()]);
+
                 return response()->json([
                     'success' => false,
                     'message' => 'Invalid extra info data',
                     'errors' => $validator->errors(),
-                    'timestamp' => $timestamp
+                    'timestamp' => $timestamp,
                 ], 422);
             }
 
@@ -515,7 +544,7 @@ class CheckInApiController extends Controller
             Log::info("CheckInApiController: Step 5 - Processing extra info [{$timestamp}]", [
                 'checkin_id' => $checkinId,
                 'inventory_count' => count($extraData['inventory'] ?? []),
-                'grooming_services' => array_keys($extraData['grooming'] ?? [])
+                'grooming_services' => array_keys($extraData['grooming'] ?? []),
             ]);
 
             // Get check-in
@@ -534,8 +563,21 @@ class CheckInApiController extends Controller
             Log::info("CheckInApiController: Step 5 - Extra info submitted successfully [{$timestamp}]", [
                 'checkin_id' => $checkinId,
                 'processed_inventory' => count($extraData['inventory'] ?? []),
-                'processed_grooming' => count($extraData['grooming'] ?? [])
+                'processed_grooming' => count($extraData['grooming'] ?? []),
             ]);
+
+            // Step 5 is the last call of the submission sequence, so this is the
+            // point where the check-in is genuinely complete. The listener is
+            // queued and coalesces multi-pet submissions into one email.
+            // Never let a mail problem turn a saved check-in into a 500.
+            try {
+                CheckInCompleted::dispatch($checkIn);
+            } catch (\Throwable $mailError) {
+                Log::warning("CheckInApiController: check-in confirmation failed to dispatch [{$timestamp}]", [
+                    'checkin_id' => $checkinId,
+                    'error' => $mailError->getMessage(),
+                ]);
+            }
 
             return response()->json([
                 'success' => true,
@@ -543,9 +585,9 @@ class CheckInApiController extends Controller
                 'data' => [
                     'checkin_id' => $checkinId,
                     'processed_inventory' => count($extraData['inventory'] ?? []),
-                    'processed_grooming' => count($extraData['grooming'] ?? [])
+                    'processed_grooming' => count($extraData['grooming'] ?? []),
                 ],
-                'timestamp' => $timestamp
+                'timestamp' => $timestamp,
             ]);
 
         } catch (\Exception $e) {
@@ -553,80 +595,145 @@ class CheckInApiController extends Controller
             Log::error("CheckInApiController: Step 5 - Extra info submission failed [{$timestamp}]", [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
-                'request_data' => $request->all()
+                'request_data' => $request->all(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to submit extra info: ' . $e->getMessage(),
-                'timestamp' => $timestamp
+                'message' => 'Failed to submit extra info: '.$e->getMessage(),
+                'timestamp' => $timestamp,
             ], 500);
         }
     }
 
-     /**
-      * Auto-save check-in (not implemented)
-      *
-      * @param Request $request
-      * @return \Illuminate\Http\JsonResponse
-      */
-     public function autoSaveCheckIn(Request $request)
-     {
-         // This could be implemented later for periodic saving
-         return response()->json([
-             'success' => true,
-             'message' => 'Auto-save not implemented yet'
-         ]);
-     }
+    /**
+     * Delete the booking's pets that an edit removed in the wizard.
+     *
+     * Called once after the step 1-5 sequence of an edited booking, with the
+     * pet ids it just saved. Every open row of the owner for any other pet is
+     * deleted, so a pet removed in the wizard leaves the check-in — except a
+     * SIGNED row, which only pet staff may delete; it is kept and reported in
+     * `kept_signed_check_in_ids`.
+     *
+     * Routed in web.php, not api.php: the api group is stateless and could
+     * never see that the editor is a logged-in staff member.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function pruneBooking(Request $request)
+    {
+        $timestamp = now()->toISOString();
 
-     /**
-      * Update server session with newly created check-in data
-      *
-      * This endpoint is called after successful check-in submission to ensure
-      * that the server session contains the newly created check-in data.
-      * This prevents the drop-in confirmation page from loading stale data.
-      *
-      * @param Request $request
-      * @return \Illuminate\Http\JsonResponse
-      */
-     public function updateSessionCheckIn(Request $request)
-     {
-         try {
-             $validated = $request->validate([
-                 'checkin_data' => 'required|array',
-             ]);
+        // min:1 — an empty list would delete the whole booking.
+        $validator = Validator::make($request->all(), [
+            'check_in_id' => 'required|integer|exists:check_ins,id',
+            'pet_ids' => 'required|array|min:1',
+            'pet_ids.*' => 'integer',
+        ]);
 
-             $checkinData = $validated['checkin_data'];
-             $checkinId = $checkinData['id'] ?? null;
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid booking data',
+                'errors' => $validator->errors(),
+                'timestamp' => $timestamp,
+            ], 422);
+        }
 
-             Log::info('CheckInApiController: updateSessionCheckIn', [
-                 'checkin_id' => $checkinId,
-                 'user_phone' => $checkinData['user']['info']['phone'] ?? 'UNKNOWN',
-             ]);
+        try {
+            $anchor = CheckIn::findOrFail($request->input('check_in_id'));
+            $result = $this->checkInService->pruneBooking($anchor, $request->input('pet_ids'), $request->user());
 
-             // Store the check-in data in session
-             session(['checkin_data' => $checkinData]);
+            Log::info("CheckInApiController: booking pruned [{$timestamp}]", [
+                'check_in_id' => $anchor->id,
+                'deleted_check_in_ids' => $result['deleted'],
+                'kept_signed_check_in_ids' => $result['kept_signed'],
+            ]);
 
-             Log::info('CheckInApiController: Session updated with new check-in', [
-                 'checkin_id' => $checkinId,
-                 'session_key' => 'checkin_data'
-             ]);
+            return response()->json([
+                'success' => true,
+                'message' => 'Booking updated',
+                'data' => [
+                    'deleted_check_in_ids' => $result['deleted'],
+                    'kept_signed_check_in_ids' => $result['kept_signed'],
+                ],
+                'timestamp' => $timestamp,
+            ]);
+        } catch (\Exception $e) {
+            Log::error("CheckInApiController: booking prune failed [{$timestamp}]", [
+                'error' => $e->getMessage(),
+                'request_data' => $request->all(),
+            ]);
 
-             return response()->json([
-                 'success' => true,
-                 'message' => 'Session updated with check-in data',
-                 'checkin_id' => $checkinId
-             ]);
-         } catch (\Exception $e) {
-             Log::error('CheckInApiController: updateSessionCheckIn failed', [
-                 'error' => $e->getMessage(),
-                 'trace' => $e->getTraceAsString()
-             ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update booking: '.$e->getMessage(),
+                'timestamp' => $timestamp,
+            ], 500);
+        }
+    }
 
-             return response()->json([
-                 'success' => false,
-                 'message' => 'Failed to update session: ' . $e->getMessage()
-             ], 500);
-          }
-      }
+    /**
+     * Auto-save check-in (not implemented)
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function autoSaveCheckIn(Request $request)
+    {
+        // This could be implemented later for periodic saving
+        return response()->json([
+            'success' => true,
+            'message' => 'Auto-save not implemented yet',
+        ]);
+    }
+
+    /**
+     * Update server session with newly created check-in data
+     *
+     * This endpoint is called after successful check-in submission to ensure
+     * that the server session contains the newly created check-in data.
+     * This prevents the drop-in confirmation page from loading stale data.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function updateSessionCheckIn(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'checkin_data' => 'required|array',
+            ]);
+
+            $checkinData = $validated['checkin_data'];
+            $checkinId = $checkinData['id'] ?? null;
+
+            Log::info('CheckInApiController: updateSessionCheckIn', [
+                'checkin_id' => $checkinId,
+                'user_phone' => $checkinData['user']['info']['phone'] ?? 'UNKNOWN',
+            ]);
+
+            // Store the check-in data in session
+            session(['checkin_data' => $checkinData]);
+
+            Log::info('CheckInApiController: Session updated with new check-in', [
+                'checkin_id' => $checkinId,
+                'session_key' => 'checkin_data',
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Session updated with check-in data',
+                'checkin_id' => $checkinId,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('CheckInApiController: updateSessionCheckIn failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update session: '.$e->getMessage(),
+            ], 500);
+        }
+    }
 }

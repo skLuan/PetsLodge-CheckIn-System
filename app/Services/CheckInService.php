@@ -6,6 +6,7 @@ use App\Models\CheckIn;
 use App\Models\Item;
 use App\Models\ExtraService;
 use App\Models\Status;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -14,6 +15,94 @@ use Illuminate\Support\Facades\Log;
  */
 class CheckInService
 {
+    /**
+     * The pet's current, still-open stay, if any.
+     *
+     * Steps 3 and 4 both run once per pet and must land on the SAME row. When
+     * step 3 created its own row unconditionally, editing a check-in left the
+     * original row in place and added a second one — the booking grew a phantom
+     * pet on every save.
+     *
+     * `CANCELLED` is excluded explicitly: cancelling sets the status but leaves
+     * `check_out` null.
+     */
+    public function findActiveCheckIn($pet): ?CheckIn
+    {
+        return CheckIn::where('pet_id', $pet->id)
+            ->open()
+            ->orderBy('id')
+            ->first();
+    }
+
+    /**
+     * Delete one pet's row of a booking together with what hangs off it.
+     */
+    public function deleteCheckIn(CheckIn $checkIn): void
+    {
+        DB::transaction(function () use ($checkIn) {
+            $checkIn->foods()->delete();
+            $checkIn->medicines()->delete();
+            $checkIn->items()->delete();
+            $checkIn->extraServices()->detach();
+            $checkIn->delete();
+        });
+    }
+
+    /**
+     * After an edited booking is re-submitted, delete the rows of pets the
+     * client removed in the wizard. The submission only ever writes the pets it
+     * still has, so without this a removed pet stays in the booking.
+     *
+     * A signed row is only deleted when pet staff is the one editing; otherwise
+     * it is kept and reported back.
+     *
+     * @param  int[]  $keptPetIds  Pet ids the submission just saved.
+     * @return array{deleted: int[], kept_signed: int[]} Check-in ids.
+     */
+    public function pruneBooking(CheckIn $anchor, array $keptPetIds, ?User $actor = null): array
+    {
+        $removed = CheckIn::openBookingOf($anchor->user_id)
+            ->whereNotIn('pet_id', $keptPetIds)
+            ->withExists('signatures')
+            ->get();
+
+        [$deletable, $protected] = $removed->partition(fn (CheckIn $checkIn) => $checkIn->canBeDeletedBy($actor));
+
+        foreach ($deletable as $checkIn) {
+            $this->deleteCheckIn($checkIn);
+        }
+
+        return [
+            'deleted' => $deletable->pluck('id')->values()->all(),
+            'kept_signed' => $protected->pluck('id')->values()->all(),
+        ];
+    }
+
+    /**
+     * The pet's open stay, created as CHECKED_IN when there is none (a new
+     * check-in). An edit reuses the row being edited.
+     */
+    public function findOrCreateActiveCheckIn($pet): CheckIn
+    {
+        $existing = $this->findActiveCheckIn($pet);
+
+        if ($existing) {
+            return $existing;
+        }
+
+        $checkedInStatus = Status::where('name', 'CHECKED_IN')->first();
+        if (!$checkedInStatus) {
+            throw new \Exception('CHECKED_IN status not found in database');
+        }
+
+        return CheckIn::create([
+            'check_in' => now(),
+            'pet_id' => $pet->id,
+            'user_id' => $pet->user_id,
+            'status_id' => $checkedInStatus->id,
+        ]);
+    }
+
     /**
      * Process check-in record for a pet
      *
@@ -30,10 +119,8 @@ class CheckInService
             throw new \Exception('CHECKED_IN status not found in database');
         }
 
-        // Check if there's already an active check-in for this pet
-        $existingCheckIn = CheckIn::where('pet_id', $pet->id)
-                                 ->whereNull('check_out')
-                                 ->first();
+        // Must resolve the same row step 3 attached the feeding/medication to.
+        $existingCheckIn = $this->findActiveCheckIn($pet);
 
         if ($existingCheckIn) {
             // Update existing check-in
@@ -66,6 +153,10 @@ class CheckInService
             return;
         }
         foreach ($checkIns as $checkIn) {
+            // The payload is the full list, not a delta: replace, so re-saving
+            // an edited check-in doesn't duplicate every item.
+            $checkIn->items()->delete();
+
             foreach ($inventoryData as $itemData) {
                 Item::create([
                     'name' => $itemData ?? 'Item',
@@ -89,23 +180,23 @@ class CheckInService
             return;
         }
 
-        foreach ($checkIns as $checkIn) {
-            foreach ($groomingData as $service => $enabled) {
-                // Skip non-service keys like 'appointmentDay'
-                if ($service === 'appointmentDay' || !$enabled) {
-                    continue;
-                }
+        // Get the appointment day if it exists
+        $appointmentDay = $groomingData['appointmentDay'] ?? null;
 
-                $extraService = ExtraService::firstOrCreate(['name' => $service]);
-
-                // Get the appointment day if it exists
-                $appointmentDay = $groomingData['appointmentDay'] ?? null;
-
-                // Attach service to check-in with appointment day in pivot table
-                $checkIn->extraServices()->syncWithoutDetaching([
-                    $extraService->id => ['grooming_appointment_day' => $appointmentDay]
-                ]);
+        $services = [];
+        foreach ($groomingData as $service => $enabled) {
+            // Skip non-service keys like 'appointmentDay' and the per-pet selector 'pets'
+            if (in_array($service, ['appointmentDay', 'pets'], true) || !$enabled) {
+                continue;
             }
+
+            $extraService = ExtraService::firstOrCreate(['name' => $service]);
+            $services[$extraService->id] = ['grooming_appointment_day' => $appointmentDay];
+        }
+
+        // Full set, not a delta: sync so a service unticked while editing is removed.
+        foreach ($checkIns as $checkIn) {
+            $checkIn->extraServices()->sync($services);
         }
     }
 }

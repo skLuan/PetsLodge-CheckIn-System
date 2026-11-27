@@ -1,5 +1,5 @@
-# Use PHP 8.2 FPM Alpine base image
-FROM php:8.2-fpm-alpine
+# Use PHP 8.3 FPM Alpine base image — matches the Hostinger production server (8.3).
+FROM php:8.3-fpm-alpine
 
 # Install system dependencies
 RUN apk add --no-cache \
@@ -37,8 +37,13 @@ COPY . .
 # Copy .env.docker as .env (after COPY . . so it's not overwritten by local .env)
 COPY .env.docker .env
 
-# Install PHP dependencies
-RUN composer install --optimize-autoloader --no-dev
+# Install PHP dependencies.
+#
+# Dev dependencies (phpunit, faker) are installed ON PURPOSE. docker-compose.yml
+# mounts a named volume over /var/www/vendor and seeds it from THIS layer, so the
+# vendor/ built here is the one the running containers actually use. Under
+# --no-dev, `docker compose exec app php artisan test` dies on a missing PHPUnit.
+RUN composer install --optimize-autoloader
 
 # Generate application key
 RUN php artisan key:generate
@@ -56,9 +61,10 @@ COPY docker/php/local.ini /usr/local/etc/php/conf.d/local.ini
 COPY docker/php/php-fpm-healthcheck /usr/local/bin/php-fpm-healthcheck
 RUN chmod +x /usr/local/bin/php-fpm-healthcheck
 
-# Copy Docker entrypoint script
-COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+# NOTE: Database migrations + seeding run at CONTAINER STARTUP via
+# docker-entrypoint.sh (below), NOT during `docker build` — MySQL only exists
+# at runtime. Do NOT add a `RUN php artisan migrate` here; it would fail the build.
+COPY --chmod=0755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # Expose port 9000
 EXPOSE 9000

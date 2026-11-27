@@ -1,3 +1,54 @@
+# PetsLodge — local development stack.
+#
+# ---------------------------------------------------------------------------
+# WHERE CONFIGURATION LIVES:  .env.docker  (mounted read-only as /var/www/.env)
+# ---------------------------------------------------------------------------
+# Do NOT add APP_/DB_/MAIL_/REDIS_ values to the `environment:` blocks below and
+# expect the web app to see them. Laravel 10's `php artisan serve` filters the
+# environment down to a short whitelist (APP_ENV, PATH, XDEBUG_*, …) before it
+# spawns the HTTP server, so anything else set here is dropped for every web
+# request — while CLI and the queue worker still see it. That split produces
+# the worst possible bug: mail that works from the worker but not the app, or
+# vice versa. One file, `.env.docker`, avoids it.
+#
+# MAIL: by default every message is captured by mailpit (http://localhost:8025)
+# and nothing reaches a real client. To rehearse the production Hostinger path,
+# edit the MAIL_* block in `.env.docker`, then:
+#
+#   docker compose restart app queue
+#   docker compose exec app php artisan mail:test you@example.com
+
+# NOTE: no DB_*/APP_*/MAIL_* variables are exported to the PHP containers.
+# A real environment variable outranks both `.env` and PHPUnit's <env> overrides
+# (it arrives via $_SERVER, which Laravel's env repository reads first), so an
+# exported DB_DATABASE made `php artisan test` run RefreshDatabase against the
+# DEVELOPMENT database and truncate it. docker-entrypoint.sh supplies the same
+# values as shell defaults for its readiness probe, so nothing is lost.
+
+# The project is bind-mounted so edits to mail templates, listeners and config
+# take effect on `docker compose restart` instead of needing a full rebuild.
+# `.env.docker` is mounted over `.env` so the container keeps container-side
+# hostnames (mysql, redis, mailpit) while the host `.env` stays host-side.
+x-app-volumes: &app-volumes
+  - .:/var/www
+  - ./.env.docker:/var/www/.env:ro
+  # PERFORMANCE — do not remove. The bind mount above crosses the WSL2 9p
+  # bridge to C:\, where a single stat() costs ~5.9 ms. A Laravel bootstrap
+  # includes 455 PHP files, 421 of them (93%) under vendor/ — roughly 2.5 s of
+  # pure filesystem latency on EVERY request, before a line of app code runs.
+  # This named volume serves vendor/ from the container's own ext4 instead
+  # (~0.007 ms per stat), while app/, config/ and resources/ stay bind-mounted
+  # and hot-reloadable.
+  #
+  # CAVEAT: the volume is seeded from the image ONCE, when it is first created.
+  # After changing composer.json/composer.lock you must rebuild AND drop it:
+  #   docker compose down && docker volume rm petslodge_vendor_data
+  #   docker compose build
+  #   docker compose up -d app   # seed with ONE service first,
+  #   docker compose up -d       # then the rest: app+queue race on an empty volume
+  # A `composer install` run on the HOST no longer affects the containers.
+  - vendor_data:/var/www/vendor
+
 services:
   # Laravel Application (php artisan serve)
   app:
@@ -5,7 +56,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: petslodge-app
-    restart: no
+    restart: unless-stopped
     working_dir: /var/www
     ports:
       - "8080:8000"
@@ -14,22 +65,57 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    environment:
-      - APP_KEY=base64:s12COBNOF0DKWXWTo7709hGBJ31sAhwQLjbvzPQH09M=
-      - APP_ENV=local
-      - APP_DEBUG=true
-      - APP_URL=http://localhost:8080
-      - DB_HOST=mysql
-      - DB_PORT=3306
-      - DB_DATABASE=petslodge
-      - DB_USERNAME=petslodge
-      - DB_PASSWORD=petslodge_secret
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - CACHE_DRIVER=redis
-      - SESSION_DRIVER=redis
-      - QUEUE_CONNECTION=redis
+    volumes: *app-volumes
+    # Run the bind-mounted entrypoint rather than the copy baked into the image,
+    # so edits to docker-entrypoint.sh apply on `restart` without a rebuild.
+    entrypoint: ["sh", "/var/www/docker-entrypoint.sh"]
     command: php artisan serve --host=0.0.0.0 --port=8000
+    networks:
+      - petslodge-network
+
+  # Queue worker — transactional emails are queued, so without this container
+  # running no client email is ever actually delivered.
+  #
+  # `restart: unless-stopped` is REQUIRED, not a nicety: --max-time makes the
+  # worker exit on purpose once an hour (to release leaked memory), and under a
+  # `no` restart policy that first clean exit would end mail delivery for good.
+  #
+  # SKIP_SHARED_SETUP stops this container touching any state the app container
+  # owns. Both run the same entrypoint over the same bind mount, so without it:
+  #   - both run `migrate` at startup, and the loser dies on "table already exists"
+  #   - this container's `view:clear` wipes storage/framework/views WHILE the app
+  #     is serving out of it, forcing every page to recompile Blade across the
+  #     slow mount — the "app got slow after I added the queue" symptom
+  #   - both race on `storage:link`, and the loser exits non-zero under `set -e`
+  queue:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: petslodge-queue
+    restart: unless-stopped
+    working_dir: /var/www
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SKIP_SHARED_SETUP: "true"
+    volumes: *app-volumes
+    entrypoint: ["sh", "/var/www/docker-entrypoint.sh"]
+    command: php artisan queue:work --tries=3 --backoff=30 --sleep=3 --max-time=3600
+    networks:
+      - petslodge-network
+
+  # Mailpit — catches every locally sent email so nothing reaches real clients.
+  # Web UI: http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: petslodge-mailpit
+    restart: unless-stopped
+    ports:
+      - "8025:8025"
+      - "1025:1025"
     networks:
       - petslodge-network
 
@@ -37,7 +123,7 @@ services:
   mysql:
     image: mysql:8.0
     container_name: petslodge-mysql
-    restart: no
+    restart: unless-stopped
     environment:
       - MYSQL_ROOT_PASSWORD=root_secret
       - MYSQL_DATABASE=petslodge
@@ -60,7 +146,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: petslodge-redis
-    restart: no
+    restart: unless-stopped
     ports:
       - "6379:6379"
     volumes:
@@ -81,4 +167,8 @@ volumes:
   mysql_data:
     driver: local
   redis_data:
+    driver: local
+  # Serves vendor/ from container-native ext4 instead of the slow 9p bind
+  # mount. Seeded from the image at creation — see the x-app-volumes note.
+  vendor_data:
     driver: local

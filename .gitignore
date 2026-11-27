@@ -4,6 +4,8 @@
 /public/hot
 /public/storage
 **/.htaccess
+# …except Laravel's own rewrite rules, which the deploy needs (see ai/plans/active/08-*).
+!public/.htaccess
 /storage/*.key
 /temp
 /vendor
@@ -11,6 +13,9 @@
 .env.backup
 .env.production
 .env.docker
+.env.testing
+.env*.bak.claude
+.env.v0
 .phpunit.result.cache
 Homestead.json
 Homestead.yaml
@@ -20,11 +25,13 @@ yarn-error.log
 /.fleet
 /.idea
 /.vscode
-/plans/
+# Legacy pre-roadmap plans (Jan–Mar 2026), kept local-only as before.
+# Everything else under ai/ is tracked normally.
+/ai/plans/archive/
 /logs
 /reports
 .kilocodemodes
-
+.kilo/
 # Docker files (optional - can be tracked if needed)
 # Dockerfile
 # Dockerfile.nginx

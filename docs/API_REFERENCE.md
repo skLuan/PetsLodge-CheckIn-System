@@ -17,6 +17,7 @@
 7. [UI Update Methods](#ui-update-methods)
 8. [Utility Methods](#utility-methods)
 9. [Deprecated Methods](#deprecated-methods)
+10. [HTTP Endpoints](#http-endpoints)
 
 ---
 
@@ -1213,6 +1214,145 @@ static getPetsFromCookies(): Array
 ```javascript
 static updatePetInCookies(petIndex: number, data: Object): boolean
 ```
+
+---
+
+## HTTP Endpoints
+
+Backend routes that the front-end talks to directly (see `routes/api.php` and
+`routes/web.php` for the full list).
+
+### GET `/api/terms/active`
+
+Returns the Terms & Conditions version currently shown to clients. Public — no auth,
+because the check-in form is used by walk-in clients.
+
+**Response `200`**
+
+```json
+{
+  "title": "Terms & Conditions",
+  "content": "<p class=\"text-gray-700 leading-relaxed\">...</p>",
+  "version": 1
+}
+```
+
+`content` is sanitized HTML, safe to inject with `innerHTML` / `{!! !!}`.
+
+**Response `404`** — no active version exists (nothing seeded, or every version was
+deactivated). The check-in popup falls back to rendering empty rather than erroring.
+
+> The popup itself does **not** call this endpoint — it is server-rendered via the view
+> composer in `AppServiceProvider`. The endpoint exists for JS consumers and for the
+> signature module (Plan 03), which needs to record the accepted version.
+
+### Terms & Conditions editor (pet staff)
+
+| Method | URL | Route name | Middleware |
+|---|---|---|---|
+| GET | `/petstaff/terms` | `pet-staff.terms.edit` | `auth`, `pet.staff.only` |
+| PUT | `/petstaff/terms` | `pet-staff.terms.update` | `auth`, `pet.staff.only` |
+
+`PUT` accepts `title` (optional, max 255) and `content` (required, max 200KB of HTML).
+Saving never overwrites: `TermsAndConditions::publishNewVersion()` inserts version N+1,
+deactivates N, and records `updated_by`. Old rows stay intact as the audit trail that
+signed agreements point at.
+
+### Signatures (pet staff)
+
+| Method | URL | Route name | Middleware |
+|---|---|---|---|
+| POST | `/signatures` | `signatures.store` | `auth`, `pet.staff.only` |
+| GET | `/signatures/{signature}` | `signatures.show` | `auth`, `pet.staff.only` |
+
+> These are **web** routes, not `api.php` ones. The `api` middleware group is stateless
+> (Sanctum's `EnsureFrontendRequestsAreStateful` is commented out in `Kernel.php`), so
+> `pet.staff.only` could never read the staff session there.
+
+**POST `/signatures`** — store a signature drawn on the pad.
+
+```json
+{
+  "image": "data:image/png;base64,iVBORw0KGgoAAA...",
+  "check_in_id": 42,
+  "context": "drop-in"
+}
+```
+
+| Field | Rules |
+|---|---|
+| `image` | required. Must be a `data:image/png;base64,` URL whose **decoded** bytes start with the PNG magic number and are ≤ 1 MB. The declared mime is client-supplied, so the bytes are what is actually checked. |
+| `check_in_id` | required, must exist in `check_ins`. |
+| `context` | optional, `drop-in` (default) or `check-in`. |
+
+**Response `201`**
+
+```json
+{ "id": 7, "url": "http://localhost:8080/signatures/7", "signedAt": "2026-08-24T18:20:11+00:00" }
+```
+
+**Response `422`** — standard Laravel validation body. Anything rejected is never
+written to disk.
+
+Side effects: the PNG is written to the **private** `local` disk at
+`storage/app/signatures/YYYY/MM/{uuid}.png`, and a row is inserted recording the pet
+**owner** (not the staff member operating the tablet), the check-in, and the
+`terms_and_conditions_id` that was active at that moment. Rows are append-only —
+re-signing inserts a new one, so the audit trail is never overwritten.
+
+**GET `/signatures/{signature}`** — streams the PNG (`Content-Type: image/png`,
+`Cache-Control: private, no-store`). This is the only way to read a signature image;
+there is no public URL and the absolute URL is never persisted — build it with
+`route('signatures.show', $signature)` or `$signature->url()`. Returns `404` if the
+file has gone missing from the disk.
+
+### POST `/api/readyToPrint`
+
+Completes a drop-in: renders the summary PDF (once — a second call reuses
+`check_ins.document_path`) and **uploads the bytes** to PrintNode as
+`contentType: pdf_base64`.
+
+**Rejects with `422` and `{"requiresSignature": true}` unless a `drop-in` signature
+already exists for `info.id`** — the browser gate in `Drop-in-confirmation.blade.php` is
+a convenience, this is the enforcement.
+
+**Response `200`**
+
+```json
+{
+  "message": "Print job sent successfully!",
+  "documentUrl": "http://localhost:8080/petstaff/check-in/26/document",
+  "printResponse": 623
+}
+```
+
+`documentUrl` is the **authenticated staff-only** route below. There is no public PDF
+URL — see the note on `pdf_base64`.
+
+**Response `422`** — unsigned, or the stored PDF has vanished from disk.
+**Response `500`** — PrintNode rejected the job; `error` carries the reason.
+
+### GET `/petstaff/check-in/{checkIn}/document`
+
+| Route name | Middleware |
+|---|---|
+| `pet-staff.check-in.document` | `auth`, `pet.staff.only` |
+
+Streams the stored check-in summary (`application/pdf`, `Cache-Control: private,
+no-store`). `404` when the check-in has no `document_path` or the file is missing.
+
+> **Why printing changed (Plan 07).** `PrintNodeService` used to send
+> `contentType: pdf_uri`, so PrintNode's *cloud servers* fetched the PDF from a URL
+> built out of `APP_URL`. That forced the summary — owner name/phone/address, pet health
+> notes, and the client's signature — onto a publicly readable disk, and made printing
+> impossible from localhost. It now uploads raw base64 (**no `data:` prefix**) and PDFs
+> live on the private disk. `check_ins.document_url` was replaced by `document_path`,
+> which stores a relative path; the old column held an absolute `APP_URL`-based link
+> that broke whenever the app changed domain.
+>
+> PrintNode answers a successful job with **HTTP 201 and the bare job id** (`623`), not
+> a JSON object, so `printResponse` is a scalar. Request bodies are capped at 50MB
+> (~37.5MB of document); a check-in summary is ~40KB.
 
 ---
 

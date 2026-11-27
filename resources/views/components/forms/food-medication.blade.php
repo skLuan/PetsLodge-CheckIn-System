@@ -1,10 +1,13 @@
 <form id="feedingAndMedication" action="" class="bg-green-lightest rounded-xl relative pt-12">
     <div id="sameFeedingContainer" class="mb-4 flex items-center hidden">
-        <label class="inline-flex items-center text-gray font-semibold w-full">
+        <label class="inline-flex items-center text-gray font-semibold w-full cursor-pointer">
             <input type="checkbox" id="sameFeedingForAll" name="sameFeedingForAll"
                 class="p-0 my-0 mr-2 w-5 h-5 !rounded-sm">
             <span>Same feeding for all</span>
         </label>
+    </div>
+    <div id="feedingGroupedByPet" class="hidden">
+        {{-- Populated dynamically: collapsible per-pet feeding/medication sections --}}
     </div>
     <!------------------------------------------------------------------------ Morning Section -->
     <div class="container-day mb-8 hidden" data-time-slot="morning">

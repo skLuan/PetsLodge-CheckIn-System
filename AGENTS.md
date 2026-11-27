@@ -1,0 +1,561 @@
+# AGENTS.md — Guide for AI Coding Agents
+
+> **Read this file first, then `ai/JOURNAL.md`.** This file is the shortcut map of the
+> PetsLodge project so you (an AI coding agent) don't have to re-read the whole codebase
+> every session; `ai/JOURNAL.md` is the running log of what previous sessions actually did.
+> When something here goes stale, update it as part of your change — and append your
+> session to `ai/JOURNAL.md` before you finish.
+>
+> Everything written for agents (journal, plans, specs, implementation notes) lives in
+> **`ai/`** — see `ai/README.md`. Claude Code also loads `CLAUDE.md`, which imports this file.
+
+This file is written for two audiences:
+- **The AI agent** doing the work — file map, commands, conventions, gotchas.
+- **The non-coder** directing the agent — plain-language explanations of where things live.
+
+---
+
+## 1. What this project is (in one paragraph)
+
+**PetsLodge** is a pet-lodging (boarding) management system. Front-desk staff **check
+pets in** through a multi-step form, manage **pet profiles** (health, feeding,
+medication), track **services** (grooming, inventory), and **print/PDF** a check-in
+summary. The signature piece of the app is a **cookie-based form data flow** (historic
+name): the whole check-in form's state lives in one browser entry (`pl_checkin_data`,
+in **localStorage** since 2026-11-06 — it used to be a cookie) that acts as the single
+source of truth, with automatic UI updates when the data changes.
+
+---
+
+## 2. Tech stack
+
+| Layer        | Technology                                                        |
+|--------------|-------------------------------------------------------------------|
+| Backend      | **Laravel 10**, PHP **8.3** (Docker + Hostinger both 8.3 since 2026-11-26; `composer.json` floor is still `^8.1`, unpinned) |
+| Database     | **MySQL 8.0** (via Docker); Redis 7 for cache/session/queue       |
+| Auth         | Laravel Breeze + Sanctum                                           |
+| Frontend     | **Vite**, **Tailwind CSS**, **Alpine.js**, vanilla JS, Iconify    |
+| PDF / Print  | dompdf, PrintNode integration                                     |
+| Testing      | PHPUnit, Faker, Mockery                                            |
+| Formatting   | Laravel Pint (PHP)                                                 |
+| Container    | Docker + docker-compose                                            |
+
+---
+
+## 3. How to run it (Docker is the primary way)
+
+The project runs in Docker. `docker-compose.yml` defines five services: `app`
+(Laravel on port **8080** → container 8000), `queue` (the mail worker), `mysql` (3306),
+`redis` (6379), and `mailpit` (catches local email — UI on **http://localhost:8025**).
+
+> ⚠️ Client emails are **queued**. If the `queue` service isn't running, no email is
+> ever delivered — the job just sits in Redis. `docker compose logs -f queue` to check.
+
+> **Container config lives in `.env.docker`** (mounted read-only over `/var/www/.env`),
+> *not* in compose's `environment:`. Laravel 10's `artisan serve` strips every env var
+> outside a short whitelist before spawning the HTTP server, so variables set in compose
+> reach the CLI and queue worker but never a web request. Edit `.env.docker`, then
+> `docker compose restart app queue`. The project is bind-mounted, so PHP/blade edits
+> need only a restart — no rebuild.
+
+> **`vendor/` is a named volume (`vendor_data`), not the bind mount.** The repo lives on
+> a Windows path, so the bind mount crosses the WSL2 9p bridge where a single `stat()`
+> costs ~5.9 ms. A Laravel bootstrap includes 455 PHP files, 421 of them under `vendor/`
+> — ~2.7 s of filesystem latency on *every* request. Serving `vendor/` from the
+> container's ext4 took a bare 302 from **2.83 s → 0.17 s**.
+>
+> The volume is seeded from the image **once, at creation**. Consequences:
+> - `composer install` on the **host** no longer affects the containers.
+> - After changing `composer.json`/`composer.lock` (or the PHP version), rebuild and
+>   reseed — **one service first**:
+>   ```bash
+>   docker compose down
+>   docker volume rm petslodge_vendor_data
+>   docker compose build
+>   docker compose up -d app   # seeds the empty volume with a SINGLE container
+>   docker compose up -d       # then the rest
+>   ```
+>   `docker compose up -d` straight onto an empty `vendor_data` fails: `app` and `queue`
+>   both mount it and Docker seeds it per container, so they race and the loser dies with
+>   `failed to mkdir .../vendor/_data/brick: file exists`. Seeding with one service first
+>   avoids it. (Hit for real on 2026-11-26 during the PHP 8.3 bump.)
+>
+> The image therefore installs **dev** dependencies (no `--no-dev`), or `artisan test`
+> inside the container dies on a missing PHPUnit.
+
+> **Only the `app` container may run migrations, seeding, cache clearing or
+> `storage:link`.** `docker-entrypoint.sh` gates all of it behind `SKIP_SHARED_SETUP`
+> (set on `queue`; the old name `SKIP_MIGRATIONS` is still honoured). Both containers
+> share one bind mount, so an unguarded `view:clear` from the queue worker wipes the
+> compiled Blade views the app is serving from — and `--max-time=3600` restarts that
+> worker every hour. That was the real cause of "the app got slow after I added the
+> queue".
+
+```bash
+# Start everything (app, MySQL, Redis)
+docker compose up -d
+
+# App is served at:  http://localhost:8080
+# Landing route "/" redirects to /check-in
+
+# View logs
+docker compose logs -f app
+
+# Run an artisan command inside the container
+docker compose exec app php artisan migrate
+docker compose exec app php artisan db:seed
+
+# Stop everything
+docker compose down
+```
+
+**Frontend assets** are built with Vite. During active UI work you usually want:
+```bash
+npm install          # first time only
+npm run dev          # hot-reload dev server (Vite) — run on the HOST, not in Docker
+npm run build        # production build
+```
+
+> ⚠️ **`public/build` is gitignored, so `git pull` never updates compiled assets.** Any
+> pull that touches `resources/js` or `resources/css` needs `npm run build` or the
+> browser keeps running the previous bundle against the new markup. Rebuilding the
+> **image** does not help: the Dockerfile runs `npm run build`, but the bind mount hides
+> the image's `public/build` behind the host's copy. Only a host-side build counts.
+>
+> This has already bitten once: a stale 7-step `tabbar.js` ran against 6-step markup and
+> threw `can't access property "classList", document.getElementById(...) is null`.
+
+> ⚠️ **A leftover `public/hot` silently breaks every asset.** `@vite` loads from the Vite
+> dev server whenever that file exists, so if `npm run dev` dies without cleaning up, the
+> page requests `127.0.0.1:5173` and **no JS or CSS loads at all** (`ERR_CONNECTION_REFUSED`
+> in the console). Fix: start the dev server, or `rm public/hot`. It is gitignored and
+> regenerated automatically.
+
+> **Don't move `npm run dev` into Docker.** `node_modules` sits on the slow bind mount,
+> so a containerised dev server recreates the exact 9p problem the `vendor_data` volume
+> solves — it would need its own named volume. The browser runs on the host and reaches
+> `localhost:5173` directly, and `vite.config.js` is already set to `host: '127.0.0.1'`.
+
+**Non-Docker (local) fallback** (see README for full steps): `composer install`,
+`npm install`, copy `.env.example` → `.env`, `php artisan key:generate`,
+`php artisan migrate --seed`, then `php artisan serve` + `npm run dev`.
+
+---
+
+## 4. How to test & format
+
+> ⚠️ **Tests need a separate database.** They use `RefreshDatabase`, which drops every
+> table on the configured connection — this has already wiped the dev database once
+> (see ai/JOURNAL.md, 2026-08-24). `phpunit.xml` now pins the target explicitly:
+> `<env name="DB_DATABASE" value="petslodge_testing" force="true"/>`.
+> On a fresh clone, create the schema once: `CREATE DATABASE petslodge_testing;`
+>
+> `force="true"` is necessary but **not sufficient on its own** — a real environment
+> variable reaches Laravel via `$_SERVER`, which its env repository reads *before*
+> PHPUnit's override. That is why `docker-compose.yml` deliberately exports **no**
+> `DB_*`/`APP_*`/`MAIL_*` variables; container config lives in `.env.docker`, which is
+> mounted over `/var/www/.env`. Don't add those variables back to compose.
+
+```bash
+# PHP tests
+docker compose exec app php artisan test        # or: php artisan test
+php artisan test --filter=SomeTest              # single test
+
+# Format PHP code (do this before finishing a PHP change)
+./vendor/bin/pint
+
+# JS: there is no configured JS test runner. Verify JS changes in the browser.
+```
+
+> ⚠️ There is **no automated JS test suite**. For frontend changes, verify manually
+> in the browser (see the debug helpers in §8) and check the browser console for errors.
+
+**Known-red tests (pre-existing, not your change):** `ExampleTest`, `Auth\RegistrationTest
+> new users can register`, and both `CheckInSubmissionTest` cases. The practical gate is
+"**no new failures**", not "all green". Current baseline: **156 passed / 4 failed** (Plan 04 health-details fix, 2026-11-25).
+
+> The two `CheckInSubmissionTest` failures are caused by `CheckInApiController::submitCheckIn`
+> calling `CheckInService::submitCheckIn()`, **a method that does not exist** — so
+> `/api/checkin/submit` always returns 500. (Confirmed 2026-08-04; an earlier guess that
+> blamed missing seed data was wrong.) Fixing it belongs to Plan 05.
+
+---
+
+## 5. Project map — where things live
+
+### Backend (`app/`)
+| Path | What it does |
+|------|--------------|
+| `app/Http/Controllers/CheckInApiController.php` | **API endpoints** for the check-in form (submit, autosave, per-step submission, session update). Frontend talks to this. |
+| `app/Http/Controllers/CheckInFormController.php` | Renders form pages (new / pre-filled / view / **edit** / delete check-in). |
+| `app/Http/Controllers/CheckInController.php`     | Check-in web controller. |
+| `app/Http/Controllers/DropInController.php`      | Drop-in flow (staff-only). |
+| `app/Http/Controllers/PetStaffDashboardController.php` | Staff dashboard: checkout, cancel, reprint. |
+| `app/Http/Controllers/TermsAndConditionsController.php` | T&C editor for pet staff (`/petstaff/terms`) + public `GET /api/terms/active`. |
+| `app/Http/Controllers/SignatureController.php` | Stores client signatures (`POST /signatures`) and streams them back (`GET /signatures/{signature}`). |
+| `app/Http/Controllers/HealthCheckController.php` | `/health` monitoring endpoints. |
+| `app/Services/CheckInTransformer.php`   | **Converts** between DB format ⇄ cookie/form format (null-safe). |
+| `app/Services/CheckInDataValidator.php` | Validates check-in data structure & required fields. |
+| `app/Services/CheckInService.php`       | Core check-in business logic. |
+| `app/Services/CheckInPetService.php`    | Pet-related operations. |
+| `app/Services/CheckInUserService.php`   | User/owner operations. |
+| `app/Services/PdfService.php` | Renders the check-in summary to PDF on the **private** disk; returns a relative path + `pdfBytes()`. |
+| `app/Services/PrintNodeService.php` | Uploads PDF bytes to PrintNode (`contentType: pdf_base64`). Never sends a URL. |
+| `app/Services/FakePrintNodeService.php` | Local stand-in for PrintNode (`PRINTNODE_FAKE=true`). Logs the job instead of printing; bound in `AppServiceProvider::bindPrinter()`. |
+| `app/Models/` | Eloquent models: `CheckIn`, `Pet`, `EmergencyContact`, `Food`, `Medicine`, `Item`, `ExtraService`, `KindOfPet`, `Gender`, `Castrated`, `MomentOfDay`, `Status`, `TermsAndConditions`, `Signature`, `User`. |
+| `app/Providers/AppServiceProvider.php` | View composer for `$activeTerms`, plus `bindPrinter()` (real vs fake PrintNode). |
+| `app/Providers/EventServiceProvider.php` | Maps the check-in/drop-in/drop-out events to their queued mail listeners. |
+| `app/Http/Middleware/AdminOnly.php`, `PetStaffOnly.php` | Role gates (`admin.only`, `pet.staff.only`). |
+| `app/Events/` | `CheckInCompleted`, `PetDroppedIn`, `PetDroppedOut` — each carries a `CheckIn`. |
+| `app/Listeners/` | `SendCheckInConfirmation` (coalesces multi-pet bookings into one email), `SendDropInNotification`, `SendDropOutNotification`. All `ShouldQueue`. |
+| `app/Mail/` | `CheckInConfirmationMail` (takes a **Collection** of check-ins), `DropInMail`, `DropOutMail`. |
+
+### Frontend JS (`resources/js/`)
+The heart of the app. **`cookies-and-form/` is where most feature work happens.**
+
+| Path | What it does |
+|------|--------------|
+| `cookies-and-form/FormDataManager.js` | **Main public API** for form data. Start here for form-state work. |
+| `cookies-and-form/StorageManager.js` | Reads/writes `pl_checkin_data` in **localStorage** (envelope with 7-day `expiresAt`; falls back to cookies if localStorage is unavailable). Used only by `CoreDataManager`. |
+| `cookies-and-form/CookieManager.js` / `CookieHandler.js` | Generic cookie helpers (legacy `pl_checkin_data` cookie migration, small id cookies from `SubmissionManager`). |
+| `cookies-and-form/config.js` | Cookie/form configuration. |
+| `cookies-and-form/form-processor.js` | Processes/normalizes form data. |
+| `cookies-and-form/managers/` | Specialized managers (one concern each) — see below. |
+| `cookies-and-form/reactivitySystem/` | Auto-updates the UI when cookie data changes. |
+| `components/CheckInHandler.js`, `datePicker.js` | Check-in orchestration & date picker. |
+| `components/SignaturePad.js` | Signature capture (`window.SignatureCapture`). Wraps `signature_pad`; handles devicePixelRatio + POSTs the PNG. |
+| `config/checkInConfig.js` | Check-in front-end config. |
+| `Pill.js`, `Utils.js`, `app.js`, `bootstrap.js` | UI widgets, utilities, entry points. |
+| `tabbar.js` | Wizard step navigation. **Discovers its steps from the DOM** (`.step[id^='step']`) instead of hard-coding a count, and guards every `getElementById`. Both exist because the hard-coded `1..7` loop crashed when the wizard dropped to 6 steps. Don't reintroduce a literal step count. |
+
+**`managers/`** (each handles one slice of the form):
+`EditingModeManager` (edit vs. create + original snapshot), `CoreDataManager`,
+`PetManager` / `PetPillManager`, `HealthFormManager`, `InventoryManager` /
+`InventoryFormManager`, `FormHandler`, `NavigationManager`, `ValidationManager`,
+`SubmissionManager`, `PopupManager`, `CheckInSummaryUpdater`, `FastCheckinManager`,
+`UtilitiesManager`, `index.js` (barrel export).
+
+**`reactivitySystem/`**:
+`CookieReactivityManager` (watches cookie via MutationObserver — no aggressive polling),
+`UIManager` (updates DOM without wiping user input), `FormUpdater` (form field updates),
+`SummaryRenderer`, `index.js`.
+
+### Views (`resources/views/`) — Blade templates
+| Path | What it does |
+|------|--------------|
+| `checkIn.blade.php` | Main check-in page (route `/check-in`). |
+| `view-check-in.blade.php` | The client's current visit: **one card per booking** (every open pet); per-pet sections in `components/view-check-in/pet-section.blade.php`. |
+| `Process.blade.php` | The multi-step wizard (new / pre-filled / edit). |
+| `components/forms/` | Form partials: `pet-info` (**includes the health fields**), `food-medication`, `inventory`, `owner-info`. |
+| `components/steps/` | One component per wizard step — **6 of them**, in this order: `owner-info` (step1), `pet-info` (step2), `feeding-medication` (step3), `inventory` (step4), `grooming` (step5), `review-submit` (step6). |
+| `components/ui/` | Shared form/visual primitives: `input`, `select`, `radio`, `checkbox`, `date-picker`, `field`, `card`. |
+| `components/wizard/` | Sticky wizard header (progress bar + pet pills). |
+| `components/pop-ups/` | Modals: `feeding-medication`, `grooming`, `terms-conditions`. |
+| `components/progress/` | Progress bar / circle. |
+| `components/tabbar.blade.php`, `CheckInSummary.blade.php` | Tab bar, summary. |
+| `pet-staff/dashboard.blade.php`, `Drop-in*.blade.php` | Staff dashboard, drop-in pages. |
+| `pet-staff/terms-edit.blade.php` | T&C editor (HTML textarea + Alpine live preview). |
+| `components/signature-pad.blade.php` | The signature canvas + Clear button, embedded in `Drop-in-confirmation.blade.php`. |
+| `emails/layouts/base.blade.php` | Shared branded email shell (inline CSS + tables — email clients ignore external CSS). |
+| `emails/check-in-confirmation.blade.php`, `drop-in.blade.php`, `drop-out.blade.php` | The three client emails. |
+| `pdf-for-print.blade.php` | The PDF/print template. |
+| `admin/monitoring-dashboard.blade.php` | Admin monitoring view. |
+| `layouts/`, `auth/`, `profile/` | Layouts, Breeze auth pages, profile pages. |
+
+### Routes
+- `routes/web.php` — pages: `/check-in` (phone entry), `/new-form` (the actual multi-step
+  form), `/edit-check-in/{id}` (edits the whole booking), `/view-check-in`,
+  `/delete-check-in/{id}` (one pet), `/delete-booking/{id}`, `POST /check-in/booking/prune`
+  (after an edit; web so it can see a staff session), `/drop-in`, `/petstaff/dashboard`,
+  `/petstaff/terms`, `/signatures` (store/show), `/petstaff/check-in/{id}/document`,
+  `/health`, admin monitoring.
+- `routes/api.php` — form API: `/api/checkin/submit`, `/api/checkin/autosave`,
+  per-step `/api/checkin/step1..step5/...`, `/api/update-session-checkin`, `/api/check-user`,
+  `/api/terms/active`.
+
+> ⚠️ Staff URLs are `/petstaff/*` (no hyphen) while their **route names** are
+> `pet-staff.*` (with hyphen). Easy to get wrong — always use `route()`.
+- `routes/auth.php` — Breeze auth routes.
+
+### Other
+- `database/migrations/`, `database/seeders/` — schema & seed data.
+- `docs/` — deeper developer docs (see §9).
+- `ai/` — everything for agents: `JOURNAL.md`, `plans/` (roadmap + `active/` / `done/` /
+  `archive/`), `specs/` (OpenSpec feature specs), `implementation/`. Index: `ai/README.md`.
+- `config/`, `.env` (local secrets), `.env.example` (template).
+
+---
+
+## 6. The core concept you must understand: cookie-based data flow
+
+The check-in form does **not** keep state in scattered variables. Instead:
+
+```
+Database → Laravel Session → DOM data-* attributes → localStorage (pl_checkin_data) → Form UI
+```
+
+> **"Cookie" in this codebase means the `pl_checkin_data` localStorage entry.** It was a
+> real cookie until 2026-11-06, when multi-pet check-ins hit the 4 KB cookie cap
+> ("Cookie data too large"). The server never read it — data reaches Laravel only through
+> the step1–5 JSON bodies. Class/method names (`CookieReactivityManager`,
+> `getCookieSize`, …) were kept. Don't move it back to a cookie.
+
+Rules that keep this from breaking:
+1. **The cookie is the single source of truth.** All form state lives in `pl_checkin_data`;
+   read/write it only through `CoreDataManager` (which uses `StorageManager`).
+2. **Session data is merged into the cookie once** at init, in a specific order. The
+   wizard's prefill comes **only** from the one-shot flash key `wizard`
+   (`prefill` + `editing_check_in_id`, set by `CheckInFormController::editCheckIn`) —
+   never from `checkin_data`, which belongs to the drop-in flow. The draft also keeps a
+   `sessionSeed` so the same payload is never merged twice.
+   **UI renders per step:** `UIManager.updateUIFromCookieData` only paints the step in
+   `?step=`, so `NavigationManager.updateTabbarForStep` repaints the feeding/inventory
+   lists on step entry. A new list-type step needs the same.
+3. **Editing mode is explicit** — a dedicated flag tracks edit-vs-create, and an
+   *original data snapshot* is stored so changes can be diffed and reset.
+4. **Transformations are lossless & null-safe** (see `CheckInTransformer`).
+5. **UI reacts automatically** to cookie changes via `CookieReactivityManager`
+   (MutationObserver) — don't add polling loops.
+6. **Order matters.** Editing-mode init and cookie init have race conditions if you
+   reorder async steps. Preserve existing async/await ordering unless you fully
+   understand it.
+
+If you touch form state, go through **`FormDataManager`** rather than writing cookies
+directly.
+
+---
+
+## 6a. Per-pet health: three names for one value
+
+Health lives on the **pet**, inside step 2 (`#petInfoForm`) — there is no separate health
+step any more. The same value is called three different things, and the renames are
+deliberate boundaries, not bugs:
+
+| Layer | Name |
+|---|---|
+| DOM field (`forms/pet-info.blade.php`) | `healthBehaviorDetails` |
+| Cookie + API payload (`PetManager.js` maps it) | `healthBehaviors` |
+| Database (`pets.health_conditions`) | the "Which?" **text**, or `'Yes'` when the owner said Yes without details |
+
+Rules:
+
+1. **`pets.health_conditions` stores the details, never the Yes/No flag.** It used to
+   store the boolean (`"1"`), which threw the text away and rendered "⚠️ 1" on
+   `/view-check-in`. Write it only through `CheckInPetService::healthConditionsFrom()`.
+2. **Legacy rows still hold `"1"`/`"0"`.** `CheckInTransformer` and
+   `components/view-check-in/pet-section.blade.php` both translate them; keep any new
+   reader consistent with those two.
+3. **`warnings` alone must not flip `unusualHealthBehavior` to Yes** — they are
+   independent fields. Covered by `MultiPetHealthFoodTest`.
+4. **The standalone health step is gone.** `components/steps/health-info.blade.php`,
+   `components/forms/health-info.blade.php` and `app/View/Components/forms.health-info.php`
+   were orphaned and were deleted on 2026-11-26 (`6b7ef33`). The last could never autoload
+   anyway — `class formsHealthInfo` in a file named `forms.health-info.php` breaks PSR-4.
+   Don't recreate a separate health step: health belongs to the pet, and the old step
+   component carried `id="step4"`, which now belongs to `inventory`.
+
+---
+
+## 6b. The second concept: transactional emails
+
+Three emails go to clients, all fired as **events → queued listeners → mailables**:
+
+| Trigger | Fired from | Event → Listener → Mail |
+|---|---|---|
+| Check-in finished | `CheckInApiController::submitExtraInfo` (**step 5**) | `CheckInCompleted` → `SendCheckInConfirmation` → `CheckInConfirmationMail` |
+| Pet arrived | `PetStaffDashboardController::dropped_in` | `PetDroppedIn` → `SendDropInNotification` → `DropInMail` |
+| Pet picked up | `PetStaffDashboardController::checkout` | `PetDroppedOut` → `SendDropOutNotification` → `DropOutMail` |
+
+Rules that keep this from breaking:
+
+1. **Steps 2–5 run once per pet** (`SubmissionManager.submitSequentialCheckIn`), so a
+   3-pet booking fires `CheckInCompleted` three times. `SendCheckInConfirmation` runs on
+   a **~2-minute delay**, then claims every un-announced check-in for that owner
+   (`check_ins.confirmation_sent_at IS NULL`) and sends **one** email listing them all.
+   Sibling jobs find nothing left to claim and exit. Don't "fix" the delay away.
+2. **Never let mail break the flow.** Every dispatch is wrapped in try/catch +
+   `Log::warning`. A dead SMTP server must not 500 a check-in or a checkout.
+3. **Invalid/missing owner email is a skip, not an error** — guarded in each listener.
+4. **Inline CSS + tables only** in `resources/views/emails/`. Email clients discard
+   `<style>` blocks and external stylesheets.
+5. **`/api/checkin/submit` is dead code** — it calls `CheckInService::submitCheckIn()`,
+   which does not exist, so it always 500s. Don't wire anything new to it; the live
+   path is step1→step5.
+6. **Something must drain the queue, and it differs per environment.** Local Docker
+   uses Redis + the `queue` container. Production is **Hostinger shared hosting**: no
+   Redis, no daemons — `QUEUE_CONNECTION=database` (needs the `jobs` table) drained by
+   a per-minute hPanel cron. Details and the cron line: `docs/DEPLOYMENT_GUIDE.md`.
+
+## 6d. Printing: the document is UPLOADED, never linked
+
+`PrintNodeService::sendPrintJob()` takes **raw PDF bytes** and sends them as
+`contentType: pdf_base64`. It used to send `pdf_uri` — a URL PrintNode's cloud servers
+fetched themselves — which forced the printed summary onto a **public** disk and made
+printing impossible from localhost. Plan 07 changed that.
+
+Rules that keep this from breaking:
+
+1. **Never hand PrintNode a URL again.** `sendPrintJob($bytes)`, not `sendPrintJob($url)`.
+   `content` must be **raw base64 with no `data:` prefix** (signature payloads use the
+   prefixed form — don't copy that shape here).
+2. **Printed summaries are personal data.** They hold owner name/phone/address, health
+   notes and the client's signature, so they live on the **private** disk
+   (`PdfService::DISK`, `storage/app/pdfs/YYYY/MM/{uuid}.pdf`). The only way to read one
+   is `GET /petstaff/check-in/{checkIn}/document` (`auth` + `pet.staff.only`).
+3. **`check_ins.document_path` stores a relative path**, never a URL. The old
+   `document_url` column held an absolute `APP_URL`-based link, so every stored value
+   broke when the app changed domain. It is gone; don't reintroduce it.
+4. **A successful `POST /printjobs` returns 201 with the bare job id** (`623`), not a
+   JSON object — so `$response['data']` is a **scalar**, not an array.
+5. **Size limit is 50MB of request body** (~37.5MB of document). A check-in summary is
+   ~40KB, so `PrintNodeService::MAX_DOCUMENT_BYTES` is a sanity guard, not a real
+   constraint.
+6. **`APP_URL` no longer affects printing at all.** It still matters for email
+   `asset()` links (§6b) — don't assume this fixed that.
+
+### `PRINTNODE_FAKE=true`
+
+Swaps in `FakePrintNodeService`, which logs the job (and its byte size) at **warning**
+level and returns `fake: true`. Opt-in, and **ignored when `APP_ENV=production`** —
+auto-faking on a missing key would let production report "printed successfully" forever
+while nothing came out of the printer. Since Plan 07 a real API key also works locally,
+so this is now a convenience rather than the only option.
+
+**Diagnosing mail:** `php artisan mail:test [address] [--template=confirmation|drop-in|drop-out]`
+prints the configuration Laravel has *actually* loaded, warns about the common
+Hostinger mistakes, and sends synchronously so SMTP errors surface instead of being
+swallowed by rule 2's try/catch.
+
+---
+
+## 6c. The third concept: signatures
+
+A signature is **per-visit consent**, not a user attribute. It lives on its own
+`signatures` table — deliberately *not* a `signature_url` column on `users`, which
+would be overwritten every visit and destroy the legal audit trail.
+
+Each row records **who** signed (the pet *owner*, never the staff member holding the
+tablet), **which visit** (`check_in_id`), and **which text they agreed to**
+(`terms_and_conditions_id`, pinned to the version that was on screen — this is what
+Plan 01's append-only T&C versioning exists for).
+
+Rules that keep this from breaking:
+
+1. **Signature images are personal data.** The PNG goes to the **private** `local`
+   disk (`storage/app/signatures/YYYY/MM/{uuid}.png`). Never `public/`, never
+   `Storage::disk('public')`. The only way to read one is the authenticated
+   `GET /signatures/{signature}` route.
+2. **Store the path, build the URL on read** — `$signature->url()` /
+   `route('signatures.show', $signature)`. Absolute URLs are never persisted.
+3. **The routes are in `web.php`, not `api.php`.** The `api` middleware group is
+   stateless (Sanctum's stateful middleware is commented out in `Kernel.php`), so
+   `pet.staff.only` cannot see a staff session there.
+4. **Trust the bytes, not the label.** The `data:image/png` prefix is client-supplied;
+   `SignatureController` checks the decoded PNG magic number and a 1 MB cap, and
+   rejects before anything touches the disk.
+5. **Rows are append-only.** Re-signing inserts a new row; the newest one for a
+   check-in is the effective signature. Never update or delete one.
+   **A signed check-in can only be deleted by pet staff or above**
+   (`User::isPetStaff()` = `PET_STAFF`/`SUPER_ADMIN`, same as `pet.staff.only`):
+   `CheckIn::canBeDeletedBy()` gates `deleteCheckIn`, `deleteBooking` (all or nothing)
+   and the edit prune (keeps signed rows, reports `kept_signed_check_in_ids`). Caveat:
+   `signatures.check_in_id` is `cascadeOnDelete`, so when staff does delete, the
+   signature rows go with it (the PNG stays on disk).
+6. **A drop-in cannot complete unsigned.** `DropInController::readyToPrint` returns
+   `422 {requiresSignature: true}` when no `drop-in` signature exists for the
+   check-in. The disabled print button is a convenience; this is the enforcement.
+7. **dompdf cannot fetch the authenticated route**, so `pdf-for-print.blade.php`
+   embeds the bytes inline via `$signature->dataUri()`. The pad draws on a white
+   background for exactly this reason — a transparent PNG prints as black-on-black.
+8. **Canvas gotcha:** the bitmap must be re-scaled to `devicePixelRatio` on every
+   resize or strokes land offset from the pen. `SignaturePad.js` does this and
+   preserves the drawing across the resize (`toData()` / `fromData()`).
+
+---
+
+## 7. Conventions & rules for agents
+
+- **Match the surrounding style.** This is vanilla JS with ES modules and class-style
+  "manager" objects; Blade + Tailwind for markup; standard Laravel for PHP.
+- **One manager = one concern.** New form behavior usually belongs in a new/existing
+  file under `cookies-and-form/managers/`, exported via `managers/index.js`.
+- **Don't bypass the cookie flow.** Use `FormDataManager` / the managers.
+- **Run Pint** on PHP changes; **check the browser console** on JS changes.
+- **Don't reorder the init/async sequence** in the reactivity & editing-mode code
+  without strong reason — it's race-condition sensitive.
+- **Git:** work on a feature branch, not directly on `develop`. Commit only when asked.
+- **Secrets:** never commit `.env`. Use `.env.example` as the template.
+- **Windows host:** the repo lives on Windows; the app runs in Linux containers. Prefer
+  running artisan/composer **inside** the container (`docker compose exec app ...`).
+- **Scope discipline:** make the change requested; if you spot unrelated issues, note
+  them rather than silently expanding the change.
+
+---
+
+## 8. Debugging helpers (run in the browser console)
+
+```javascript
+FormDataManager.debugCheckinData();   // dump all check-in data + cookie size
+FormDataManager.isEditingMode();      // are we editing an existing check-in?
+FormDataManager.hasDataChanged();     // has the user changed anything?
+FormDataManager.getChangeSummary();   // what changed
+FormDataManager.resetToOriginal();    // revert to original snapshot (edit mode)
+CookieReactivityManager.triggerCheck(); // force a reactivity/UI refresh
+```
+
+Common symptoms → look here:
+- **Form not pre-filled when editing** → `data-session-checkin` attribute valid JSON?
+  editing flag set? clear cookies & reload.
+- **Changes not detected** → editing mode on? original snapshot stored?
+- **UI not updating** → reactivity listeners registered? console errors from
+  MutationObserver? try `CookieReactivityManager.triggerCheck()`.
+- **"Cookie data too large"** → stale build from before the localStorage move; `npm run build` + hard reload.
+- **No JS/CSS at all, `ERR_CONNECTION_REFUSED` on `127.0.0.1:5173`** → leftover
+  `public/hot` from a dev server that died. Start `npm run dev` or `rm public/hot`.
+- **JS throws against markup that looks correct** (e.g. `getElementById(...) is null`) →
+  stale bundle. `public/build` is gitignored, so a `git pull` never refreshes it: run
+  `npm run build` on the host. Restarting the container cannot fix this.
+  Stored size: `debugCheckinData()` (DevTools → Application → Local Storage → `pl_checkin_data`).
+
+---
+
+## 9. Deeper docs (read only when the task needs them)
+
+| File | When to read it |
+|------|-----------------|
+| `ai/JOURNAL.md` | **Read at the start of every session.** What previous agent sessions did, what worked, what didn't, and known-broken things deliberately left alone. |
+| `ai/plans/00-MASTER-PLAN-v1.0-beta.md` | Roadmap to v1.0-beta and the phase order. |
+| `README.md` | Full feature list, setup, troubleshooting. |
+| `docs/DATA_FLOW.md` | Complete architecture of the cookie data flow. |
+| `docs/DEVELOPER_GUIDE.md` | FormDataManager API usage & examples. |
+| `docs/API_REFERENCE.md` | Method-level reference. |
+| `docs/DEPLOYMENT_GUIDE.md` / `DEPLOYMENT_LOG.md` | Deploy & rollback. |
+| `docs/MIGRATION_GUIDE.md` | Upgrading between versions of the system. |
+| `DOCKER_README.md` | Docker details. |
+| `ai/plans/active/08-github-actions-hostinger-deploy.md` | **Deploying.** Hostinger/GitHub-Actions plan, built on the user's two working deployments (`skLuan/PersonalLaravelWepPage`, `skLuan/thelamb.studio-web`). Read before touching deployment. |
+| `CHECKIN_COOKIE_REFACTOR_README.md` | History/rationale of the cookie refactor. |
+| `ai/plans/active/`, `ai/plans/done/` | Pending plans / executed plans with Execution notes. |
+| `ai/plans/archive/` | Legacy (Jan–Mar 2026) data-flow refactor plans & phase reports. Gitignored, local only. |
+| `ai/specs/` | OpenSpec manifest (`openspec.md`) + one spec per feature (`features/`). |
+| `ai/implementation/` | Implementation notes (loading/FOUC, per-mascot refactor, view-check-in). |
+
+---
+
+## 10. Quick task recipes
+
+- **Add/change a form field** → edit the relevant `resources/views/components/forms/*.blade.php`
+  partial, wire its data through the matching manager in `cookies-and-form/managers/`,
+  and make sure it's included in the cookie via `FormDataManager` / transformer.
+- **Change what a check-in saves to the DB** → `CheckInApiController` (endpoint) +
+  `CheckInService` / `CheckInTransformer` (transform) + model + a migration if the
+  schema changes.
+- **Add an API endpoint** → `routes/api.php` → method in `CheckInApiController` (or a
+  new controller) → service for logic.
+- **Change the printed/PDF summary** → `resources/views/pdf-for-print.blade.php` +
+  `PdfService`.
+- **Add a staff dashboard action** → `routes/web.php` (under `pet.staff.only`) +
+  `PetStaffDashboardController` + `resources/views/pet-staff/dashboard.blade.php`.
+
+---
+
+_Keep this file current: when you move, rename, or add a major piece, update the map above._

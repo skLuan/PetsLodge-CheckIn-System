@@ -32,6 +32,7 @@ class DatabaseSeeder extends Seeder
             FoodSeeder::class,
             MedicineSeeder::class,
             ItemSeeder::class,
+            TermsAndConditionsSeeder::class,
         ]);
     }
 }

@@ -18,11 +18,18 @@ class PetManager {
         const currentData = CoreDataManager.getCheckinData();
         if (!currentData) return false;
 
+        const { unusualHealthBehavior, healthBehaviorDetails, warnings, ...infoData } = petData;
+
         const newPet = {
             ...DEFAULT_PET_STRUCTURE,
             info: {
                 ...DEFAULT_PET_STRUCTURE.info,
-                ...petData,
+                ...infoData,
+            },
+            health: {
+                unusualHealthBehavior: unusualHealthBehavior === 'yes',
+                healthBehaviors: healthBehaviorDetails || '',
+                warnings: warnings || '',
             },
             id: this.generatePetId(),
         };
@@ -47,9 +54,16 @@ class PetManager {
 
         const updatedPets = [...currentData.pets];
 
+        const { unusualHealthBehavior, healthBehaviorDetails, warnings, ...infoData } = petData;
+
         // Merge de datos de la mascota
         updatedPets[petIndex] = CoreDataManager.deepMerge(updatedPets[petIndex], {
-            info: { ...petData },
+            info: { ...infoData },
+            health: {
+                unusualHealthBehavior: unusualHealthBehavior === 'yes',
+                healthBehaviors: healthBehaviorDetails || '',
+                warnings: warnings || '',
+            },
             lastUpdated: new Date().toISOString(),
         });
 
