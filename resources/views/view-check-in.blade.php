@@ -158,7 +158,7 @@
             @endif
         </div>
         @if (auth()->check())
-        <a class="p-4 text-center flex w-fit mx-auto rounded-md bg-yellow" href="{{route("drop-in.confirmation", ['phone' => $user->phone])}}">Continue to Drop in</a>
+        <a class="p-4 text-center flex w-fit mx-auto rounded-md bg-yellow" href="{{route("drop-in.confirmation", ['phone' => $user->phone])}}">Continue to Drop-in</a>
         @else
         <p class="text-lg font-bold! text-center py-4">See you later alligator 😄 🐊</p>
         @endif

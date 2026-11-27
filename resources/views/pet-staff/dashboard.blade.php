@@ -15,6 +15,12 @@
             </div>
         @endif
 
+        @if (session('error'))
+            <div class="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+                {{ session('error') }}
+            </div>
+        @endif
+
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <!-- Checked-In Pets Section -->
             <div class="bg-white rounded-lg shadow-lg p-6">
