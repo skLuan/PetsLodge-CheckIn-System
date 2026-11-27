@@ -96,8 +96,13 @@ php artisan migrate --force        # creates `jobs` and `failed_jobs`
 Set the schedule to **every minute** and use:
 
 ```
-cd /home/u189079842/domains/petlodge.fun/public_html && /usr/bin/php artisan queue:work --stop-when-empty --tries=3 --backoff=30 --max-time=55 >> storage/logs/queue.log 2>&1
+cd /home/u189079842/domains/petlodge.fun && /usr/bin/php artisan queue:work --stop-when-empty --tries=3 --backoff=30 --max-time=55 >> storage/logs/queue.log 2>&1
 ```
+
+> The path is the **Laravel root** (the domain dir), not `public_html`. After the Plan 08
+> layout migration (`scripts/hostinger/migrate-layout.sh`), `public_html` is a symlink to
+> `public/` and has no `artisan` in it. If the site has not been migrated yet, the old
+> `.../public_html` path still applies.
 
 Why each flag matters on shared hosting:
 

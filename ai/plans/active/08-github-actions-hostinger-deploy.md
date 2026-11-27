@@ -389,3 +389,41 @@ test` and add it later. Don't paper over it with `continue-on-error`.
   deploy carrying a destructive migration; own plan.
 - Fixing the 4 known-red tests so the test gate can be enabled (Plan 05).
 - Moving the 3 closure routes into controllers to unlock `optimize`.
+
+---
+
+## Execution notes — 2026-11-27 (`feature/08-hostinger-deploy`)
+
+**Done in the repo (code complete; stays in `active/` until the server side is done):**
+
+- `scripts/hostinger/migrate-layout.sh` / `rollback-layout.sh` — ported verbatim from
+  `PersonalLaravelWepPage`, with these deviations:
+  - `DOMAIN_DIR` default `$HOME/domains/petlodge.fun`, `SITE_URL` overridable.
+  - **No `public/storage` link** (PetsLodge does not use the public disk — "Verified facts").
+  - Clash check accounts for `.htaccess` being renamed to `.htaccess.public_html-old`
+    (the original would have missed a clash there).
+  - Dry run prints the signature file count, so it can be compared after `--apply`.
+  - Smoke loop also hits `/check-in`, `/vendor/autoload.php`, `/storage/logs/laravel.log`.
+  - Rollback warns that signatures/PDFs written after the migration live in the new
+    `storage/`, not in the backup.
+- `.github/workflows/deploy.yml` — the plan's YAML, with these deviations:
+  - **Safety switches instead of a hand-edited `--dry-run`:** `workflow_dispatch` has a
+    `dry_run` input that **defaults to true** (rsync `--dry-run`, migrate + smoke skipped).
+    Pushes to `main` deploy **only if repo variable `DEPLOY_ON_PUSH == 'true'`**, so merging
+    this branch cannot deploy to an unmigrated server. Execution-order steps 6/7 become
+    "run manually with dry_run on, then off, then set `DEPLOY_ON_PUSH=true`".
+  - **No `needs: test`** (no `tests.yml` exists; 4 known-red tests).
+  - New "Check required secrets" step (also rejects a `DEPLOY_PATH` ending in `public_html`).
+  - New "Assert server layout" step **before** rsync: refuses to `--delete` into a dir
+    without the `public_html` symlink, `artisan`, `storage/` and `.env`. The plan only
+    asserted it after the upload — too late.
+  - Secrets passed through `env:` rather than inlined `${{ }}` in shell.
+  - Extra excludes: `/logs/`, `/.htaccess.public_html-old`, `.user.ini`,
+    `/docker-entrypoint.sh`; anchored the root-level ones.
+  - `APP_DEBUG` check rewritten as `if …; then` instead of `grep && {…}` — equivalent
+    under `set -e`, but unambiguous to read.
+  - Smoke test also requires `/check-in` → 200 (acceptance criterion).
+- `docs/DEPLOYMENT_GUIDE.md` §3 cron line repointed to the domain dir (step 8).
+
+**Not verified:** the workflow has never run (no secrets, no migrated server). YAML was
+written by hand; no `actionlint` available locally.

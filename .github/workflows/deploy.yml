@@ -1,0 +1,188 @@
+# Deploy PetsLodge to Hostinger shared hosting (Plan 08).
+#
+# Prerequisites (one-time, by hand): scripts/hostinger/migrate-layout.sh --apply on the
+# server, then the secrets/variables listed in ai/plans Plan 08.
+#
+# Safety switches:
+#   - Manual runs default to an rsync DRY RUN (nothing is uploaded or migrated).
+#   - Pushes to main deploy only when the repo variable DEPLOY_ON_PUSH is 'true'.
+#     Leave it unset until a dry run and one real manual deploy have been checked.
+#
+# No test gate yet: 4 tests are known-red (AGENTS.md §4), so it could never pass.
+name: Deploy to Hostinger
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'rsync --dry-run only (no upload, no migrate)'
+        type: boolean
+        default: true
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  PHP_VERSION: '8.3'     # matches Hostinger and local Docker
+  NODE_VERSION: '22'
+  SITE_URL: https://petlodge.fun
+  DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '1' || '0' }}
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || vars.DEPLOY_ON_PUSH == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://petlodge.fun
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: pdo_mysql, zip, intl, gd, bcmath
+          coverage: none
+
+      - name: Composer install (no dev)
+        run: composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Build assets
+        run: |
+          npm ci --legacy-peer-deps --no-audit --no-fund
+          npm run build
+
+      - name: Guard against shipping a broken release
+        run: |
+          test -s public/.htaccess           || { echo "::error::public/.htaccess missing"; exit 1; }
+          test -f public/build/manifest.json || { echo "::error::vite manifest missing"; exit 1; }
+          test -f vendor/autoload.php        || { echo "::error::vendor missing"; exit 1; }
+          test ! -e public/hot               || { echo "::error::public/hot would disable all assets"; exit 1; }
+
+      - name: Check required secrets
+        env:
+          H: ${{ secrets.HOSTINGER_SSH_HOST }}
+          P: ${{ secrets.HOSTINGER_SSH_PORT }}
+          U: ${{ secrets.HOSTINGER_SSH_USER }}
+          K: ${{ secrets.HOSTINGER_SSH_KEY }}
+          D: ${{ secrets.HOSTINGER_DEPLOY_PATH }}
+        run: |
+          missing=0
+          for pair in H:HOSTINGER_SSH_HOST P:HOSTINGER_SSH_PORT U:HOSTINGER_SSH_USER K:HOSTINGER_SSH_KEY D:HOSTINGER_DEPLOY_PATH; do
+            var="${pair%%:*}"
+            [ -n "${!var}" ] || { echo "::error::secret ${pair#*:} is not set"; missing=1; }
+          done
+          case "$D" in */public_html|*/public_html/) echo "::error::HOSTINGER_DEPLOY_PATH must be the domain dir, not public_html"; missing=1;; esac
+          exit $missing
+
+      - name: Prepare SSH key
+        env:
+          SSH_KEY: ${{ secrets.HOSTINGER_SSH_KEY }}
+          SSH_HOST: ${{ secrets.HOSTINGER_SSH_HOST }}
+          SSH_PORT: ${{ secrets.HOSTINGER_SSH_PORT }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keygen -y -P '' -f ~/.ssh/deploy_key > /dev/null \
+            || { echo "::error::HOSTINGER_SSH_KEY is not a valid passphrase-less OpenSSH private key"; exit 1; }
+          ssh-keyscan -p "$SSH_PORT" "$SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Assert server layout
+        env:
+          SSH_HOST: ${{ secrets.HOSTINGER_SSH_HOST }}
+          SSH_PORT: ${{ secrets.HOSTINGER_SSH_PORT }}
+          SSH_USER: ${{ secrets.HOSTINGER_SSH_USER }}
+          DEPLOY_PATH: ${{ secrets.HOSTINGER_DEPLOY_PATH }}
+        run: |
+          # Refuse to rsync --delete into a directory that is not the migrated Laravel root.
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
+            "cd '$DEPLOY_PATH' && [ -L public_html ] && [ -f artisan ] && [ -d storage ] && [ -f .env ]" \
+            || { echo "::error::$DEPLOY_PATH is not the migrated layout (need public_html symlink, artisan, storage/, .env). Run scripts/hostinger/migrate-layout.sh first."; exit 1; }
+
+      - name: Upload files (rsync)
+        env:
+          SSH_HOST: ${{ secrets.HOSTINGER_SSH_HOST }}
+          SSH_PORT: ${{ secrets.HOSTINGER_SSH_PORT }}
+          SSH_USER: ${{ secrets.HOSTINGER_SSH_USER }}
+          DEPLOY_PATH: ${{ secrets.HOSTINGER_DEPLOY_PATH }}
+        run: |
+          extra=()
+          [ "$DRY_RUN" = "1" ] && { extra+=(--dry-run); echo "::notice::DRY RUN — nothing will be uploaded"; }
+          # Excluded paths are never deleted on the receiver (no --delete-excluded).
+          # /storage/ holds signatures (legal evidence) and must never be synced over.
+          rsync -az --delete --no-perms --omit-dir-times --itemize-changes "${extra[@]}" \
+            -e "ssh -i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes -p $SSH_PORT" \
+            --exclude='/public_html' --exclude='/logs/' --exclude='/.htaccess.public_html-old' \
+            --exclude='.git/' --exclude='/.github/' --exclude='node_modules/' \
+            --exclude='/tests/' --exclude='/docker/' --exclude='/docker-compose.yml' \
+            --exclude='/Dockerfile*' --exclude='/docker-entrypoint.sh' \
+            --exclude='/ai/' --exclude='/docs/' --exclude='/*.md' \
+            --exclude='/.env' --exclude='/.env.*' \
+            --exclude='/storage/' --exclude='/bootstrap/cache/*.php' \
+            --exclude='/public/storage' --exclude='/public/hot' \
+            --exclude='.user.ini' --exclude='error_log' --exclude='.well-known/' \
+            ./ "$SSH_USER@$SSH_HOST:$DEPLOY_PATH/"
+
+      - name: Migrate and rebuild caches
+        if: env.DRY_RUN != '1'
+        env:
+          SSH_HOST: ${{ secrets.HOSTINGER_SSH_HOST }}
+          SSH_PORT: ${{ secrets.HOSTINGER_SSH_PORT }}
+          SSH_USER: ${{ secrets.HOSTINGER_SSH_USER }}
+          DEPLOY_PATH: ${{ secrets.HOSTINGER_DEPLOY_PATH }}
+          PHP_BIN: ${{ vars.HOSTINGER_PHP || 'php' }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
+            "DEPLOY_PATH='$DEPLOY_PATH' PHP='$PHP_BIN' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd "$DEPLOY_PATH"
+          [ -f artisan ] || { echo "::error::artisan not found in DEPLOY_PATH"; exit 1; }
+          [ -L public_html ] || { echo "::error::public_html is not a symlink"; exit 1; }
+          [ -f .env ] || { echo "::error::no .env on the server"; exit 1; }
+          grep -Eq '^APP_KEY=["'"'"']?base64:' .env || { echo "::error::APP_KEY is empty on the server"; exit 1; }
+          if grep -Eiq '^APP_DEBUG=["'"'"']?(true|1|on|yes)' .env; then echo "::error::APP_DEBUG=true in production"; exit 1; fi
+          mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs storage/app bootstrap/cache
+          $PHP -v | head -1
+          $PHP artisan config:clear          # stale cache would poison migrate
+          $PHP artisan down --retry=15 || true
+          trap '$PHP artisan up' EXIT
+          $PHP artisan migrate --force
+          $PHP artisan optimize:clear
+          $PHP artisan config:cache
+          $PHP artisan view:cache
+          # NO route:cache / optimize — closure routes in web.php cannot serialize.
+          $PHP artisan queue:restart
+          REMOTE
+
+      - name: Smoke test
+        if: env.DRY_RUN != '1'
+        run: |
+          fail=0
+          for p in / /check-in; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -L "$SITE_URL$p")
+            echo "$p -> $code"; [ "$code" = "200" ] || { echo "::error::$p returned $code"; fail=1; }
+          done
+          # Nothing outside public/ may be reachable.
+          for p in /.env /artisan /composer.json /composer.lock /vendor/autoload.php \
+                   /storage/logs/laravel.log /storage/app/signatures/ /public/index.php; do
+            c=$(curl -s -o /dev/null -w '%{http_code}' "$SITE_URL$p")
+            echo "$p -> $c"
+            [ "$c" = "200" ] && { echo "::error::$p is publicly reachable"; fail=1; }
+          done
+          exit $fail
+
+      - name: Clean up SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
