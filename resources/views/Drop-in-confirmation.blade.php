@@ -67,7 +67,7 @@
                     <!-- Success message -->
                     <div id="print-success"
                         class="hidden mt-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
-                        <p>✓ Drop in sent successfully!</p>
+                        <p>✓ Drop-in sent successfully!</p>
                     </div>
 
                     <!-- Error message -->
@@ -81,8 +81,8 @@
             <!-- Post-Print State -->
             <div id="post-print-state" class="hidden">
                 <div class="bg-white p-4 rounded-md shadow-md mx-auto mb-6">
-                    <h1 class="text-2xl font-bold text-center">Drop in created</h1>
-                    <p class="text-lg text-center pt-1 pb-6">Please proceed to the drop in area for:</p>
+                    <h1 class="text-2xl font-bold text-center">Drop-in created</h1>
+                    <p class="text-lg text-center pt-1 pb-6">Please proceed to the drop-in area for:</p>
                     <!-- CheckInSummary Component - Pet Details Only -->
                     <div id="pet-details-only" class="text-left text-sm text-gray-600" data-check-in-summary>
                         @if ($checkinData && !empty($checkinData))

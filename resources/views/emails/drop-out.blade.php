@@ -22,10 +22,7 @@
            style="margin:0 0 20px 0; background-color:#FFFBEB; border-left:4px solid #7EAF67; border-radius:6px;">
         <tr>
             <td style="padding:16px 20px; font-size:14px; color:#54595F;">
-                <p style="margin:0 0 4px 0;">
-                    <strong style="color:#4D723C;">Check-in ID:</strong>
-                    #{{ str_pad($checkIn->id, 4, '0', STR_PAD_LEFT) }}
-                </p>
+                {{-- No check-in ID here: the stay is over, and the raw id means nothing to the client (Plan 06 #6). --}}
                 <p style="margin:0;">
                     <strong style="color:#4D723C;">Picked up:</strong>
                     {{ ($checkIn->check_out ?? now())->format('M j, Y \a\t g:i A') }}

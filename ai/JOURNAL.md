@@ -10,6 +10,53 @@
 
 ---
 
+## Session 2026-11-27 — Plan 08: first deployment to Hostinger (LIVE)
+
+**Branches:** `feature/08-hostinger-deploy` and `develop` both fast-forwarded to `8f8924d`
+(plus this session's docs commit). `main` untouched.
+
+**https://petlodge.fun/ is live.** The domain was re-pointed, so `public_html` was empty
+and the layout-migration script was not needed (kept in `scripts/hostinger/` for reference).
+Bootstrapped by hand (`.env`, `public_html -> public`), then GitHub Actions run #8 deployed:
+all steps green, smoke test passed, `.env`/`vendor`/`artisan`/`laravel.log` not reachable,
+assets load from `/build/assets/`, 13 migrations ran.
+
+- Added `scripts/hostinger/{migrate,rollback}-layout.sh` and `.github/workflows/deploy.yml`
+  (manual runs default to `dry_run=true`; push-to-main deploys only if `DEPLOY_ON_PUSH=true`
+  — **not set**, so a push to `main` does nothing yet).
+- GitHub secrets `HOSTINGER_SSH_{HOST,PORT,USER,KEY}`, `HOSTINGER_DEPLOY_PATH` and variable
+  `HOSTINGER_PHP=/opt/alt/php83/usr/bin/php` are set (default `php` over SSH is 8.2).
+- The old `~/.ssh/petlodge_deployment` private key was an empty placeholder; a new deploy key
+  was generated and registered in hPanel as `github-actions`.
+- `.env.production`'s `APP_KEY` was a 32-hex string, not `base64:`. A real key is on the
+  server only; the local file is unchanged.
+- The dry run caught `screenshots/`, `scripts/` etc. being uploaded and a `*deleting` of
+  Hostinger's placeholder file — excluded before the live run.
+- Seeded **reference data only** (statuses, genders, castrated, kinds, moments, T&C). Did
+  **not** run `DatabaseSeeder`: `UserSeeder` hardcodes `password123` accounts.
+- A `git commit` landed on the wrong branch because the working tree had switched to
+  `chore/06-ui-polish` mid-session; fixed with `git branch -f`. Unrelated uncommitted
+  changes in the working tree were not touched or committed.
+- Not tested: a real check-in end to end, PDF/signature on the server, or email.
+
+### Left for a human
+
+1. **Create the first staff/admin user** — there are none (`users=0`), so nobody can log in
+   to `/petstaff/*`. No default-password seeder was run on purpose.
+2. **Queue cron in hPanel → Cron Jobs** (no `crontab` on the host; every minute):
+   `cd /home/u189079842/domains/petlodge.fun && /opt/alt/php83/usr/bin/php artisan queue:work --stop-when-empty --tries=3 --backoff=30 --max-time=55 >> storage/logs/queue.log 2>&1`
+   Use the php83 path — the plain `/usr/bin/php` is 8.2.
+3. Confirm mailbox `no-reply@petlodge.fun` exists and `MAIL_PASSWORD` is right; run
+   `php artisan mail:test you@example.com` on the server. SPF/DKIM.
+4. Edit the T&C at `/petstaff/terms` — seeded text still has `[Insert Address]`.
+5. Fill `LODGE_ADDRESS/PHONE/EMAIL` in the server `.env`, then re-run `config:cache`.
+6. Set repo variable `DEPLOY_ON_PUSH=true` when you want pushes to `main` to deploy.
+7. Back up `storage/app/signatures/` (legal evidence, outside the DB and git).
+8. Rotate/replace the local `.env.production` `APP_KEY` so it matches the server's, or
+   delete the file — it is gitignored but now misleading.
+9. Plan 08 stays in `active/` until the cron + one real email/check-in are verified.
+
+---
 ## Session 2026-11-26 (b) — PHP 8.3, domain typo fixed, Plan 08 rewritten from prior art
 
 **Branch:** `feature/04-multi-pet-health-food` (uncommitted, on top of `6b7ef33`).
@@ -201,6 +248,26 @@ No PHP was changed this session, so no Pint run.
   `public_html` → `laravel/public` symlink, with a split-public fallback.
 - Nothing committed this session.
 - The repo-into-WSL2 move is still the real fix for local performance.
+
+---
+
+## Session 2026-11-27 — Plan 04 closed, Plan 06 quick wins
+
+**Branch:** `chore/06-ui-polish` (from `feature/08-hostinger-deploy`; uncommitted). The
+uncommitted Plan 08 work (`.github/`, `scripts/hostinger/`, deploy docs) was already in the
+working tree and travelled with the checkout — untouched.
+
+- Plan 04 → `ai/plans/done/` (user confirmed QA passed and the health-info views were
+  deleted in `6b7ef33`); obsolete draft `04b` removed.
+- Plan 06: #2 Drop-in wording, #5 discount highlight, #6 no check-in ID in the checkout
+  email, plus `error` flashes on the staff dashboard. #3 not reproduced, #4 needs a human
+  proofread. Details in the plan's Execution notes.
+- **Blocker (environment):** `.env.docker` is an **empty directory** (created 16:33 by Docker
+  after the host file disappeared), so `app`/`queue` fail with "mount a directory onto a
+  file". Fix: `Remove-Item .env.docker`, restore the real file, `docker compose up -d
+  --force-recreate app queue`. Test suite not run this session for that reason.
+- Gotcha: PowerShell `Set-Content -Encoding UTF8` adds a BOM and mangles emoji in Blade —
+  use the Edit tool.
 
 ---
 

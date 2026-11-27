@@ -6,7 +6,7 @@
         <div class="mb-4">
             <div>
                 <h4 class="text-base font-semibold text-gray-700">Want grooming before picking up?</h4>
-                <h3 class="mt-1 mb-3 text-sm">Take the service with 10% discount!</h3>
+                <h3 class="mt-1 mb-3 text-sm">Take the service with <span class="inline-block px-2 py-0.5 rounded-full bg-orange-100 text-orange-600 font-bold">10% discount!</span></h3>
             </div>
             <div class="flex flex-col gap-3">
                 <x-ui.checkbox name="groomingOptions[]" value="bath"><span class="text-sm font-medium">Bath</span></x-ui.checkbox>

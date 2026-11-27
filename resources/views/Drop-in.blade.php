@@ -1,13 +1,13 @@
 <x-app-layout>
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            {{ __('Drop In') }}
+            {{ __('Drop-in') }}
         </h2>
     </x-slot>
 
     <div class="container text-center px-4 py-8 max-w-screen-sm mx-auto">
         <img src="{{ asset('images/logo-pets-lodge.png') }}" alt="Pet Lodge & Spa Logo" class="logo w-48 mx-auto">
-        <h1 class="text-green-dark">Drop In</h1>
+        <h1 class="text-green-dark">Drop-in</h1>
         <p class="text-lg px-2 mt-4">Please enter your phone to start the process</p>
         <form id="drop-in-form">
             @csrf
