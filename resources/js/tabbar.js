@@ -13,6 +13,8 @@
 // Reading the count from the DOM means the next change to the step list
 // cannot reintroduce that bug.
 
+import { validateOwnerEmail } from "./components/EmailAvailability.js";
+
 const progressBar = document.getElementById("stepProgress");
 const prevButton = document.getElementById("prevStep");
 const nextButton = document.getElementById("nextStep");
@@ -135,6 +137,12 @@ if (prevButton) {
 if (nextButton) {
     nextButton.addEventListener("click", async function (e) {
         e.preventDefault();
+
+        // Step 1: an email owned by another client would fail at submission.
+        if (getCurrentStep() === 1 && !(await validateOwnerEmail())) {
+            document.querySelector("#ownerInfoForm [name='email']")?.focus();
+            return;
+        }
 
         // First, save form data to cookies if the form saving logic is available
         if (window.SubmissionManager && window.SubmissionManager.handleNextStep) {

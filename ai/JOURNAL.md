@@ -1285,3 +1285,8 @@ If `AGENTS.md` tells you to run `docker compose exec app php artisan ...` — ch
 `docker compose ps` first. In this session Docker was down and everything ran on the
 Windows host with the local PHP 8.1 CLI and local MySQL.
 
+
+## 2026-11-27 � Step 1 duplicate-email check
+- New `POST /api/check-email` (`CheckInApiController::checkEmail`): email taken by a user with a *different* phone (owners are matched by phone). `submitUserInfo` now returns 422 'This email already exist' instead of a SQL 1062 500.
+- Front: `resources/js/components/EmailAvailability.js` checks on blur and blocks Next on step 1 (imported by `tabbar.js`); error `<p id=emailTakenError>` in `forms/owner-info.blade.php`.
+

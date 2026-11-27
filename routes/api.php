@@ -27,6 +27,7 @@ Route::post('/check-user', [App\Http\Controllers\CheckInApiController::class, 'c
 Route::post('/readyToPrint', [DropInController::class, 'readyToPrint']);
 
 // Sequential submission routes
+Route::post('/check-email', [App\Http\Controllers\CheckInApiController::class, 'checkEmail'])->name('check-email');
 Route::post('/checkin/step1/user-info', [App\Http\Controllers\CheckInApiController::class, 'submitUserInfo']);
 Route::post('/checkin/step2/pet-info', [App\Http\Controllers\CheckInApiController::class, 'submitPetInfo']);
 Route::post('/checkin/step3/pet-health', [App\Http\Controllers\CheckInApiController::class, 'submitPetHealth']);

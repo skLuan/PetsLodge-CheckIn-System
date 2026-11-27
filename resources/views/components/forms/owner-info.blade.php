@@ -13,6 +13,7 @@
 
     <x-ui.input label="Email" name="email" type="email" placeholder="Your Email"
         :value="$user?->email ?? old('email')" required />
+    <p id="emailTakenError" class="hidden -mt-2 mb-3 text-sm text-red-600">This email already exist</p>
 
     <x-ui.input label="Address" name="address" placeholder="Your Address"
         :value="$user?->address ?? old('address')" required />
