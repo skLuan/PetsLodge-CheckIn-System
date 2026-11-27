@@ -1,6 +1,6 @@
 # Plan 08 — Deploy to Hostinger with GitHub Actions
 
-**Status:** Pending. Draft 2026-11-26; decisions 1–4 settled, then **rewritten the same
+**Status:** **Deployed 2026-11-27** (first install, fresh domain, via GitHub Actions run #8). Open: queue cron in hPanel, staff user, mailbox. Draft 2026-11-26; decisions 1–4 settled, then **rewritten the same
 day against two working deployments of the user's own** (see "Prior art").
 **Target:** `https://petlodge.fun/` on Hostinger **shared** hosting.
 **Companion:** `docs/DEPLOYMENT_GUIDE.md` covers SMTP and the queue cron. This plan covers
@@ -427,3 +427,41 @@ test` and add it later. Don't paper over it with `continue-on-error`.
 
 **Not verified:** the workflow has never run (no secrets, no migrated server). YAML was
 written by hand; no `actionlint` available locally.
+
+### First deployment — 2026-11-27 (change of plan: fresh domain, no migration)
+
+The domain was re-pointed, so `public_html` was an **empty** directory — Step 0
+(`migrate-layout.sh`) was **not needed** and was not run. Instead, by hand over SSH:
+uploaded `.env` (mode 600) to `~/domains/petlodge.fun/`, replaced the empty `public_html`
+with `ln -s public public_html`, created `public/`, `storage/…`, `bootstrap/cache`.
+Then GitHub Actions did the rest. Run #8 (`workflow_dispatch`, `dry_run=false`): all steps
+green, smoke test passed (`/` 200, `/check-in` 200, `/.env` 403, `/artisan`,
+`/composer.json`, `/vendor/autoload.php` 404, `/storage/logs/laravel.log` 403).
+
+Things learned / deviations:
+
+- **PHP:** `php` over SSH is **8.2.36**; `HOSTINGER_PHP=/opt/alt/php83/usr/bin/php` (8.3.37)
+  is set as a repo variable and is required. Extensions present: pdo_mysql, gd, intl,
+  bcmath, zip, mbstring, redis. `disable_functions` is empty on this account.
+- **Deploy key:** `~/.ssh/petlodge_deployment` on the dev machine was a 119-byte
+  placeholder (no key material). A new passphrase-less ed25519 pair was generated, the
+  public half added in hPanel (`github-actions`), the private half stored only as the
+  `HOSTINGER_SSH_KEY` secret. The temp files were not kept in the repo.
+- **`.env.production` had a non-`base64:` APP_KEY** (32 hex chars) — it would fail the
+  preflight and is not a valid Laravel key. A fresh `base64:` key was generated and used
+  on the server only; `.env.production` locally still has the old value.
+- **First-install fix:** the "Assert server layout" step required `artisan`, which only
+  exists after the first rsync. Dropped that check (commit `2a6446b`).
+- **Dry run caught stray uploads** (`screenshots/`, `scripts/`, `LICENCE`, `phpunit.xml`,
+  and a `*deleting DO_NOT_UPLOAD_HERE`); all now excluded (commit `8f8924d`).
+- **`workflow_dispatch` needs the workflow on the default branch (`develop`)**, so
+  `develop` was fast-forwarded to the deploy commits. Dispatch with `--ref develop`.
+- **Seeding:** `migrate --force` creates schema only. Reference data was seeded by hand
+  with `db:seed --class=` for `Status`, `Gender`, `Castrated`, `KindOfPet`, `MomentOfDay`
+  and `TermsAndConditions` (statuses=5 kinds=5 genders=2 castrated=2 moments=5 terms=1).
+  **`DatabaseSeeder` was deliberately NOT run:** `UserSeeder` creates
+  `admin@petslodge.com` / `staff@petslodge.com` with the password `password123`, and the
+  other seeders add demo data. The dashboard crashes without `StatusSeeder` (CLAUDE.md §4).
+- The seeded T&C text still contains the placeholder `[Insert Address]` — edit it at
+  `/petstaff/terms` once a staff user exists.
+- **No `crontab` binary on the shared host** — the queue cron can only be added in hPanel.
